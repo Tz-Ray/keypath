@@ -20,14 +20,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
----
-
-The code in this repository is MIT-licensed. The linguistic data tables under
-tables/ are derived from third-party sources under their own licenses — see
-tables/VERSIONS.md for exact provenance:
-
-  libchewing-data ......... LGPL-2.1
-  CC-CEDICT ............... CC BY-SA 4.0
-  SKK-JISYO ............... GPL-2.0
-  JMdict (jmdict-simplified) CC BY-SA 4.0
-  FreeDict spa-eng ........ GPL
