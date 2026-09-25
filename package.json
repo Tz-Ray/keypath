@@ -1,0 +1,10 @@
+{
+  "name": "keypath-site",
+  "private": true,
+  "type": "module",
+  "description": "KeyPath, the IME-keystroke puzzle cipher, running in the browser",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}

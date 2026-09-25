@@ -1,0 +1,51 @@
+// The fallback glyph fonts: size budget, license, and no character that
+// only a challenge answer contains (a font's character map is public).
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { ROOT, readJson, readJsonl } from "./helpers.js";
+
+const ranges = readJson("fonts/ranges.json");
+const size = f => readFileSync(join(ROOT, "fonts", f)).length;
+const parse = text => text.split(", ").map(r => r.slice(2).split("-").map(h => parseInt(h, 16)))
+  .map(([a, b = a]) => [a, b]);
+const covers = (list, cp) => list.some(([a, b]) => cp >= a && cp <= b);
+
+test("font budget: each at most 70 KB, both at most 90 KB", () => {
+  assert.ok(size("glyphs-tc.woff2") <= 70 * 1024);
+  assert.ok(size("glyphs-kr.woff2") <= 70 * 1024);
+  assert.ok(size("glyphs-tc.woff2") + size("glyphs-kr.woff2") <= 90 * 1024);
+});
+
+test("the fonts ship with the OFL and their copyright notice", () => {
+  const ofl = readFileSync(join(ROOT, "fonts/OFL.txt"), "utf8");
+  assert.match(ofl, /SIL OPEN FONT LICENSE Version 1\.1/);
+  assert.match(ofl, /Adobe/);
+  assert.equal(ranges.family, "KeyPath Glyphs");
+});
+
+test("the fonts cover the hero's characters and Bopomofo", () => {
+  const tc = parse(ranges["glyphs-tc.woff2"]);
+  const hero = readJson("data/hero.json");
+  for (const ch of Object.values(hero.lists).join("") + "ㄅㄆㄇㄈˊˇˋ˙") assert.ok(covers(tc, ch.codePointAt(0)), ch);
+  const kr = parse(ranges["glyphs-kr.woff2"]);
+  for (const ch of "ㄱㅋㅣ한국") assert.ok(covers(kr, ch.codePointAt(0)), ch);
+});
+
+test("no character found only in challenge answers is in a font", () => {
+  const all = [...parse(ranges["glyphs-tc.woff2"]), ...parse(ranges["glyphs-kr.woff2"])];
+  const siteIds = new Set(readJsonl("tests/fixtures/vectors.jsonl.gz").filter(v => v.class === "site").map(v => v.id));
+  const curated = new Set([
+    readFileSync(join(ROOT, "data/hero.json"), "utf8"),
+    readFileSync(join(ROOT, "data/layouts.json"), "utf8"),
+    ...readJsonl("tests/fixtures/traces.jsonl.gz").filter(t => siteIds.has(t.id)).map(t => JSON.stringify(t.trace)),
+    ...["index.html", "assets/js/ui/text.js"].map(f => { try { return readFileSync(join(ROOT, f), "utf8"); } catch { return ""; } }),
+  ].join(""));
+  for (let n = 1; n <= 6; n++) {
+    for (const ch of readJson(`data/challenges/0${n}.json`).plaintext) {
+      if (curated.has(ch)) continue;
+      assert.ok(!covers(all, ch.codePointAt(0)), `challenge ${n}: ${ch}`);
+    }
+  }
+});
