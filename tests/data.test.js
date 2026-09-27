@@ -49,7 +49,7 @@ test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 
   assert.equal(dataFiles.filter(f => f.startsWith("data/en/vocab/")).length, 26);
   const reg = readJson("data/registry.json");
   for (const sid of reg.allowed.en.filter(s => s !== "en_identity"))
-    assert.equal(dataFiles.filter(f => f.startsWith(`data/en/${sid}/`)).length, 26, sid);
+    assert.equal(dataFiles.filter(f => f.startsWith(`data/en/${sid}/`) && f.endsWith(".json")).length, 26, sid);
   const index = readJson("data/challenges/index.json");
   assert.deepEqual(index.map(c => c.n), [1, 2, 3, 4, 5, 6]);
   for (const c of index) assert.equal(readJson(`data/challenges/0${c.n}.json`).ciphertext, c.ciphertext);

@@ -1,0 +1,10 @@
+Parts of the files in this directory are modified versions of:
+
+- libchewing-data (LGPL-2.1-or-later, ../../LICENSES/LGPL-2.1.txt), changed by the KeyPath project on 2026-07-10, 2026-09-23 and 2026-09-24
+- FreeDict spa-eng 0.3.1 (GPL-2.0-or-later, ../../LICENSES/GPL-2.0.txt), changed by the KeyPath project on 2026-07-10 and 2026-09-24
+
+They are not the original works; do not report errors in them upstream.
+What was changed, the copyright notices and the upstream versions: ../../DATA-LICENSES.md
+("Changes to the GPL and LGPL sources"); later changes: this repository's history.
+They are distributed WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license texts above.

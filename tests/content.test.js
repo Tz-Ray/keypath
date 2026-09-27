@@ -194,3 +194,17 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
     assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);
   }
 });
+
+test("every directory of copyleft-derived data says it was changed, with links that resolve", () => {
+  const dirs = ["data", "data/zh", "data/en/zh_daqian", "data/en/zh_pinyin", "data/en/zh_hanja", "data/en/ja_romaji",
+    "data/en/ko_dubeolsik", "data/en/es_accent", "data/challenges", "tests/fixtures"];
+  const md = readFileSync(join(ROOT, "DATA-LICENSES.md"), "utf8");
+  assert.match(md, /^## Changes to the GPL and LGPL sources$/m);
+  assert.doesNotMatch(md, /can be regenerated from its sources/);
+  for (const dir of dirs) {
+    const notice = readFileSync(join(ROOT, dir, "NOTICE"), "utf8");
+    assert.match(notice, /modified versions of:[\s\S]*changed by the KeyPath project on 20\d\d-\d\d-\d\d/, dir);
+    for (const [, rel] of notice.matchAll(/((?:\.\.\/)+[\w./-]+\.(?:txt|md))/g))
+      assert.ok(existsSync(join(ROOT, dir, rel)), `${dir}/NOTICE: ${rel}`);
+  }
+});

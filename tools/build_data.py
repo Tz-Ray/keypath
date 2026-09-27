@@ -1169,6 +1169,40 @@ def static_fixture(out: Out, hero: dict[str, Any], vec_rows: dict[str, dict[str,
 
 # ================================================================== main
 
+# GPL-2.0 §2(a) / LGPL §2(b): the files derived from the copyleft sources
+# carry a notice that they were changed, and when.  Directory -> sources.
+SKK = ("SKK-JISYO.L", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", "2026-07-10 and 2026-09-24")
+SPA = ("FreeDict spa-eng 0.3.1", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", "2026-07-10 and 2026-09-24")
+CHEWING = ("libchewing-data", "LGPL-2.1-or-later", "LICENSES/LGPL-2.1.txt", "2026-07-10, 2026-09-23 and 2026-09-24")
+KENG = ("kengdic", "LGPL-2.0-or-later", "LICENSES/LGPL-2.0.txt", "2026-09-23 and 2026-09-24")
+NOTICES: dict[str, tuple[str, tuple[tuple[str, str, str, str], ...]]] = {
+    "data": ("hero.json and layouts.json", (CHEWING,)),
+    "data/zh": ("the files in this directory", (CHEWING,)),
+    "data/en/zh_daqian": ("the files in this directory", (CHEWING,)),
+    "data/en/zh_pinyin": ("the files in this directory", (CHEWING,)),
+    "data/en/zh_hanja": ("the files in this directory", (CHEWING,)),
+    "data/en/ja_romaji": ("the files in this directory", (SKK,)),
+    "data/en/ko_dubeolsik": ("the files in this directory", (KENG,)),
+    "data/en/es_accent": ("the files in this directory", (SPA,)),
+    "data/challenges": ("the files in this directory", (CHEWING, SPA)),
+    "tests/fixtures": ("the files in this directory", (SKK, SPA, CHEWING, KENG)),
+}
+
+
+def notices(out: Out) -> None:
+    for folder, (which, sources) in NOTICES.items():
+        up = "../" * folder.count("/") + "../"
+        lines = [f"Parts of {which} are modified versions of:", ""]
+        for name, lic, text, dates in sources:
+            lines.append(f"- {name} ({lic}, {up}{text}), changed by the KeyPath project on {dates}")
+        lines += ["", "They are not the original works; do not report errors in them upstream.",
+                  f"What was changed, the copyright notices and the upstream versions: {up}DATA-LICENSES.md",
+                  "(\"Changes to the GPL and LGPL sources\"); later changes: this repository's history.",
+                  "They are distributed WITHOUT ANY WARRANTY; without even the implied warranty of",
+                  "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license texts above.", ""]
+        out.write(f"{folder}/NOTICE", "\n".join(lines))
+
+
 def guards() -> None:
     assert keypath.__version__ == "2.0.0", keypath.__version__
     assert tables_sha256() == EDITION, tables_sha256()
@@ -1194,6 +1228,7 @@ def build(root: Path) -> Out:
     digests(out, vocab, rows)
     unicode_fixture(out)
     static_fixture(out, hero, rows)
+    notices(out)
     files = {rel: {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
              for rel, data in sorted(out.files.items()) if rel.startswith("data/")}
     out.json("data/manifest.json", {"keypath": keypath.__version__, "tag": "v2.0", "edition": EDITION,
