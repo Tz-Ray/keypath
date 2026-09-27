@@ -15,6 +15,8 @@ import { assembleWords, regexTokens, tokensToItems } from "./assemble.js";
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 export const EN_WORD = /[a-z]+/gu;
+/** A word as the reader typed it: letters and marks, around any a-z runs. */
+const TYPED_WORD = /[\p{L}\p{M}'’]*[a-z][\p{L}\p{M}'’]*/gu;
 export const vocabPath = letter => `data/en/vocab/${letter}.json`;
 export const rowsPath = (sid, letter) => `data/en/${sid}/${letter}.json`;
 
@@ -75,7 +77,8 @@ export function createEnglish({ data, layouts, lists, surfaceById }) {
 
   /**
    * Normalized en text -> {words, parts} on translated surface `sid`, or
-   * {unknown: [words not in the vocabulary, first-seen order]}.
+   * {unknown: [words not in the vocabulary, first-seen order], typed: [the
+   * typed words that contain them, for display]}.
    */
   async function encode(text, sid) {
     const tokens = regexTokens(text, EN_WORD);
@@ -84,7 +87,13 @@ export function createEnglish({ data, layouts, lists, surfaceById }) {
     const unknown = [];
     for (const [kind, w] of tokens)
       if (kind === "word" && !vocab.get(w[0]).has(w) && !unknown.includes(w)) unknown.push(w);
-    if (unknown.length) return { unknown };
+    if (unknown.length) {
+      // for display, the whole typed word ("café"), not just its a-z run ("caf")
+      const typed = [];
+      for (const [word] of text.matchAll(TYPED_WORD))
+        if ([...word.matchAll(EN_WORD)].some(([w]) => unknown.includes(w)) && !typed.includes(word)) typed.push(word);
+      return { unknown, typed };
+    }
     const items = tokensToItems(tokens, w => {
       const row = rowOf(sid, w);
       return row ? entryOf(sid, row) : null;

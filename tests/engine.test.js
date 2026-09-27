@@ -128,6 +128,11 @@ test("encode refusals", async () => {
   assert.deepEqual([newer.reason, newer.codePoint], ["newerUnicode", "U+31350"]);
   const unknown = await enc("Welcome, xyzzy and qwertyuiop! xyzzy", "en", "ru_jcuken");
   assert.deepEqual([unknown.reason, unknown.words], ["unknownWords", ["xyzzy", "qwertyuiop"]]);
+  assert.deepEqual(unknown.typed, ["xyzzy", "qwertyuiop"]);
+  // words is Python's list (a-z runs); typed, which the page shows, is the whole
+  // typed word, not its a-z run ("caf"); naïve is na + ï + ve, both known
+  const accented = await enc("Un café, naïve über-smart", "en", "zh_daqian");
+  assert.deepEqual([accented.reason, accented.words, accented.typed], ["unknownWords", ["caf", "ber"], ["café", "über"]]);
   const plain = await enc("xyzzy", "en", "en_identity");
   assert.equal(plain.ciphertext, "xyzzy");
 });
@@ -158,6 +163,12 @@ test("decode refusals: invalid key, missing data, free translation", async () =>
   assert.ok(parseKeyJson("[1.0, 1e2, 3]")[0] instanceof PyFloat);
   assert.equal(parseKeyJson("[1.0, 1e2, 3]")[2], 3);
   assert.equal((await dec(hero.ciphertext + "x", heroKey)).reason, "keyInvalid");
+  // a key without the version field says so, not "unsupported key version undefined"
+  const { keypath: _v, ...noVersion } = heroKey;
+  const missing = await dec(hero.ciphertext, noVersion);
+  assert.equal(missing.reason, "keyInvalid");
+  assert.match(missing.message, /missing required field "keypath"/);
+  assert.doesNotMatch(missing.message, /undefined/);
   assert.equal((await dec("cj0u/6ru", heroKey)).reason, "keyInvalid");
   const tier2 = structuredClone(heroKey);
   tier2.segments[0].words = [{ units: heroKey.segments[0].words[0].units.concat(heroKey.segments[0].words[1].units),

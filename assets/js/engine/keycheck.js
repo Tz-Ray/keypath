@@ -170,6 +170,7 @@ export function splitRoute(route) {
 /** The key rules validate_key and decode's route and edition-table checks apply. */
 export function checkKey(key, R) {
   if (!IS_TYPE.object(key)) fail("key is not a JSON object");
+  if (!has(key, "keypath")) fail(`$: missing required field ${show("keypath")}`);
   if (!R.keyVersions.some(v => pyEqual(key.keypath, v))) fail(`unsupported key version ${show(key.keypath)}`);
   if (!R.editionHashes.includes(key.tables_sha256))
     fail("key tables_sha256 is not a known table edition");

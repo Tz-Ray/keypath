@@ -161,6 +161,10 @@ await attempt("typing", async () => {
   const msg = await b.evaluate(`${q("#enc-refusal")}.textContent`);
   check("typing: words outside the list are refused, naming them",
     msg.startsWith("Not in this page's 10,000-word English list: ") && oov.jsRefusal[1].every(w => msg.includes(w)), msg);
+  await typeMessage("the café straße", "en", "zh_daqian");
+  await b.waitFor(`/café/.test(${q("#enc-refusal")}.textContent)`).catch(() => {});
+  const whole = await b.evaluate(`${q("#enc-refusal")}.textContent`);
+  check("typing: a refused word is named whole, accents included", /: café, straße\. /.test(whole), whole);
 });
 
 await attempt("widths", async () => {
@@ -435,10 +439,37 @@ await attempt("touch targets", async () => {
   await b.waitFor("document.querySelectorAll('.chal').length === 6");
   await b.evaluate(`document.querySelector("#key-panel").open = true`);
   const small = await b.evaluate(`[...document.querySelectorAll("button, .btn, [role=tab], summary, .chip")]
-    .filter(e => e.offsetParent && !e.closest(".walk, .walk-legend, .kb-pic, .popover") && !e.classList.contains("sense"))
+    .filter(e => e.offsetParent && !e.closest(".walk, .walk-legend, .kb-pic, .popover"))
     .map(e => { const r = e.getBoundingClientRect(); return [e.id || e.textContent.trim().slice(0, 20), Math.round(r.width), Math.round(r.height)]; })
     .filter(([, w, h]) => w < 44 || h < 44)`);
   check("touch targets: every control is at least 44 x 44 px at 360px", small.length === 0, js(small));
+  // The walk figure's controls may draw smaller (the 18px sense chips) but must
+  // take taps across 44 x 44 px: from each one's centre, hit-test pixel by pixel
+  // outwards and measure the unbroken span that reaches it, across and down.
+  const figure = await b.evaluate(`(() => {
+    const out = { senses: 0, missed: [] };
+    for (const e of document.querySelectorAll(".walk button")) {
+      if (!e.offsetParent) continue;
+      if (e.classList.contains("sense")) out.senses++;
+      e.scrollIntoView({ block: "center", inline: "center" });
+      const r = e.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const stops = [];
+      const reach = (dx, dy) => {
+        let n = 0;
+        while (n < 80) {
+          const hit = document.elementFromPoint(cx + dx * (n + 1), cy + dy * (n + 1));
+          if (!hit || hit.closest("button") !== e) { stops.push(hit && (hit.tagName + "." + hit.className)); break; }
+          n++;
+        }
+        return n;
+      };
+      const w = reach(-1, 0) + reach(1, 0) + 1, h = reach(0, -1) + reach(0, 1) + 1;
+      if (w < 44 || h < 44) out.missed.push([e.className, e.textContent.trim().slice(0, 20), w, h, stops]);
+    }
+    return out;
+  })()`);
+  check("touch targets: the walk figure's buttons, sense chips included, take taps across 44 x 44 px",
+    figure.senses > 0 && figure.missed.length === 0, js(figure));
 });
 
 await attempt("focus", async () => {

@@ -593,8 +593,15 @@ select {
   border: 0; font-size: 11px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;
   color: var(--hop); background: color-mix(in srgb, var(--hop) 10%, transparent);
 }
-button.sense { position: relative; }
-button.sense::after { content: ""; position: absolute; inset: -13px -4px; }
+button.sense { position: relative; z-index: 2; }
+/* the sense chip and its hit area overhang the keys band below: keep them on top */
+.wg > .b-dict { z-index: 1; }
+/* an 18px chip with a 44 x 44 px (at least) hit area, reaching up over its
+   dictionary word, since the keys below take their own taps */
+button.sense::after {
+  content: ""; position: absolute; top: -23px; bottom: -3px; left: 50%;
+  width: max(calc(100% + 8px), 44px); transform: translateX(-50%);
+}
 button.sense:hover { background: color-mix(in srgb, var(--hop) 18%, transparent); }
 
 .stack {

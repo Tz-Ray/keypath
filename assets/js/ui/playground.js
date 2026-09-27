@@ -102,7 +102,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     if (seq !== state.seq) return;
     setBusy(false);
     if (!r.ok) {
-      if (r.reason === "unknownWords") return refuse(T.unknownWords(r.words));
+      if (r.reason === "unknownWords") return refuse(T.unknownWords(r.typed));
       if (r.reason === "jaSource") return refuse(T.jaSource);
       if (r.reason === "routeOff") return refuse(routeOffText());
       if (r.reason === "newerUnicode") return refuse(T.newerUnicode(r.codePoint));

@@ -140,7 +140,7 @@ export async function createEngine({ fetchText } = {}) {
         assembled = s.language === "zh" ? await native.encodeZh(norm, surface) : native.encodeBijective(norm, surface);
       } else {
         assembled = await english.encode(norm, surface);
-        if (assembled.unknown) return { ok: false, reason: "unknownWords", words: assembled.unknown };
+        if (assembled.unknown) return { ok: false, reason: "unknownWords", words: assembled.unknown, typed: assembled.typed };
       }
     } catch (e) {
       if (e instanceof LoadError) return { ok: false, reason: "loadFailed", message: e.message };
