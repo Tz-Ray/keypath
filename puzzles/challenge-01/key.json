@@ -1,0 +1,30 @@
+{
+  "keypath": "1.0",
+  "tables_sha256": "2e8c5305ac52868917e1f7b48fc0aae20e2f23a4828eda4945ce8230dd260995",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "zh_daqian",
+      "route": [
+        "homophone:zh",
+        "keystroke:zh_daqian"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

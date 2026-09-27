@@ -86,18 +86,24 @@ const UPSTREAM = [
   "https://github.com/notofonts/noto-cjk",
   "https://www.unicode.org/ucd/",
 ];
-const DATA_LICENSES = "https://github.com/Tz-Ray/keypath/blob/main/DATA-LICENSES.md";
+const REPO = "https://github.com/Tz-Ray/keypath";
+const DATA_LICENSES = `${REPO}/blob/main/DATA-LICENSES.md`;
+/** A link into this repository must name a file or folder that exists here. */
+function repoPath(u) {
+  const m = u.match(/^https:\/\/github\.com\/Tz-Ray\/keypath(?:\/(?:blob|tree)\/main\/(.+))?$/);
+  return m ? (m[1] ?? "") : null;
+}
 
-test("links are relative, to the project on GitHub, or to a credited upstream", () => {
+test("links are relative, into this repository on GitHub, or to a credited upstream", () => {
   const urls = [];
   for (const el of elements(doc)) for (const a of ["href", "src"]) if (el.attrs[a] !== undefined) urls.push(el.attrs[a]);
   assert.ok(urls.length > 20);
   for (const u of urls) {
     assert.ok(!u.startsWith("http:") && !u.startsWith("//"), `insecure or protocol-relative URL: ${u}`);
     if (/^[a-z][a-z0-9+.-]*:/i.test(u)) {
-      const ok = u.startsWith("https://github.com/Tz-Ray/cipher-project") || UPSTREAM.includes(u) || u === DATA_LICENSES
-        || u.startsWith("data:image/svg+xml,");
+      const ok = repoPath(u) !== null || UPSTREAM.includes(u) || u.startsWith("data:image/svg+xml,");
       assert.ok(ok, `unexpected absolute URL: ${u}`);
+      if (repoPath(u)) assert.ok(existsSync(join(ROOT, repoPath(u))), `link to a file this repository lacks: ${u}`);
     } else {
       assert.ok(!u.startsWith("/"), `root-absolute URL breaks under /keypath/: ${u}`);
       const file = u.split("#")[0];
@@ -106,7 +112,7 @@ test("links are relative, to the project on GitHub, or to a credited upstream", 
   }
   // every credited upstream is linked
   for (const u of UPSTREAM) assert.ok(urls.includes(u), `credit link missing: ${u}`);
-  assert.ok(urls.includes("https://github.com/Tz-Ray/cipher-project"));
+  assert.ok(urls.includes(REPO));
   assert.ok(urls.includes(DATA_LICENSES));
 });
 
@@ -134,11 +140,44 @@ test("no absolute or protocol-relative URLs in scripts and styles", () => {
   assert.doesNotMatch(css, /@import/);
   for (const [file, s] of uiStrings) {
     if (s === "http://www.w3.org/2000/svg") continue; // a namespace, not a request
-    if (/^(https?:)?\/\//.test(s)) assert.ok(s.startsWith("https://github.com/Tz-Ray/cipher-project"), `${file}: ${s}`);
+    if (/^(https?:)?\/\//.test(s)) assert.ok(repoPath(s.replace(/\$\{n\}/g, "1")) !== null, `${file}: ${s}`);
   }
 });
 
 test("the page names itself honestly", () => {
   assert.match(html, /<title>KeyPath: hide a message in keystrokes<\/title>/);
   assert.match(html, /puzzle cipher/i);
+});
+
+// The cipher project's repository is private: nothing public may link to it.
+test("nothing links to the private cipher-project repository", () => {
+  const files = ["index.html", "README.md", "DATA-LICENSES.md", "puzzles/README.md", "docs/analysis.md",
+    ...readdirSync(join(ROOT, "assets/js/ui")).map(f => `assets/js/ui/${f}`),
+    ...[1, 2, 3, 4, 5, 6].map(n => `puzzles/challenge-0${n}/solve-path.md`)];
+  for (const f of files) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), /github\.com\/Tz-Ray\/cipher-project/i, f);
+});
+
+test("the solve-path links after a reveal name files in this repository", () => {
+  const js = readFileSync(join(ROOT, "assets/js/ui/challenges.js"), "utf8");
+  const tpl = js.match(/const SOLVE_PATH = n => `([^`]+)`/)[1];
+  for (let n = 1; n <= 6; n++) {
+    const path = repoPath(tpl.replace("${n}", String(n)));
+    assert.ok(path && existsSync(join(ROOT, path)), `solve path ${n}: ${path}`);
+  }
+});
+
+test("the copied puzzles match the page's challenges, and the provenance is the edition's", async () => {
+  const { createHash } = await import("node:crypto");
+  const index = JSON.parse(readFileSync(join(ROOT, "data/challenges/index.json"), "utf8"));
+  assert.equal(index.length, 6);
+  for (const c of index) {
+    const dir = join(ROOT, `puzzles/challenge-0${c.n}`);
+    const data = JSON.parse(readFileSync(join(ROOT, `data/challenges/0${c.n}.json`), "utf8"));
+    assert.equal(readFileSync(join(dir, "ciphertext.txt"), "utf8"), data.ciphertext, `${c.n} ciphertext`);
+    assert.equal(readFileSync(join(dir, "key.json"), "utf8"), data.keyText, `${c.n} key`);
+    assert.equal(readFileSync(join(dir, "plaintext.txt"), "utf8"), data.plaintext, `${c.n} plaintext`);
+  }
+  const manifest = JSON.parse(readFileSync(join(ROOT, "data/manifest.json"), "utf8"));
+  const sha = createHash("sha256").update(readFileSync(join(ROOT, "docs/VERSIONS.md"))).digest("hex");
+  assert.equal(sha, manifest.edition);
 });

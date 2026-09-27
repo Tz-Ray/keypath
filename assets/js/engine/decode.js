@@ -105,7 +105,7 @@ export function walkKey(ctx, cipher, key) {
         continue;
       }
       if (!has(word, "units")) fail("word entry has neither literal nor units");
-      if (hasTier2(word)) throw new Tier2Error("free-translation (tier-2) records need the command-line tool");
+      if (hasTier2(word)) throw new Tier2Error("free-translation (tier-2) records are not supported in the browser");
       const recs = records(word);
       if (!Array.isArray(recs) || recs.length !== hops.length)
         fail(`word has ${Array.isArray(recs) ? recs.length : "no list of"} translation records for ${hops.length} hops`);

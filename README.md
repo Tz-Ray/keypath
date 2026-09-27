@@ -1,6 +1,6 @@
 # KeyPath in the browser
 
-The web page for [KeyPath](https://github.com/Tz-Ray/cipher-project), a
+The web page for KeyPath, a
 puzzle cipher that hides a message in the keystrokes you would type for it
 on a Chinese, Japanese, Korean or Russian keyboard (or in a Spanish
 accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
@@ -25,29 +25,33 @@ tables edition `67a40391…61f2`); its sources and licenses are listed in
 | `data/` | generated tables the engine loads on demand (never edit by hand) |
 | `fonts/` | fallback glyphs, used only when the system has no CJK font |
 | `tools/build_data.py` | writes `data/` and `tests/fixtures/` from the Python implementation |
+| `tools/copy_docs.py` | copies the puzzles, the analysis and the table provenance into `puzzles/` and `docs/` |
 | `tools/build_fonts.py` | writes `fonts/` from pinned Noto Sans CJK |
 | `tools/serve.mjs` | a static server that mounts the repo at `/keypath/`, like GitHub Pages |
 | `tools/cdp.mjs` | end-to-end checks in headless Chromium, and screenshots |
 | `tools/check_links.mjs` | checks the page's external links (network) |
+| `puzzles/` | the six challenges: ciphertext, key, plaintext and solve path (spoilers) |
+| `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256) |
 | `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
 | `tests/` | `node --test` suites; `tests/fixtures/` is generated |
 
 ## Rebuilding the data
 
-The build reads a checkout of the cipher project at tag `v2.0`, given by
-`KEYPATH_PROJECT` (default: `../cipher-project`, next to this repository),
-as files and uses its `keypath` package, installed into a local virtual
-environment:
+The build reads a checkout of KeyPath's Python implementation at tag
+`v2.0` (its repository is not published), given by `KEYPATH_PROJECT`
+(default: `../cipher-project`, next to this repository), as files and uses
+its `keypath` package, installed into a local virtual environment:
 
 ```sh
 uv venv --python 3.11 .venv
 uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.0
 uv pip install --python .venv/bin/python -r tools/requirements.txt
 .venv/bin/python tools/build_data.py            # data/ and tests/fixtures/
+.venv/bin/python tools/copy_docs.py            # puzzles/ and docs/
 .venv/bin/python tools/build_fonts.py           # fonts/ (downloads to tools/.cache/)
 ```
 
-Both scripts are deterministic; `--check` rebuilds into a temporary
+The scripts are deterministic; `--check` rebuilds into a temporary
 directory and fails if anything differs from the committed files.
 
 ## Running locally
@@ -67,12 +71,9 @@ node tools/cdp.mjs [--shots DIR]   # the browser checks on their own, optionally
 node tools/check_links.mjs         # needs the network: every external link resolves when signed out
 ```
 
-The page links to the cipher project on GitHub (source, analysis, puzzle
-write-ups), so that repository must be public for those links to work.
-
 The engine suites compare the JavaScript engine with fixtures the Python
 implementation generated: about 7,400 encode/decode vectors over every live
-route (the cipher project's corpora and golden vectors, seeded fuzz strings,
+route (KeyPath's test corpora and golden vectors, seeded fuzz strings,
 edge cases), 419 walk traces, 149 tampered keys, and exhaustive digests of
 every Chinese phrase and character on all three Chinese keyboards, every
 reading, every Korean syllable, every hanja reading and every English row.

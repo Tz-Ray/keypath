@@ -1,0 +1,201 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "ko_dubeolsik",
+      "route": [
+        "homophone:ko_hanja",
+        "keystroke:ko_dubeolsik"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 5
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 5
+            },
+            {
+              "len": 2,
+              "homophone_index": 9
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 2,
+              "homophone_index": 19
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        }
+      ],
+      "hint": "…несчастлива по-своему."
+    },
+    {
+      "language": "zh",
+      "layout": "zh_pinyin",
+      "route": [
+        "homophone:zh",
+        "keystroke:zh_pinyin"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            },
+            {
+              "len": 5,
+              "homophone_index": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "language": "ru",
+      "layout": "ru_jcuken",
+      "route": [
+        "translate:zh>en",
+        "translate:en>ru",
+        "keystroke:ru_jcuken"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ],
+          "translations": [
+            {
+              "tier": 1,
+              "index": 1
+            },
+            {
+              "tier": 1,
+              "index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "language": "zh",
+      "layout": "zh_daqian",
+      "route": [
+        "homophone:zh",
+        "keystroke:zh_daqian"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "language": "zh",
+      "layout": "ko_dubeolsik",
+      "route": [
+        "homophone:ko_hanja",
+        "keystroke:ko_dubeolsik"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,139 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2",
+  "source_language": "ru",
+  "segments": [
+    {
+      "language": "ru",
+      "layout": "ru_jcuken",
+      "route": [
+        "keystroke:ru_jcuken"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 6
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 1
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 6
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 1
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 1
+            }
+          ]
+        },
+        {
+          "literal": {
+            "tier": 3,
+            "text": " "
+          }
+        }
+      ],
+      "hint": "Открытка из Москвы, typed on a PC. Every word but one; that one insisted on being typed in its mother tongue."
+    },
+    {
+      "language": "zh",
+      "layout": "zh_pinyin",
+      "route": [
+        "translate:ru>en",
+        "translate:en>zh",
+        "homophone:zh",
+        "keystroke:zh_pinyin"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 2
+            }
+          ],
+          "translations": [
+            {
+              "tier": 1,
+              "index": 0
+            },
+            {
+              "tier": 1,
+              "index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -48,17 +48,17 @@ export const isolate = s => `\u2068${s}\u2069`;
 export const T = {
   // refusals, errors and toasts (§2.3)
   empty: "Type a message to see its keystrokes.",
-  unknownWords: words => `Not in this page's 10,000-word English list: ${words.join(", ")}. The command-line tool has the full dictionaries.`,
+  unknownWords: words => `Not in this page's 10,000-word English list: ${words.join(", ")}. Try a more common word, or type it on Plain English.`,
   jaSource: "Japanese messages need the full Japanese dictionary, which this page doesn't carry. Try an English message on the Japanese keyboard.",
-  routeOff: (lang, keyboards) => `From ${lang}, this page types on ${listAnd(keyboards)} only. Other routes need the full dictionaries of the command-line tool.`,
+  routeOff: (lang, keyboards) => `From ${lang}, this page types on ${listAnd(keyboards)} only.`,
   newerUnicode: cp => `${cp} is newer than the Unicode version KeyPath uses. Remove it to continue.`,
   loadFailed: "Couldn't load part of the dictionary. Check your connection and try again.",
   retry: "Retry",
   badJson: "That key isn't valid JSON.",
   keyInvalid: message => `This key doesn't fit this ciphertext: ${stripDot(message)}.`,
-  notCarried: what => `This key needs dictionary data this page doesn't carry (${stripDot(what)}). The command-line tool, keypath decode, can read it.`,
-  tier2: "Free-translation keys need the command-line tool.",
-  encodeError: "This message can't be walked here. The command-line tool can try it.",
+  notCarried: what => `This key needs dictionary data this page doesn't carry (${stripDot(what)}).`,
+  tier2: "This page can't read free-translation keys.",
+  encodeError: "This message can't be walked here.",
   copied: "Copied.",
   linkCopied: "Link copied.",
   // [before, after] around the decoded text (placed in an isolating <bdi>)

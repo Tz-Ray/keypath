@@ -6,7 +6,7 @@ import { checkAnswer } from "../engine/hash.js";
 import { mountFigure } from "./figure.js";
 import { renderKeyText } from "./keypanel.js";
 
-const SOLVE_PATH = n => `https://github.com/Tz-Ray/cipher-project/blob/v2.0/puzzles/challenge-0${n}/solve-path.md`;
+const SOLVE_PATH = n => `https://github.com/Tz-Ray/keypath/blob/main/puzzles/challenge-0${n}/solve-path.md`;
 const TITLE_LANG = { 2: "es" };
 
 /** Wrap Cyrillic runs in <span lang="ru"> so screen readers switch voice. */

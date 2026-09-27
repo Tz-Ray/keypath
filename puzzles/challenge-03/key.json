@@ -1,0 +1,106 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2",
+  "source_language": "ko",
+  "segments": [
+    {
+      "language": "ko",
+      "layout": "ko_dubeolsik",
+      "route": [
+        "keystroke:ko_dubeolsik"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3
+            },
+            {
+              "len": 3
+            },
+            {
+              "len": 2
+            },
+            {
+              "len": 2
+            },
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            },
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            },
+            {
+              "len": 4
+            },
+            {
+              "len": 2
+            },
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            },
+            {
+              "len": 3
+            },
+            {
+              "len": 3
+            },
+            {
+              "len": 2
+            },
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 1
+            },
+            {
+              "len": 1
+            }
+          ]
+        }
+      ],
+      "hint": "Nobody pressed the key to the right of the space bar."
+    }
+  ]
+}

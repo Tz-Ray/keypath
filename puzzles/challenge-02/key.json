@@ -1,0 +1,126 @@
+{
+  "keypath": "1.0",
+  "tables_sha256": "2e8c5305ac52868917e1f7b48fc0aae20e2f23a4828eda4945ce8230dd260995",
+  "source_language": "es",
+  "segments": [
+    {
+      "language": "es",
+      "layout": "es_accent",
+      "route": [
+        "keystroke:es_accent"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 9
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 8
+            }
+          ]
+        },
+        {
+          "literal": {
+            "tier": 3,
+            "text": " "
+          }
+        }
+      ],
+      "hint": "dos teclados, un mensaje"
+    },
+    {
+      "language": "zh",
+      "layout": "zh_daqian",
+      "route": [
+        "translate:es>en",
+        "translate:en>zh",
+        "homophone:zh",
+        "keystroke:zh_daqian"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 1
+            }
+          ],
+          "translations": [
+            {
+              "tier": 1,
+              "index": 1
+            },
+            {
+              "tier": 1,
+              "index": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ],
+          "translations": [
+            {
+              "tier": 1,
+              "index": 0
+            },
+            {
+              "tier": 1,
+              "index": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ],
+          "translations": [
+            {
+              "tier": 1,
+              "index": 0
+            },
+            {
+              "tier": 1,
+              "index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
