@@ -49,3 +49,11 @@ test("no character found only in challenge answers is in a font", () => {
     }
   }
 });
+
+test("the fonts cover every CJK character the page's own text shows", () => {
+  const all = [...parse(ranges["glyphs-tc.woff2"]), ...parse(ranges["glyphs-kr.woff2"])];
+  const cjk = /[ぁ-ゖㄅ-ㄯㄱ-ㆎ㐀-䶿一-鿿가-힣]/u;
+  for (const f of ["index.html", "assets/js/ui/text.js"])
+    for (const ch of new Set(readFileSync(join(ROOT, f), "utf8")))
+      if (cjk.test(ch)) assert.ok(covers(all, ch.codePointAt(0)), `${f}: ${ch}`);
+});
