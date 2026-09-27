@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>KeyPath: hide a message in keystrokes</title>
+<meta name="description" content="KeyPath is a puzzle cipher. A message becomes the raw keystrokes of a Chinese, Japanese, Korean, Russian or Spanish keyboard, and a small key records the route back.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23fffdf8' stroke='%231b1d22' stroke-width='2'/%3E%3Cpath d='M5 24h22' stroke='%23b9b2a4' stroke-width='2'/%3E%3Ctext x='16' y='20' font-family='ui-monospace,monospace' font-size='15' font-weight='700' text-anchor='middle' fill='%231b1d22'%3EK%3C/text%3E%3C/svg%3E">
+<script>
+try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+</script>
+<link rel="stylesheet" href="assets/css/site.css">
+<link rel="preload" as="fetch" crossorigin href="data/hero.json">
+<link rel="modulepreload" href="assets/js/app.js">
+<link rel="modulepreload" href="assets/js/ui/text.js">
+<link rel="modulepreload" href="assets/js/ui/dom.js">
+<link rel="modulepreload" href="assets/js/ui/theme.js">
+<link rel="modulepreload" href="assets/js/ui/walk.js">
+<link rel="modulepreload" href="assets/js/ui/figure.js">
+<link rel="modulepreload" href="assets/js/ui/popover.js">
+<link rel="modulepreload" href="assets/js/ui/keypanel.js">
+<link rel="modulepreload" href="assets/js/ui/keyboard.js">
+<link rel="modulepreload" href="assets/js/ui/playground.js">
+<link rel="modulepreload" href="assets/js/ui/challenges.js">
+<link rel="modulepreload" href="assets/js/ui/share.js">
+<link rel="modulepreload" href="assets/js/engine/index.js">
+<link rel="modulepreload" href="assets/js/engine/data.js">
+<link rel="modulepreload" href="assets/js/engine/unicode.js">
+<link rel="modulepreload" href="assets/js/engine/normalize.js">
+<link rel="modulepreload" href="assets/js/engine/layouts.js">
+<link rel="modulepreload" href="assets/js/engine/lists.js">
+<link rel="modulepreload" href="assets/js/engine/assemble.js">
+<link rel="modulepreload" href="assets/js/engine/native.js">
+<link rel="modulepreload" href="assets/js/engine/rows.js">
+<link rel="modulepreload" href="assets/js/engine/decode.js">
+<link rel="modulepreload" href="assets/js/engine/keycheck.js">
+<link rel="modulepreload" href="assets/js/engine/dumps.js">
+<link rel="modulepreload" href="assets/js/engine/hash.js">
+<script type="module" src="assets/js/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#try">Skip to the playground</a>
+<header class="site-head">
+  <div class="wrap head-row">
+    <a class="wordmark" href="#top" aria-label="KeyPath, back to top"><span aria-hidden="true"><kbd>K</kbd><kbd>e</kbd><kbd>y</kbd><kbd>P</kbd><kbd>a</kbd><kbd>t</kbd><kbd>h</kbd></span></a>
+    <nav aria-label="Sections">
+      <ul>
+        <li class="wide-only"><a href="#try">Try it</a></li>
+        <li class="wide-only"><a href="#how">How it works</a></li>
+        <li><a href="#challenges">Challenges</a></li>
+        <li class="wide-only"><a href="#credits">Credits</a></li>
+        <li><a href="https://github.com/Tz-Ray/cipher-project" rel="noopener">GitHub <span aria-hidden="true">↗</span></a></li>
+      </ul>
+    </nav>
+    <button id="theme" class="icon-btn" type="button" aria-label="Colour theme: Auto">
+      <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg>
+      <svg class="i-light" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+      <svg class="i-dark" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<section id="top" class="hero" aria-labelledby="hero-h">
+  <div class="wrap">
+    <div id="puzzle-slot"></div>
+    <div class="hero-copy">
+      <div class="hero-title">
+        <p class="eyebrow">A puzzle cipher</p>
+        <h1 id="hero-h">Hide a message in the keys you'd press to type it.</h1>
+      </div>
+      <div class="hero-lead">
+        <p class="lead">KeyPath turns a message into the raw keystrokes of a Chinese, Japanese, Korean, Russian or Spanish keyboard. A small key records every choice on the way, so the walk back is exact.</p>
+        <p class="honest-note" data-honesty>A puzzle, not a lock: it's built to be solved, not to keep secrets.</p>
+      </div>
+    </div>
+
+    <div class="card play" id="try">
+      <div class="play-head">
+        <h2 class="label">Try it</h2>
+        <div class="seg-ctl" role="tablist" aria-label="Mode">
+          <button type="button" role="tab" id="tab-enc" aria-selected="true" aria-controls="panel-enc">Hide a message</button>
+          <button type="button" role="tab" id="tab-dec" aria-selected="false" aria-controls="panel-dec" tabindex="-1">Walk one back</button>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-enc" aria-labelledby="tab-enc" class="enc-grid">
+        <div class="enc-form">
+        <div class="form-grid">
+          <div class="field f-msg">
+            <label for="msg">Your message</label>
+            <textarea id="msg" rows="2" maxlength="200" spellcheck="false" autocomplete="off">welcome home</textarea>
+          </div>
+          <div class="field f-lang">
+            <label for="lang">Written in</label>
+            <div class="sel-row">
+              <select id="lang">
+                <option value="en">English</option>
+                <option value="es" lang="es">Español</option>
+                <option value="ru" lang="ru">Русский</option>
+                <option value="ko" lang="ko">한국어</option>
+                <option value="zh" lang="zh-Hant">中文（繁體）</option>
+              </select>
+              <span id="lang-mode" class="muted small">detected</span>
+            </div>
+          </div>
+        </div>
+
+        <fieldset class="chips" id="kbd">
+          <legend>Type it on</legend>
+          <div class="chip-row">
+            <label class="chip"><input type="radio" name="kbd" value="zh_daqian" checked><span class="g" lang="zh-Hant" aria-hidden="true">ㄅ</span><span class="t">Bopomofo (Taiwan)</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="zh_pinyin"><span class="g" aria-hidden="true">pīn</span><span class="t">Pinyin</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="zh_hanja"><span class="g" lang="zh-Hant" aria-hidden="true">漢</span><span class="t">Chinese on a Korean keyboard</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="ja_romaji"><span class="g" lang="ja" aria-hidden="true">か</span><span class="t">Japanese romaji</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="ko_dubeolsik"><span class="g" lang="ko" aria-hidden="true">한</span><span class="t">Korean</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="ru_jcuken"><span class="g" lang="ru" aria-hidden="true">Й</span><span class="t">Russian <span lang="ru">ЙЦУКЕН</span></span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="es_accent"><span class="g" lang="es" aria-hidden="true">ñ</span><span class="t">Spanish accents</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="en_identity"><span class="g" aria-hidden="true">a</span><span class="t">Plain English</span><span class="tip vh"></span></label>
+          </div>
+          <p id="route-note" class="route-note small" hidden></p>
+        </fieldset>
+
+        <div class="examples" id="examples">
+          <span class="ex-label">Examples:</span>
+          <button type="button" data-text="welcome home" data-lang="en" data-surface="zh_daqian" data-static="chips.0">welcome home</button>
+          <button type="button" data-text="鍵盤" data-lang="zh" data-surface="zh_daqian" data-static="chips.1"><span lang="zh-Hant">鍵盤</span> (keyboard)</button>
+          <button type="button" data-text="國家" data-lang="zh" data-surface="zh_hanja" data-static="chips.2"><span lang="zh-Hant">國家</span> on a Korean keyboard</button>
+          <button type="button" data-text="한국어" data-lang="ko" data-surface="ko_dubeolsik" data-static="chips.3"><span lang="ko">한국어</span></button>
+          <button type="button" data-text="ёжик" data-lang="ru" data-surface="ru_jcuken" data-static="chips.4"><span lang="ru">ёжик</span></button>
+          <button type="button" data-text="mañana" data-lang="es" data-surface="es_accent" data-static="chips.5"><span lang="es">mañana</span></button>
+        </div>
+        </div>
+
+        <div class="enc-out">
+        <p id="enc-refusal" class="refusal" role="status" hidden></p>
+        <div id="enc-result" class="output">
+          <div class="out-label"><span class="label">Ciphertext</span></div>
+          <p id="cipher" class="cipher marks" lang="en" translate="no"><span data-static="hero.ciphertext">cj0u/6ru8</span></p>
+          <div class="out-actions">
+            <button type="button" id="copy-cipher" class="btn primary">Copy</button>
+            <button type="button" id="copy-link" class="btn">Copy link</button>
+            <button type="button" id="make-puzzle" class="btn">Make it a puzzle</button>
+            <label class="toggle"><input type="checkbox" id="unit-marks" checked> Unit marks</label>
+          </div>
+          <p id="caption" class="caption"></p>
+          <p class="stats"><span id="stats"></span><span id="stats2" class="stats2" hidden></span></p>
+          <div id="whatif-slot"></div>
+          <div id="walk" class="walk-slot" aria-busy="false"></div>
+          <div class="walk-controls">
+            <button type="button" id="walk-back" class="btn">Walk back</button>
+            <button type="button" id="replay" class="btn motion-only">Replay typing</button>
+            <button type="button" id="table-toggle" class="btn" aria-pressed="false">Table view</button>
+          </div>
+          <p id="walked" class="walked" role="status" hidden></p>
+          <div class="panels">
+            <details id="key-panel" class="panel">
+              <summary>The key</summary>
+              <pre id="key-pre" class="key-pre"></pre>
+              <div class="btn-row">
+                <button type="button" id="copy-key" class="btn small">Copy key</button>
+                <button type="button" id="dl-key" class="btn small">Download key.json</button>
+              </div>
+              <p class="small muted">Anyone with this key can read the message.</p>
+            </details>
+            <details id="kbd-panel" class="panel">
+              <summary>The keyboard</summary>
+              <div id="kbd-pic" class="kbd-host"></div>
+            </details>
+          </div>
+        </div>
+        </div>
+      </div>
+
+      <div role="tabpanel" id="panel-dec" aria-labelledby="tab-dec" hidden>
+        <p class="dec-lead">Have a ciphertext and its key? Paste both to walk it back.</p>
+        <div class="field">
+          <label for="dec-cipher">Ciphertext</label>
+          <textarea id="dec-cipher" class="mono" rows="2" spellcheck="false" autocomplete="off" lang="en"></textarea>
+        </div>
+        <div class="field">
+          <label for="dec-key">Key</label>
+          <textarea id="dec-key" class="mono" rows="6" spellcheck="false" autocomplete="off" lang="en"></textarea>
+        </div>
+        <div class="btn-row">
+          <button type="button" id="dec-go" class="btn primary">Walk it back</button>
+          <label class="btn file-btn">Open key.json<input type="file" id="dec-file" accept=".json,application/json" class="vh"></label>
+        </div>
+        <p id="dec-err" class="refusal" role="alert" hidden></p>
+        <div id="dec-out" class="output" hidden>
+          <p id="dec-text" class="plain"></p>
+          <div id="dec-whatif"></div>
+          <div id="dec-walk" class="walk-slot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="band-section" aria-labelledby="how-h">
+  <div class="wrap">
+    <h2 id="how-h">How it works</h2>
+    <ol class="steps">
+      <li class="step card">
+        <span class="step-n" aria-hidden="true">1</span>
+        <h3>Look it up.</h3>
+        <p>A word can hop into the keyboard's language through a public dictionary, always by way of English. The key notes which sense was used.</p>
+        <div class="fig fig-1" aria-hidden="true">
+          <span class="wtile src" data-static="step1.source">welcome</span>
+          <span class="arrow hop">→</span>
+          <span class="wtile dict" lang="zh-Hant" data-static="step1.target">歡迎</span>
+          <span class="sense-chip">sense #<span data-static="step1.index">1</span> of <span data-static="step1.count">2</span></span>
+        </div>
+      </li>
+      <li class="step card">
+        <span class="step-n" aria-hidden="true">2</span>
+        <h3>Sound it out.</h3>
+        <p>Each character is spelled by its sound, and many share one: <span data-static="step2.count">46</span> characters are read <span lang="zh-Hant">ㄧㄥˊ</span> (yíng). The key notes which one was meant.</p>
+        <div class="fig fig-2" aria-hidden="true">
+          <span class="sound" lang="zh-Hant" data-static="step2.reading">ㄧㄥˊ</span>
+          <span class="arrow">→</span>
+          <span class="tiles" lang="zh-Hant" data-static-list="step2.head"><span>營</span><span class="chosen">迎</span><span>螢</span><span>盈</span><span class="more">…</span></span>
+          <span class="rank-chip">#<span data-static="step2.index">1</span> of <span data-static="step2.count">46</span></span>
+        </div>
+      </li>
+      <li class="step card">
+        <span class="step-n" aria-hidden="true">3</span>
+        <h3>Press the keys.</h3>
+        <p>The sound is typed on a real keyboard layout: on Bopomofo, <kbd class="inline">u</kbd> is <span lang="zh-Hant">ㄧ</span>, <kbd class="inline">/</kbd> is <span lang="zh-Hant">ㄥ</span> and <kbd class="inline">6</kbd> is the rising tone. The keystrokes are the whole ciphertext.</p>
+        <div class="fig fig-3" aria-hidden="true">
+          <span class="keyrow" data-static-keys="step3">
+            <span class="kc"><kbd><span class="main">u</span><span class="leg" lang="zh-Hant">ㄧ</span></kbd></span><span class="kc"><kbd class="mis"><span class="main">/</span><span class="leg" lang="zh-Hant">ㄥ</span><span class="dot"></span></kbd></span><span class="kc"><kbd class="mis"><span class="main">6</span><span class="leg" lang="zh-Hant">ˊ</span><span class="dot"></span></kbd></span>
+          </span>
+          <span class="arrow">→</span>
+          <code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code>
+        </div>
+      </li>
+      <li class="step card">
+        <span class="step-n" aria-hidden="true">4</span>
+        <h3>Walk back.</h3>
+        <p>With the key, decoding is a chain of lookups, exact to the byte. Without it, a solver has to recognise the keyboard and choose characters that make sense. That's the puzzle.</p>
+        <div class="fig fig-4" aria-hidden="true">
+          <code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code>
+          <span class="plus">+</span>
+          <code class="c-key">{ key }</code>
+          <span class="arrow">→</span>
+          <span class="wtile src" data-static="hero.text">welcome home</span>
+        </div>
+      </li>
+    </ol>
+    <div class="strip-callout">
+      <p class="strip-note">One line can switch keyboards mid-stream: <code class="strip" lang="en" translate="no"><span class="seg-ja_romaji" data-static="strip.parts.0.keys">sono3gatsu1</span> <span class="seg-en_identity" data-static="strip.parts.1.keys">andthesun</span> <span class="seg-zh_daqian" data-static="strip.parts.2.keys">2k7s84g4</span></code> is “<span lang="es" data-static="strip.text">la luna y el sol de la ciudad</span>” on Japanese romaji, English and Bopomofo. The digits change meaning at every switch.</p>
+    </div>
+  </div>
+</section>
+
+<section id="honest" class="band-section" data-honesty aria-labelledby="honest-h">
+  <div class="wrap honest-grid">
+    <div>
+      <h2 id="honest-h">A puzzle, not a lock</h2>
+      <p>KeyPath hides a message in plain sight, the way a crossword hides a word. Its dictionaries are public and its keyboards are standard, so it is not encryption and offers no security: like a book cipher, all it keeps back is the route. A short message is often solvable without the key, which is the fun of it. Don't use it to protect anything.</p>
+      <p class="small muted">Figures from the project's <a href="https://github.com/Tz-Ray/cipher-project/blob/v2.0/docs/09-analysis.md" rel="noopener">analysis</a>.</p>
+    </div>
+    <dl class="stat-tiles">
+      <div class="tile-stat">
+        <dt data-static="stats.keyspace" data-format="number">28,152</dt>
+        <dd>ways to read <code data-static="hero.ciphertext">cj0u/6ru8</code> character by character (<span data-static="stats.factors" data-format="times">18 × 46 × 34</span>). A reader of Chinese spots <span lang="zh-Hant">歡迎</span> at once.</dd>
+      </div>
+      <div class="tile-stat">
+        <dt data-static="stats.medianCandidates" data-format="int">11</dt>
+        <dd>median number of Chinese characters that share one sound (up to <span data-static="stats.maxCandidates">215</span>).</dd>
+      </div>
+      <div class="tile-stat">
+        <dt><span data-static="stats.rank0Percent" data-format="round">73</span>%</dt>
+        <dd>of Chinese choices in the project's test messages are simply the first candidate.</dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<section id="challenges" class="band-section" aria-labelledby="chal-h">
+  <div class="wrap">
+    <h2 id="chal-h">Six puzzles to crack</h2>
+    <p class="section-lead">No key this time. Work out the keyboard, read the keys, and pick the words that make sense. They start easy.</p>
+    <div id="challenge-grid" class="chal-grid">
+      <noscript><p>The puzzles are also on <a href="https://github.com/Tz-Ray/cipher-project/tree/v2.0/puzzles" rel="noopener">GitHub</a>.</p></noscript>
+    </div>
+    <p class="small muted chal-foot">All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals. Each puzzle, with a write-up of how to solve it, is also in the project's <a href="https://github.com/Tz-Ray/cipher-project/tree/v2.0/puzzles" rel="noopener">puzzles folder</a>.</p>
+  </div>
+</section>
+
+<section id="credits" class="band-section" aria-labelledby="credits-h">
+  <div class="wrap">
+    <h2 id="credits-h">Credits and data</h2>
+    <p class="section-lead">KeyPath's code is MIT-licensed. The language data it walks through comes from these projects, under their own licenses:</p>
+    <div class="table-wrap">
+      <table class="credits">
+        <thead><tr><th scope="col">Source</th><th scope="col">Used for</th><th scope="col">License</th></tr></thead>
+        <tbody>
+          <tr><td><a href="https://github.com/chewing/libchewing-data" rel="noopener">libchewing-data</a></td><td>Chinese readings, candidate order and phrases</td><td>LGPL-2.1-or-later</td></tr>
+          <tr><td><a href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict" rel="noopener">CC-CEDICT (MDBG)</a></td><td>English → Chinese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://github.com/scriptin/jmdict-simplified" rel="noopener">JMdict (EDRDG), via jmdict-simplified</a></td><td>English → Japanese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://github.com/skk-dev/dict" rel="noopener">SKK-JISYO.L</a></td><td>Japanese readings and candidates</td><td>GPL-2.0-or-later</td></tr>
+          <tr><td><a href="https://github.com/garfieldnate/kengdic" rel="noopener">kengdic</a></td><td>English → Korean dictionary hops</td><td>LGPL-2.0-or-later</td></tr>
+          <tr><td><a href="https://github.com/libhangul/libhangul" rel="noopener">libhangul hanja.txt</a></td><td>Hanja candidates and readings</td><td>BSD-3-Clause</td></tr>
+          <tr><td><a href="https://download.freedict.org/dictionaries/rus-eng/" rel="noopener">FreeDict rus-eng (WikDict, from Wiktionary via DBnary)</a></td><td>English → Russian dictionary hops</td><td>CC BY-SA 3.0</td></tr>
+          <tr><td><a href="https://github.com/freedict/fd-dictionaries" rel="noopener">FreeDict spa-eng</a></td><td>English → Spanish dictionary hops</td><td>GPL-2.0-or-later</td></tr>
+          <tr><td><a href="https://github.com/rspeer/wordfreq" rel="noopener">wordfreq data</a></td><td>The English word list and dictionary ordering</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://github.com/notofonts/noto-cjk" rel="noopener">Noto Sans CJK</a></td><td>Fallback glyphs</td><td>SIL OFL 1.1</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small">Keyboard layouts are authored in KeyPath (MIT). Full notices and attributions: <a href="DATA-LICENSES.md">DATA-LICENSES.md</a>. Source code, tables and provenance: <a href="https://github.com/Tz-Ray/cipher-project" rel="noopener">github.com/Tz-Ray/cipher-project</a>.</p>
+  </div>
+</section>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <p>KeyPath 2.0 · tables edition <span data-static="edition8">67a40391</span> · code MIT · <a href="https://github.com/Tz-Ray/cipher-project" rel="noopener">Source on GitHub</a></p>
+    <p class="muted">Runs entirely in your browser. No server, no tracking.</p>
+  </div>
+</footer>
+
+<dialog id="puzzle-dialog" aria-labelledby="pd-h">
+  <h2 id="pd-h">Make it a puzzle</h2>
+  <p>The link carries only the keystrokes and a fingerprint of the answer, so your friend can check a guess. Short messages can often be solved without the key.</p>
+  <label class="check"><input type="checkbox" id="puzzle-hint"> Name the keyboard as a hint</label>
+  <div class="btn-row">
+    <button type="button" id="puzzle-copy" class="btn primary">Copy puzzle link</button>
+    <button type="button" id="puzzle-close" class="btn">Cancel</button>
+  </div>
+</dialog>
+<div id="toast" class="toast" aria-hidden="true"></div>
+<div id="live" class="vh" aria-live="polite"></div>
+</body>
+</html>
