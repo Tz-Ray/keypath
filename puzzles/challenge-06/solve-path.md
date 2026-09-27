@@ -1,11 +1,15 @@
 # Challenge #6 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-06/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext: `godqhrwjrrkwjdehtltkdtkwjrbu2xing4de5ctvmzek4u.3ek42k7qnfgod` ·
 hint: *"…несчастлива по-своему."* ("…is unhappy in its own way.")
@@ -242,75 +246,3 @@ total homophone keyspace ~10^31.53
 leaked chars (tier 2/3): 0
 leakage: 0.000 (0/21 chars)
 ```
-
-## Leakage
-
-0/21 = 0.000. Chinese is written without spaces, so the segment
-boundaries cost nothing, and the plaintext has no punctuation. The key
-carries no literal text.
-
-The ciphertext holds none of the characters docs/07 §7 sends through a
-heredoc (`' " $ \ ; [ ]` and the backtick), so it can be passed as a
-plain argument. Its one punctuation key, `.`, is ㄡ on Dàqiān.
-
-## How it was minted
-
-Five segments from a Chinese source: hanja conversion on the Korean
-2-set keyboard, Pinyin, 家庭 routed zh → en → ru and typed on
-`ru_jcuken`, Dàqiān, and hanja again. The `zh_words` equal the greedy
-split of each segment and are pinned so the split cannot drift:
-
-```
-$ keypath encode --source-lang zh --out key.json --segments '[{"length":10,"route":"zh","layout":"ko_dubeolsik","selector_mode":"keyed","zh_words":["幸福","的","家庭","都是","相似","的"],"hint":"…несчастлива по-своему."},{"length":3,"route":"zh","layout":"zh_pinyin","selector_mode":"keyed","zh_words":["不幸","的"]},{"length":2,"route":"ru","layout":"ru_jcuken","selector_mode":"keyed"},{"length":4,"route":"zh","layout":"zh_daqian","selector_mode":"keyed","zh_words":["各有","各的"]},{"length":2,"route":"zh","layout":"ko_dubeolsik","selector_mode":"keyed","zh_words":["不幸"]}]' 幸福的家庭都是相似的不幸的家庭各有各的不幸
-godqhrwjrrkwjdehtltkdtkwjrbu2xing4de5ctvmzek4u.3ek42k7qnfgod
-leakage: 0.000
-```
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Is the keystroke layer recognizable?** Yes. Every segment is a
-   valid key log for its layout, and the digits mark where the two
-   Chinese phonetic keyboards start and stop: tone digits for Pinyin,
-   tone keys for Dàqiān. None of the three digitless runs can be read
-   wholly as Chinese on Dàqiān: every cut leaves a bare phonetic letter.
-   One of them, `ctvmz`, is a Russian word on #4's
-   keyboard. The other two assemble into whole 2-set syllables.
-2. **Does one coherent decoding exist and stand out?** Yes. This is one
-   of the most quoted first lines in literature, and it has one standard
-   Chinese rendering. Two independent footholds (不幸的 and 各有各的, with
-   семья between them) and a searchable hint lead to it. Once found, it
-   confirms all 21 characters. The deep picks (似 19 of 299, 是 9 of 146)
-   are checked against a known text, not searched for. The one fork,
-   where the Russian stops, closes on семья.
-3. **Are the tables public and derivable?** Yes: `ko_dubeolsik.tsv`,
-   `ko_hanja.tsv` and `ko_hanja_readings.tsv` (docs/07 §6);
-   `zh_pinyin.tsv` and `zh_daqian.tsv` with `zh_chars.tsv` and
-   `zh_phrases.tsv` (the frequencies that order the candidates and
-   choose each word's reading, docs/06 §5.1–§5.2); `ru_jcuken.tsv`
-   (docs/07 §7); and the dictionaries `zh_en_cedict.tsv` and
-   `ru_en_freedict.tsv` (FreeDict rus-eng 2025.11.23). All are pinned in
-   `tables/VERSIONS.md`.
-4. **Is the difficulty tuned to the audience?** Yes, as the expert
-   capstone. It opens on the hardest keyboard and uses five segments
-   over four layouts. It comes last, after the challenges that teach
-   each of its keyboards: Dàqiān in #1, 2-set in #3, ЙЦУКЕН and Pinyin
-   in #4, and hanja conversion in #5. The README's nudge and two
-   footholds keep it fair.
-
-## Playtest
-
-Solved on 2026-09-24 by an independent solver who saw only the public
-page, the earlier challenges and the tools. Their answer matched
-`plaintext.txt` exactly. The run was not fully blind: before starting,
-the solver saw a commit message in the repository's history that named
-the capstone's layouts in order and its Russian word. They reported
-this themselves. The candidate lookups and the check that the parse
-uses the whole ciphertext were their own work. They judged that the
-epigraph and `godqhr` = 행복 would have led to the text anyway. They
-found the hint strong but fair for a capstone that rests on a known
-text. The README now says how answers are checked (one language, no
-punctuation, spaces ignored). The hint, the key and the level are
-unchanged. Review corrections are in the wording of steps 1 and 3 and
-fairness item 1. Some single keys type characters on Dàqiān, but every
-cut leaves a bare letter. `ctvm` + `z` is семь я. The kengdic glosses
-are now quoted in order.

@@ -181,3 +181,16 @@ test("the copied puzzles match the page's challenges, and the provenance is the 
   const sha = createHash("sha256").update(readFileSync(join(ROOT, "docs/VERSIONS.md"))).digest("hex");
   assert.equal(sha, manifest.edition);
 });
+
+test("the copied solve paths keep only the solving steps, and the index gives every hint", () => {
+  const index = JSON.parse(readFileSync(join(ROOT, "data/challenges/index.json"), "utf8"));
+  const readme = readFileSync(join(ROOT, "puzzles/README.md"), "utf8");
+  for (const c of index) {
+    assert.ok(readme.includes(c.blurb) && readme.includes(c.title), `puzzles/README.md: #${c.n}`);
+    const md = readFileSync(join(ROOT, `puzzles/challenge-0${c.n}/solve-path.md`), "utf8");
+    assert.match(md, /^# Challenge #\d[^\n]*\n\n> \*\*Spoilers\.\*\*/, `#${c.n}: title, then the preface`);
+    // the setter's notes cite unpublished documents; #4's once gave away #5
+    assert.doesNotMatch(md, /^## (Leakage|How it was minted|Fairness checklist|Playtest)/m, `#${c.n}`);
+    assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);
+  }
+});

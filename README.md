@@ -6,11 +6,12 @@ on a Chinese, Japanese, Korean or Russian keyboard (or in a Spanish
 accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
-the command-line tool, keypath 2.0.0, produces; the parity tests check this.
+KeyPath's Python reference implementation (keypath 2.0.0, not published)
+produces; the parity tests check this.
 KeyPath is a puzzle, not encryption.
 
-The data under `data/` is derived from the keypath v2.0 tables (tag `v2.0`,
-tables edition `67a40391…61f2`); its sources and licenses are listed in
+The data under `data/` is derived from the tables of keypath 2.0.0 (its tag
+`v2.0`, tables edition `67a40391…61f2`); its sources and licenses are listed in
 [DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
 [`LICENSES/`](LICENSES).
 
@@ -30,8 +31,8 @@ tables edition `67a40391…61f2`); its sources and licenses are listed in
 | `tools/serve.mjs` | a static server that mounts the repo at `/keypath/`, like GitHub Pages |
 | `tools/cdp.mjs` | end-to-end checks in headless Chromium, and screenshots |
 | `tools/check_links.mjs` | checks the page's external links (network) |
-| `puzzles/` | the six challenges: ciphertext, key, plaintext and solve path (spoilers) |
-| `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256) |
+| `puzzles/` | the six challenges: ciphertext and, as spoilers, key, plaintext and solve path |
+| `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256; a byte-for-byte copy, so the scripts it names are KeyPath's unpublished ones) |
 | `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
 | `tests/` | `node --test` suites; `tests/fixtures/` is generated |
 

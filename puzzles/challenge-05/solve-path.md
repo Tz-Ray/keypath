@@ -1,11 +1,15 @@
 # Challenge #5 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-05/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext:
 `zi3yue1xue2er2shi2xi2zhi1bu2yi4shuo1hu1dblheuwkdnjsqkdfobu2yi4le4hu1` ·
@@ -270,67 +274,3 @@ total homophone keyspace ~10^30.96
 leaked chars (tier 2/3): 0
 leakage: 0.000 (0/21 chars)
 ```
-
-## Leakage
-
-0/21 = 0.000. Chinese is written without spaces, so the segment
-boundaries cost nothing, and the line has no punctuation. The key
-carries no literal text.
-
-The ciphertext holds none of the characters docs/07 §7 sends through a
-heredoc (`' " $ \ ; [ ]` and the backtick), so it can be passed as a
-plain argument.
-
-## How it was minted
-
-Five segments from a Chinese source: Pinyin, hanja conversion on the
-Korean 2-set keyboard, 朋 routed zh → en → ru and typed on `ru_jcuken`,
-hanja again, and Pinyin. The `zh_words` equal the greedy split of each
-segment and are pinned so the split cannot drift:
-
-```
-$ keypath encode --source-lang zh --out key.json --segments '[{"length":11,"route":"zh","layout":"zh_pinyin","selector_mode":"keyed","zh_words":["子曰","學","而","時","習","之","不亦","說","乎"],"hint":"The Master said it. Seoul recites it. One word came from even farther away."},{"length":1,"route":"zh","layout":"ko_dubeolsik","selector_mode":"keyed","zh_words":["有"]},{"length":1,"route":"ru","layout":"ru_jcuken","selector_mode":"keyed"},{"length":4,"route":"zh","layout":"ko_dubeolsik","selector_mode":"keyed","zh_words":["自","遠方","來"]},{"length":4,"route":"zh","layout":"zh_pinyin","selector_mode":"keyed","zh_words":["不亦樂乎"]}]' 子曰學而時習之不亦說乎有朋自遠方來不亦樂乎
-zi3yue1xue2er2shi2xi2zhi1bu2yi4shuo1hu1dblheuwkdnjsqkdfobu2yi4le4hu1
-leakage: 0.000
-```
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Is the keystroke layer recognizable?** Yes. Pinyin delimits itself,
-   because every syllable ends in its tone digit. The 17-key digitless
-   run cannot be Pinyin, and Dàqiān cannot even start it. On 2-set it
-   assembles into the recitation of the missing line, with a visible
-   hole. The four keys in the hole read as a word on one layout only,
-   ЙЦУКЕН, and that word, друг, means 朋.
-2. **Does one coherent decoding exist and stand out?** Yes. This is the
-   best-known line of the Chinese classics. Every hanja pick is rank 2
-   or better. Every Pinyin pick is rank 1 or better except 亦 (12 of
-   215), which the known text fixes. Going in, the friend took the first
-   choice at both hops.
-3. **Are the tables public and derivable?** Yes: `zh_pinyin.tsv` with
-   `zh_chars.tsv` and `zh_phrases.tsv` (the frequencies that order the
-   candidates and choose each word's reading, docs/06 §5.1–§5.2);
-   `ko_dubeolsik.tsv`, `ko_hanja.tsv` (hanja.txt, with its glosses) and
-   `ko_hanja_readings.tsv` (docs/07 §6); `ru_jcuken.tsv` (docs/07 §7);
-   and the dictionaries `zh_en_cedict.tsv` and `ru_en_freedict.tsv`
-   (FreeDict rus-eng 2025.11.23). All are pinned in `tables/VERSIONS.md`.
-4. **Is the difficulty tuned to the audience?** Yes, for hard: three
-   keyboards, five segments, and one word translated twice, through
-   English. The very strong crib, a hint that names the recitation, and
-   #4's `lheu` balance that. The page does not point at #4: reading
-   `lheu` on the keyboard that typed #4 is the solver's own step.
-
-## Playtest
-
-Blind-solved on 2026-09-24 by an independent solver who saw only the
-public page, the earlier challenges and the tools. Their answer matched
-`plaintext.txt` exactly (they also offered the punctuated line, and
-asked whether punctuation counts). They judged the puzzle closer to
-medium than hard. The Pinyin opening plus "The Master said it" gives
-the Analects at once, and the README's line "If you solved #4, you have
-already met the traveller." all but handed over `lheu` = друг. That line
-was removed: the hint's "One word came from even farther away" still
-says a word was translated, and #4's plaintext holds друг, so no step
-became unfair. The README now also says how answers are checked (one
-language, no punctuation, spaces ignored). The hint in the key, the
-title and the level are unchanged, so the key was not re-minted.

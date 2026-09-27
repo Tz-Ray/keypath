@@ -1,11 +1,15 @@
 # Challenge #1 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-01/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext: `su3cl3` · hint: "Type it like a local" + a Taiwan/keyboard
 motif.
@@ -59,28 +63,3 @@ Clean, meaningful, self-confirming phrase → solve confirmed. (The
 author's key in `key.json` selects homophone index 0 for both syllables
 — 你 and 好 are each the most frequent character for their reading
 under the canonical ordering, docs/06 §5.1.)
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Is the keystroke layer recognizable (valid IME sequences, not
-   arbitrary)?** Yes — `su3cl3` is exactly what a Dàqiān typist's key
-   log for 你好 looks like; both units are well-formed syllables in the
-   public reading table, and the recurring tone key gives the stream
-   visible structure.
-2. **Does at least one coherent decoding exist and stand out enough to
-   confirm a solve?** Yes — of the 128 candidate combinations, 你好 is
-   the only common phrase; it is also the highest-frequency choice for
-   both syllables (index 0 × index 0).
-3. **Are the tables public/derivable, so a solver can reproduce them?**
-   Yes — committed in `tables/` with provenance and checksums in
-   `tables/VERSIONS.md`, re-derivable from pinned upstream
-   (libchewing-data @ c44e81a) via `scripts/fetch_raw.py` +
-   `scripts/build_tables.py`; the layout table is additionally
-   documented in Apple's public Zhuyin input documentation.
-4. **Is the difficulty tuned to the intended audience?** Yes — this is
-   the introductory challenge: hint-gated recognition, a single
-   two-syllable segment, single language/layout, tone-terminated units
-   (no tone-1 boundary trap), and a target phrase any zh speaker (or
-   any solver with a dictionary) confirms instantly. Harder knobs
-   (mixed layouts, tone-1 boundaries, translation routing) are
-   deliberately left for challenge #2.

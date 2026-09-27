@@ -1,11 +1,15 @@
 # Challenge #3 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-03/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext: `dkssudgktpdygksdudwjsghksgksmsrjfEhRkaQkrgoTdjdyzz` · hint:
 *"Nobody pressed the key to the right of the space bar."*
@@ -111,54 +115,3 @@ total homophone keyspace ~10^0.0
 leaked chars (tier 2/3): 0
 leakage: 0.000 (0/26 chars)
 ```
-
-## Leakage
-
-0/26 = 0.000. Korean is written with spaces, and the joiner elides them
-(docs/07 §3), so the key carries no literal text at all. The only
-information the key adds is the unit lengths and their grouping into
-words, which is where decode puts the six spaces back. The lengths fix
-every syllable boundary, including the `dyzz` fork of step 3. The
-grouping follows standard Korean spacing (걸, short for 것을, is written
-apart), and ㅋㅋ stands apart too. A solver cannot recover it from the
-ciphertext, so the README says answers are compared with spaces
-ignored.
-
-## How it was minted
-
-One segment, source language ko, typed on `ko_dubeolsik`:
-
-```
-$ keypath encode --source-lang ko --out key.json --segments '[{"length":26,"route":"ko","layout":"ko_dubeolsik","selector_mode":"keyed","hint":"Nobody pressed the key to the right of the space bar."}]' '안녕하세요 한영 전환하는 걸 또 깜빡했어요 ㅋㅋ'
-dkssudgktpdygksdudwjsghksgksmsrjfEhRkaQkrgoTdjdyzz
-leakage: 0.000
-```
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Is the keystroke layer recognizable?** Yes. It is a valid 2-set key
-   log. The capitals are a fingerprint anyone can check against the
-   public alphabets, and the opener `dkssudgktpdy` is famous on its own.
-2. **Does one coherent decoding exist and stand out?** Yes. The layout
-   is bijective, so no candidate is ever chosen. Standard 2-set assembly
-   reads the whole stream as the message except at `dyzz`, which splits
-   as 욬ㅋ or 요ㅋㅋ. Only 요ㅋㅋ is Korean.
-3. **Are the tables public and derivable?** Yes. The keyboard is
-   `ko_dubeolsik.tsv` (docs/07 §6, KS X 5002), pinned in
-   `tables/VERSIONS.md`. Syllables compose by the Unicode §3.12
-   arithmetic. No lexicon is involved.
-4. **Is the difficulty tuned to the audience?** Yes. This is the entry
-   rung for the layouts added since v1.0: one keyboard, no homophones,
-   no translation, a famous opener and one trap.
-
-## Playtest
-
-Blind-solved on 2026-09-24 by an independent solver who saw only the
-public page, the earlier challenges and the tools. They named the 한/영
-key from the hint, confirmed `ko_dubeolsik` with `keypath layouts`, and
-read every syllable. One early mis-split (`gks|ms`) was rejected at once
-by `keypath lookup`. The only difference from `plaintext.txt` was
-spacing: they wrote 깜빡했어요ㅋㅋ with no space, and said spacing could
-not be recovered. The README now says how answers are checked (spaces
-ignored, one language, no punctuation). The hint and the key are
-unchanged.

@@ -1,11 +1,15 @@
 # Challenge #4 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-04/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext: `ghbdtnlheutlernt,tbpvjcrdsdctekdtperybuebcha2` · hint:
 *"Открытка из Москвы, typed on a PC. Every word but one; that one
@@ -139,8 +143,7 @@ tea."
 Russian чай comes, ultimately, from northern Chinese chá, 茶: it
 belongs to the "cha" family of words for tea, as against the "te" of
 Min Chinese. The one word that "insisted on being typed in its mother
-tongue" went home to Mandarin to be typed. Note for later: `lheu` =
-друг, "friend".
+tongue" went home to Mandarin to be typed.
 
 With the author's key, `analyze` confirms it: twelve forced Russian
 words and one choice among 23.
@@ -159,61 +162,3 @@ total homophone keyspace ~10^1.36
 leaked chars (tier 2/3): 1
 leakage: 0.018 (1/56 chars)
 ```
-
-## Leakage
-
-1/56 = 0.018. Russian is written with spaces, and the joiner elides the
-ones between the Russian words (docs/07 §3). The space between и and чай
-crosses the segment boundary, so the key carries it as a one-character
-tier-3 literal. Challenge-02 ships the same structure.
-
-The ciphertext holds none of the characters docs/07 §7 sends through a
-heredoc (`' " $ \ ; [ ]` and the backtick), so it can be passed as a
-plain argument.
-
-## How it was minted
-
-Two segments from a Russian source: 53 characters typed on `ru_jcuken`,
-then чай routed ru → en → zh and typed on `zh_pinyin`:
-
-```
-$ keypath encode --source-lang ru --out key.json --segments '[{"length":53,"route":"ru","layout":"ru_jcuken","selector_mode":"keyed","hint":"Открытка из Москвы, typed on a PC. Every word but one; that one insisted on being typed in its mother tongue."},{"length":3,"route":"zh","layout":"zh_pinyin","selector_mode":"keyed"}]' 'привет друг еду к тебе из москвы в сеул везу книгу и чай'
-ghbdtnlheutlernt,tbpvjcrdsdctekdtperybuebcha2
-leakage: 0.018
-```
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Is the keystroke layer recognizable?** Yes. It is a ЙЦУКЕН key log
-   with a famous opener, and the hint names the city and the PC. The
-   Pinyin tail breaks the Russian reading visibly with a digit, which
-   nudges rather than blocks, and a Pinyin unit ends in its tone digit.
-2. **Does one coherent decoding exist and stand out?** Yes. The Russian
-   part is bijective. The Pinyin can start at `a2`, `ha2` or `cha2`, and
-   only `cha2` leaves the Russian in whole words. For `cha2`, only 茶
-   fits "везу книгу и ___", and 茶 → tea → чай takes the first choice at
-   both hops. No other layout's public reading of `cha2` is tea:
-   ja_romaji lists 茶 at rank 0, but its inline `2` selects 咤, and
-   Dàqiān and es_accent give no Chinese at all. A solver who tries
-   Japanese first still meets 茶 there, which does no harm.
-3. **Are the tables public and derivable?** Yes: `ru_jcuken.tsv`
-   (docs/07 §7), `zh_pinyin.tsv` with `zh_chars.tsv` and
-   `zh_phrases.tsv` (the frequencies that order the candidates, docs/06
-   §5.1–§5.2), `zh_en_cedict.tsv`, and `ru_en_freedict.tsv` (FreeDict
-   rus-eng 2025.11.23). All are pinned in `tables/VERSIONS.md`.
-4. **Is the difficulty tuned to the audience?** Yes, for medium: two
-   keyboards, one candidate choice (rank 2 of 23) and one translation
-   back into the source language. The hint names the city and "PC", and
-   the famous opener gives the first keyboard away.
-
-## Playtest
-
-Blind-solved on 2026-09-24 by an independent solver who saw only the
-public page, the earlier challenges and the tools. Their answer matched
-`plaintext.txt` exactly. They recognised `ghbdtn` at once, found the
-Pinyin tail at the digit, and took 茶 → tea → чай through the public
-dictionaries. They asked two things the page did not answer: whether the
-last word counts as чай or as 茶, and whether the lost commas and
-capitals count. The README now says how answers are checked (one
-language, no punctuation or capitals, spaces ignored). They rated the
-puzzle medium-easy. The level, the hint and the key are unchanged.

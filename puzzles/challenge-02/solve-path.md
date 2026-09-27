@@ -1,11 +1,15 @@
 # Challenge #2 — intended solve path (SPOILERS)
 
-> A copy of `puzzles/challenge-02/solve-path.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page](https://tz-ray.github.io/keypath/)'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
 
 Ciphertext: `elpingu4inocantalacancio1n54ji3u.3` · hint: *"dos
 teclados, un mensaje"* — two keyboards, one message.
@@ -77,21 +81,3 @@ is public) and carrying each gloss back into Spanish (FreeDict, the
 
 Grammatical Spanish, hint satisfied (two keyboards, one message), every
 ciphertext character consumed. Solved.
-
-## Fairness checklist (docs/03 §5), answered
-
-1. **Recognizable keystroke layer?** Yes — both halves are valid,
-   well-formed sequences for their layouts (the Spanish half even reads
-   half-decoded), and the es half *fails visibly* under the wrong
-   layout, which is a nudge, not a dead end.
-2. **Does one coherent decoding stand out?** Yes — the Spanish sentence
-   completes itself; the zh candidates that fit sit at ranks 2/1/2 of
-   their readings' frequency-ordered candidate lists, well inside any
-   solver's first handful of tries.
-3. **Public/derivable tables?** Yes — `tables/es_accent.tsv`,
-   `tables/zh_daqian.tsv`, `tables/zh_chars.tsv`, `tables/zh_en_cedict.tsv`,
-   all pinned in `tables/VERSIONS.md` and re-derivable via `scripts/`.
-4. **Difficulty tuned?** Yes — meant as the step up from #1: cold-ish
-   recognition (text hint only), two layouts with deliberate digit
-   polysemy, and a translation layer; still a single short sentence with
-   leakage 0.024 (1 boundary space in a 42-char message).

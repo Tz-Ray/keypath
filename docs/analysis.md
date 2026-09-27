@@ -1,11 +1,11 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> A copy of `docs/09-analysis.md` from KeyPath 2.0 (tag `v2.0`). The commands it
-> names (`keypath lookup`, `keypath layouts`, …) and the paths under
-> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python
-> implementation, which is not published. The table provenance it
-> cites is [`docs/VERSIONS.md`](../docs/VERSIONS.md) here, and the
-> [KeyPath page](https://tz-ray.github.io/keypath/) does the same lookups in your browser.
+> From KeyPath 2.0 (tag `v2.0`). The scripts, tests and design documents
+> it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
+> to KeyPath's Python implementation, which is not published; the tables
+> it measures are built from the sources pinned in
+> [`VERSIONS.md`](VERSIONS.md). The figures on the [KeyPath page](https://tz-ray.github.io/keypath/)
+> come from this document.
 
 This document measures, from the committed tables, how much ambiguity
 each keyboard layout and each translation hop adds to a KeyPath message,

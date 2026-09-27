@@ -3,8 +3,10 @@
 
 The cipher project's repository is not public, so the page links to these
 copies in this repository instead.  Files are read from the project's git
-tag `v2.0` (never its working tree); Markdown copies get a one-paragraph
-preface after the title, everything else is copied byte for byte.
+tag `v2.0` (never its working tree).  A solve path keeps its title and its
+solving steps (the setter's notes after them, which cite unpublished
+documents and tools, are left out) and gets a short preface; the analysis
+gets a preface too; everything else is copied byte for byte.
 
     python3 tools/copy_docs.py            # (re)write docs/ and puzzles/
     python3 tools/copy_docs.py --check    # fail if any copy differs
@@ -14,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -22,38 +25,80 @@ SITE = Path(__file__).resolve().parent.parent
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 TAG = "v2.0"
 PAGE = "https://tz-ray.github.io/keypath/"
+RULES = "All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals."
+
+# The setter's notes that follow the solving steps: they cite unpublished
+# design documents, tools and review history, so the copies end before them.
+SETTER_NOTES = re.compile(r"^## (Leakage|How it was minted|Fairness checklist|Playtest)\b", re.M)
+# Text removed from a copy: {file: [(exact text, replacement)]}.  Each must
+# match exactly once, so a change upstream fails the build instead of leaking.
+CUTS = {
+    # a hint for #5, given away the moment #4 is revealed
+    "puzzles/challenge-04/solve-path.md": [(' Note for later: `lheu` =\nдруг, "friend".', "")],
+}
+
+SOLVE_PREFACE = """\
+> **Spoilers.** This is the setter's write-up of how to crack the puzzle
+> (from KeyPath 2.0, tag `v2.0`); it may also give away steps of later
+> puzzles. The command output it quotes (`keypath lookup`, `keypath
+> analyze`, …) comes from KeyPath's Python implementation, which is not
+> published, and is shown in full. Where it calls a table public, it means
+> the public dictionaries and layouts the tables are built from, pinned in
+> [`docs/VERSIONS.md`](../../docs/VERSIONS.md); the keyboard layouts are also
+> in the [KeyPath page]({page})'s keyboard panel and in
+> [`data/layouts.json`](../../data/layouts.json). References such as
+> "docs/06 §5.1" are to KeyPath's unpublished design documents.
+
+"""
+
+ANALYSIS_PREFACE = """\
+> From KeyPath 2.0 (tag `v2.0`). The scripts, tests and design documents
+> it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
+> to KeyPath's Python implementation, which is not published; the tables
+> it measures are built from the sources pinned in
+> [`VERSIONS.md`](VERSIONS.md). The figures on the [KeyPath page]({page})
+> come from this document.
+
+"""
 
 
-def preface(source: str) -> str:
-    return (f"> A copy of `{source}` from KeyPath 2.0 (tag `{TAG}`). The commands it\n"
-            "> names (`keypath lookup`, `keypath layouts`, …) and the paths under\n"
-            "> `tables/`, `docs/`, `scripts/` and `tests/` belong to KeyPath's Python\n"
-            "> implementation, which is not published. The table provenance it\n"
-            "> cites is [`docs/VERSIONS.md`](../docs/VERSIONS.md) here, and the\n"
-            f"> [KeyPath page]({PAGE}) does the same lookups in your browser.\n\n")
-
-
-def with_preface(path: str, up: str) -> bytes:
-    """The file with the preface after its title line; `up` leads back to the site root."""
-    title, _, body = show(path).decode("utf-8").partition("\n\n")
-    return f"{title}\n\n{preface(path).replace('](../', f']({up}')}{body}".encode("utf-8")
-
-
-def show(path: str) -> bytes:
+def show(path: str) -> str:
     return subprocess.run(["git", "-C", str(PROJECT), "show", f"{TAG}:{path}"],
-                          check=True, capture_output=True).stdout
+                          check=True, capture_output=True).stdout.decode("utf-8")
+
+
+def with_preface(text: str, preface: str) -> bytes:
+    """The text with the preface after its title line."""
+    title, _, body = text.partition("\n\n")
+    return f"{title}\n\n{preface.format(page=PAGE)}{body}".encode("utf-8")
+
+
+def solve_path(path: str) -> bytes:
+    text = show(path)
+    notes = SETTER_NOTES.search(text)
+    assert notes, f"{path}: no setter's notes heading"
+    text = text[:notes.start()].rstrip("\n") + "\n"
+    for old, new in CUTS.get(path, []):
+        assert text.count(old) == 1, f"{path}: cut text not found exactly once: {old!r}"
+        text = text.replace(old, new)
+    return with_preface(text, SOLVE_PREFACE)
 
 
 def puzzles_index() -> str:
     index = json.loads((SITE / "data/challenges/index.json").read_text(encoding="utf-8"))
-    rows = "\n".join(f"| {c['n']} | {c['difficulty']} | {c['title']} | "
-                     f"[`challenge-{c['n']:02d}/`](challenge-{c['n']:02d}/) |" for c in index)
+    rows = "\n".join(
+        f"| {c['n']} | {c['difficulty']} | {c['title']} | {c['blurb']} | "
+        f"{c['keyboards'] or ''} | [`challenge-{c['n']:02d}/`](challenge-{c['n']:02d}/) |"
+        for c in index)
     return ("# The six KeyPath puzzles\n\n"
-            f"Play them on the [KeyPath page]({PAGE}#challenges). Each folder holds the\n"
-            "puzzle's `ciphertext.txt` and, as **spoilers**, the author's `key.json`, the\n"
-            "`plaintext.txt` and `solve-path.md`, the intended way to crack it.\n\n"
-            "| # | level | title | files |\n|---|-------|-------|-------|\n"
-            f"{rows}\n")
+            f"Play them on the [KeyPath page]({PAGE}#challenges): each is a ciphertext with no key.\n"
+            f"Work out the keyboard, read the keys, and pick the words that make sense. {RULES}\n\n"
+            "| # | level | title | hint | keyboards | files |\n"
+            "|---|-------|-------|------|-----------|-------|\n"
+            f"{rows}\n\n"
+            "Each folder holds the puzzle's `ciphertext.txt` and, as **spoilers**, the author's\n"
+            "`key.json`, the `plaintext.txt` and `solve-path.md`, the setter's way to crack it.\n"
+            "A solve path may also give away steps of later puzzles.\n")
 
 
 def build() -> dict[str, bytes]:
@@ -61,11 +106,13 @@ def build() -> dict[str, bytes]:
     for n in range(1, 7):
         src = f"puzzles/challenge-{n:02d}"
         for name in ("ciphertext.txt", "key.json", "plaintext.txt"):
-            files[f"{src}/{name}"] = show(f"{src}/{name}")
-        files[f"{src}/solve-path.md"] = with_preface(f"{src}/solve-path.md", "../../")
-    files["puzzles/README.md"] = puzzles_index().encode()
-    files["docs/analysis.md"] = with_preface("docs/09-analysis.md", "../")
-    files["docs/VERSIONS.md"] = show("tables/VERSIONS.md")  # verbatim: its sha256 is the edition
+            files[f"{src}/{name}"] = show(f"{src}/{name}").encode("utf-8")
+        files[f"{src}/solve-path.md"] = solve_path(f"{src}/solve-path.md")
+    files["puzzles/README.md"] = puzzles_index().encode("utf-8")
+    files["docs/analysis.md"] = with_preface(show("docs/09-analysis.md"), ANALYSIS_PREFACE)
+    # verbatim: its sha256 is the tables edition
+    files["docs/VERSIONS.md"] = subprocess.run(["git", "-C", str(PROJECT), "show", f"{TAG}:tables/VERSIONS.md"],
+                                               check=True, capture_output=True).stdout
     return files
 
 
