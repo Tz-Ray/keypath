@@ -91,6 +91,15 @@ async function typeMessage(text, source, surface) {
   await b.send("Input.insertText", { text });
 }
 
+/** typeMessage, then wait until the page shows what the engine encodes for it. */
+async function typeAndWait(text, source, surface) {
+  const want = await b.evaluate(`window.__keypath.engine.encode({ text: ${js(text)}, source: ${js(source)}, surface: ${js(surface)} }).then(r => r.ciphertext)`);
+  await typeMessage(text, source, surface);
+  await b.waitFor(`${cipherIs(want)} && ${q("#caption bdi")} && ${q("#caption bdi")}.textContent === window.__keypath.engine.normalize(${js(text)}, ${js(source)})`);
+  await settle();
+  return want;
+}
+
 // ================================================================ checks
 await attempt("hero", async () => {
   await open(1280, 800);
@@ -259,8 +268,15 @@ await attempt("share links", async () => {
   await b.waitFor(cipherIs(S.chips[4].ciphertext));
   check("share: #try= reopens message, language and keyboard",
     await b.evaluate(`${q("#msg")}.value === ${js(S.chips[4].text)} && ${q("#lang")}.value === "ru" && ${q("input[value=ru_jcuken]")}.checked`));
+  // the page's own examples can't become puzzles: their answers are on the page
   await b.evaluate(capture);
   await b.evaluate(`${q("#make-puzzle")}.click()`);
+  check("share: an example can't be made a puzzle", await b.evaluate(`!${q("#puzzle-note")}.hidden && ${q("#puzzle-copy")}.disabled`));
+  await b.evaluate(`${q("#puzzle-close")}.click()`);
+  const yolka = await typeAndWait("ёлка", "ru", "ru_jcuken");
+  await b.evaluate(capture);
+  await b.evaluate(`${q("#make-puzzle")}.click()`);
+  check("share: a new message can", await b.evaluate(`${q("#puzzle-note")}.hidden && !${q("#puzzle-copy")}.disabled`));
   await b.evaluate(`${q("#puzzle-hint")}.checked = true`);
   await b.evaluate(`${q("#puzzle-copy")}.click()`);
   const puzzleLink = await b.waitFor("window.__copied && window.__copied.includes('#puzzle=') && window.__copied");
@@ -268,15 +284,52 @@ await attempt("share links", async () => {
   await b.navigate(puzzleLink);
   await b.waitFor("document.documentElement.classList.contains('ready') && document.querySelector('#puzzle-h')");
   const banner = await b.evaluate(`${q(".puzzle-banner")}.textContent`);
-  check("share: #puzzle= shows the ciphertext and the hint", banner.includes(S.chips[4].ciphertext) && banner.includes("Hint: typed on a Russian ЙЦУКЕН keyboard."), banner);
+  check("share: #puzzle= shows the ciphertext and the hint", banner.includes(yolka) && banner.includes("Hint: typed on a Russian ЙЦУКЕН keyboard.")
+    && !banner.includes("Written in"), banner);
   const answer = async text => {
     await b.evaluate(`(() => { ${q("#puzzle-answer")}.value = ${js(text)}; ${q(".puzzle-banner form")}.requestSubmit(); })()`);
     await sleep(150);
     return b.waitFor(`${q(".puzzle-banner .verdict")}.textContent`);
   };
   check("share: puzzle rejects a wrong answer", (await answer("hedgehog")) === "Not quite. Keep going.");
-  check("share: puzzle accepts the answer", (await answer("  ЁЖИК! ")) === "Solved.");
-  check("share: puzzle accepts it accents aside", (await answer("ежик")) === "Solved, accents aside.");
+  check("share: puzzle accepts the answer", (await answer("  ЁЛКА! ")) === "Solved.");
+  check("share: puzzle accepts it accents aside", (await answer("елка")) === "Solved, accents aside.");
+
+  // through a dictionary: the English and what the keys spell both count
+  await open(1280, 800);
+  await typeAndWait("thank you", "en", "zh_daqian");
+  const spelled = await b.evaluate("window.__keypath.engine.unitText(window.__keypath.playground.state.result.trace)");
+  await b.evaluate(capture);
+  await b.evaluate(`${q("#make-puzzle")}.click()`);
+  await b.evaluate(`${q("#puzzle-hint")}.checked = true`);
+  await b.evaluate(`${q("#puzzle-copy")}.click()`);
+  const hopLink = await b.waitFor("window.__copied && window.__copied.includes('#puzzle=') && window.__copied");
+  await b.navigate("about:blank");
+  await b.navigate(hopLink);
+  await b.waitFor("document.documentElement.classList.contains('ready') && document.querySelector('#puzzle-h')");
+  const hopBanner = await b.evaluate(`${q(".puzzle-banner")}.textContent`);
+  check("share: a dictionary puzzle says which language to answer in",
+    hopBanner.includes("Written in English: answer in English, or with the Chinese the keys spell."), hopBanner);
+  check("share: it accepts what the keys spell", /\p{Script=Han}/u.test(spelled) && (await answer(spelled)) === "Solved.", spelled);
+  check("share: and the English", (await answer("Thank you!")) === "Solved.");
+
+  // #try= keeps a language chosen by hand (not what detection would pick)
+  for (const [text, source, surface] of [["hola amigo", "es", "es_accent"], ["ok 좋아", "en", "ko_dubeolsik"], ["привет world", "en", "ru_jcuken"]]) {
+    await open(1280, 800);
+    await typeAndWait(text, source, surface);
+    const sent = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#key-pre")}.textContent, ${q("#enc-result")}.hidden]`);
+    await b.evaluate(capture);
+    await b.evaluate(`${q("#copy-link")}.click()`);
+    const link = await b.waitFor("window.__copied");
+    await b.navigate("about:blank");
+    await b.navigate(link);
+    await b.waitFor("document.documentElement.classList.contains('ready')");
+    await settle();
+    await b.waitFor(`!${q("#enc-result")}.hidden || !${q("#enc-refusal")}.hidden`);
+    const got = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#key-pre")}.textContent, ${q("#enc-result")}.hidden]`);
+    check(`share: #try= reopens "${text}" as ${source} on ${surface} unchanged`,
+      !sent[2] && js(got) === js(sent) && await b.evaluate(`${q("#lang")}.value === ${js(source)}`), [sent[0], got[0]]);
+  }
 });
 
 await attempt("challenges", async () => {
@@ -311,6 +364,112 @@ await attempt("tampered keys", async () => {
   check("decode: the hero key walks back", await b.evaluate(`${q("#dec-text")}.textContent === ${js(hero.text)}`));
 });
 
+await attempt("edge messages", async () => {
+  await open(1280, 800);
+  // a message of digits and punctuation: no keystrokes, and the key walks it back
+  await typeMessage("123 !!!", "en", "zh_daqian");
+  await b.waitFor(`${cipherIs("")} && ${q("#stats")}.textContent.startsWith("0 keystrokes")`);
+  await b.evaluate(`${q("#make-puzzle")}.click()`);
+  check("all-literal: no puzzle from an empty ciphertext", await b.evaluate(`!${q("#puzzle-note")}.hidden && ${q("#puzzle-copy")}.disabled`));
+  await b.evaluate(`${q("#puzzle-close")}.click()`);
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  await b.evaluate(`${q("#dec-go")}.click()`);
+  await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`);
+  check("all-literal: walks back from its key alone", await b.evaluate(`${q("#dec-text")}.textContent === "123 !!!" && ${q("#dec-err")}.hidden`),
+    await b.evaluate(`${q("#dec-err")}.textContent`));
+  // a pathologically deep key is refused as bad JSON, with no exception
+  await b.evaluate(`(() => { ${q("#dec-cipher")}.value = "cj0u/6ru8"; ${q("#dec-key")}.value = '{"a":'.repeat(3000) + "1" + "}".repeat(3000); ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-err")}.hidden`);
+  check("decode: a deeply nested key is bad JSON", await b.evaluate(`${q("#dec-err")}.textContent === "That key isn't valid JSON."`));
+  await b.evaluate(`${q("#tab-enc")}.click()`);
+
+  // the katakana middle dot is punctuation: detected (and chosen) Chinese encodes
+  await b.evaluate(`(() => { const t = ${q("#msg")}; t.value = ""; t.dispatchEvent(new Event("input")); })()`);
+  await b.evaluate(`${q("#msg")}.focus()`);
+  await b.send("Input.insertText", { text: "哈利・波特" });
+  const dot = await b.evaluate(`window.__keypath.engine.encode({ text: "哈利・波特", source: "zh", surface: "zh_daqian" }).then(r => r.ciphertext)`);
+  await b.waitFor(cipherIs(dot));
+  check("katakana dot: detected as Chinese", await b.evaluate(`${q("#lang")}.value === "zh" && ${q("#lang-mode")}.textContent === "detected"`));
+  await typeMessage("キ官鑄進修班", "zh", "zh_daqian");
+  const ki = await b.evaluate(`window.__keypath.engine.encode({ text: "キ官鑄進修班", source: "zh", surface: "zh_daqian" }).then(r => r.ciphertext)`);
+  await b.waitFor(cipherIs(ki));
+  check("kana with Chinese chosen: encoded as chosen", true);
+
+  // walk back names normalization when the box differs from the walked-back text
+  await typeAndWait("Welcome   HOME", "en", "zh_daqian");
+  await b.evaluate(`${q("#walk-back")}.click()`);
+  await b.waitFor(`!${q("#walked")}.hidden`);
+  const walked = await b.evaluate(`${q("#walked")}.textContent`);
+  check("walk back: says the message was normalized", walked === "Walked back: “welcome home”, your message after KeyPath's normalization (lowercase, single spaces).", walked);
+
+  // user text is isolated from the page's own copy (bidi controls stay inside)
+  await typeMessage("hello \u202eworld home", "en", "zh_daqian");
+  await settle();
+  await b.waitFor(`${q("#caption bdi")} && ${q("#caption bdi")}.textContent.includes("world")`);
+  check("bidi: the caption isolates the message", await b.evaluate(`${q("#caption")}.textContent.endsWith("typed on a Bopomofo (Dàqiān) keyboard.")`));
+});
+
+await attempt("long input stays in its box", async () => {
+  for (const w of [360, 1280]) {
+    await open(w, 800);
+    for (const [name, text] of [["greek", "Γειά σου κόσμε, τι κάνεις σήμερα; Είμαι καλά, ευχαριστώ πολύ για την ερώτηση σου φίλε μου."],
+      ["digits", "1234567890".repeat(20)], ["emoji", "😀".repeat(100)], ["long word", "donaudampfschifffahrtsgesellschaftskapitän"], ["one letter", "a".repeat(199)]]) {
+      await typeMessage(text, "en", "zh_daqian");
+      await settle();
+      await b.waitFor(`!${q("#enc-result")}.hidden || !${q("#enc-refusal")}.hidden`);
+      await sleep(150);
+      const inside = await b.evaluate(`[...document.querySelectorAll("#walk .lit-text")].every(t => { const g = t.closest(".wg").getBoundingClientRect(), r = t.getBoundingClientRect(); return r.left >= g.left - 1 && r.right <= g.right + 1; })`);
+      check(`overflow: ${name} at ${w}px`, inside && await noHScroll(w), await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+    }
+  }
+  await open(360, 780);
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  const bad = hero.keyText.replace('"homophone_index": 1', '"homophone_index": -1');
+  await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(hero.ciphertext)}; ${q("#dec-key")}.value = ${js(bad)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-err")}.hidden`);
+  check("overflow: a long error path at 360px", bad !== hero.keyText && await noHScroll(360), await b.evaluate(`${q("#dec-err")}.textContent`));
+});
+
+await attempt("touch targets", async () => {
+  await open(360, 780);
+  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.evaluate(`document.querySelector("#key-panel").open = true`);
+  const small = await b.evaluate(`[...document.querySelectorAll("button, .btn, [role=tab], summary, .chip")]
+    .filter(e => e.offsetParent && !e.closest(".walk, .walk-legend, .kb-pic, .popover") && !e.classList.contains("sense"))
+    .map(e => { const r = e.getBoundingClientRect(); return [e.id || e.textContent.trim().slice(0, 20), Math.round(r.width), Math.round(r.height)]; })
+    .filter(([, w, h]) => w < 44 || h < 44)`);
+  check("touch targets: every control is at least 44 x 44 px at 360px", small.length === 0, js(small));
+});
+
+await attempt("focus", async () => {
+  await open(360, 780);
+  await b.evaluate(`document.querySelectorAll('#examples button')[1].click()`);
+  await b.waitFor(cipherIs(S.chips[1].ciphertext));
+  await settle();
+  await b.evaluate(`document.querySelector('#walk .stack').focus()`);
+  const inv = await active();
+  await press("Enter");
+  await b.waitFor(`document.querySelector('.popover') && !document.querySelector('.popover').hidden`);
+  await press("Tab");
+  check("popover: Tab past the grid closes it and returns to the unit",
+    await b.evaluate("document.querySelector('.popover').hidden") && (await active()) === inv, await active());
+  await press("Enter");
+  await b.waitFor(`!document.querySelector('.popover').hidden`);
+  await b.evaluate("document.querySelector('.popover .pop-close').focus()");
+  await b.send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, modifiers: 8 });
+  await b.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, modifiers: 8 });
+  await sleep(60);
+  check("popover: Shift+Tab from its first control closes it too",
+    await b.evaluate("document.querySelector('.popover').hidden") && (await active()) === inv, await active());
+  // reveal moves focus to the answer
+  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.evaluate(`${q("#challenge-3 .reveal .btn")}.focus()`);
+  await press("Enter");
+  await press("Enter");
+  await b.waitFor(`${q("#challenge-3 .revealed .plain")}`);
+  check("reveal: focus lands on the answer", await b.evaluate(`document.activeElement === ${q("#challenge-3 .revealed .plain")}`), await active());
+});
+
 // requests and errors, for everything above
 const origin = srv.origin + "/";
 const requests = b.events.filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
@@ -321,6 +480,23 @@ const errors = b.events.filter(e => e.method === "Runtime.exceptionThrown"
   || (e.method === "Log.entryAdded" && e.params.entry.level === "error"));
 check("console: no exceptions and no errors", errors.length === 0,
   errors.slice(0, 3).map(e => e.params.exceptionDetails?.exception?.description || e.params.entry?.text || js(e.params.args)));
+
+await attempt("reveal retry", async () => {
+  await open(1280, 800);
+  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.send("Network.setBypassServiceWorker", { bypass: true });
+  await b.send("Network.setCacheDisabled", { cacheDisabled: true });
+  await b.send("Network.setBlockedURLs", { urls: ["*data/challenges/04.json"] });
+  await b.evaluate(`(() => { const a = ${q("#challenge-4")}; a.querySelector('.reveal .btn').click(); a.querySelector('.confirm .btn.primary').click(); })()`);
+  await b.waitFor(`${q("#challenge-4 .revealed .error button")}`);
+  check("reveal: a failed load offers Retry", await b.evaluate(`document.activeElement === ${q("#challenge-4 .revealed .error")}`));
+  await b.send("Network.setBlockedURLs", { urls: [] });
+  await b.evaluate(`${q("#challenge-4 .revealed .error button")}.click()`);
+  await b.waitFor(`${q("#challenge-4 .revealed .plain")}`);
+  check("reveal: Retry then shows the answer", await b.evaluate(`${q("#challenge-4 .revealed .plain")}.textContent === ${js(challenges[3].plaintext)}`));
+  await b.send("Network.setBypassServiceWorker", { bypass: false });
+  await b.send("Network.setCacheDisabled", { cacheDisabled: false });
+});
 
 await attempt("offline", async () => {
   await open(1280, 800);

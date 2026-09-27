@@ -2,7 +2,7 @@
 // honest wording about security, and only relative or known links.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./helpers.js";
 import { parseHtml, walk, ancestors, elements } from "./html.js";
@@ -75,6 +75,7 @@ test("'encryption', 'security' and 'private' appear only inside data-honesty", (
 const UPSTREAM = [
   "https://github.com/chewing/libchewing-data",
   "https://www.mdbg.net/chinese/dictionary?page=cc-cedict",
+  "https://www.edrdg.org/",
   "https://github.com/scriptin/jmdict-simplified",
   "https://github.com/skk-dev/dict",
   "https://github.com/garfieldnate/kengdic",
@@ -83,7 +84,9 @@ const UPSTREAM = [
   "https://github.com/freedict/fd-dictionaries",
   "https://github.com/rspeer/wordfreq",
   "https://github.com/notofonts/noto-cjk",
+  "https://www.unicode.org/ucd/",
 ];
+const DATA_LICENSES = "https://github.com/Tz-Ray/keypath/blob/main/DATA-LICENSES.md";
 
 test("links are relative, to the project on GitHub, or to a credited upstream", () => {
   const urls = [];
@@ -92,16 +95,37 @@ test("links are relative, to the project on GitHub, or to a credited upstream", 
   for (const u of urls) {
     assert.ok(!u.startsWith("http:") && !u.startsWith("//"), `insecure or protocol-relative URL: ${u}`);
     if (/^[a-z][a-z0-9+.-]*:/i.test(u)) {
-      const ok = u.startsWith("https://github.com/Tz-Ray/cipher-project") || UPSTREAM.includes(u) || u.startsWith("data:image/svg+xml,");
+      const ok = u.startsWith("https://github.com/Tz-Ray/cipher-project") || UPSTREAM.includes(u) || u === DATA_LICENSES
+        || u.startsWith("data:image/svg+xml,");
       assert.ok(ok, `unexpected absolute URL: ${u}`);
     } else {
       assert.ok(!u.startsWith("/"), `root-absolute URL breaks under /keypath/: ${u}`);
+      const file = u.split("#")[0];
+      if (file) assert.ok(existsSync(join(ROOT, file)), `relative link to a missing file: ${u}`);
     }
   }
   // every credited upstream is linked
   for (const u of UPSTREAM) assert.ok(urls.includes(u), `credit link missing: ${u}`);
   assert.ok(urls.includes("https://github.com/Tz-Ray/cipher-project"));
-  assert.ok(urls.includes("DATA-LICENSES.md"));
+  assert.ok(urls.includes(DATA_LICENSES));
+});
+
+test("the (L)GPL data ships with the license texts, linked from the credits", () => {
+  const texts = { "LICENSES/GPL-2.0.txt": "GNU GENERAL PUBLIC LICENSE\\s+Version 2, June 1991",
+    "LICENSES/LGPL-2.0.txt": "GNU LIBRARY GENERAL PUBLIC LICENSE\\s+Version 2, June 1991",
+    "LICENSES/LGPL-2.1.txt": "GNU LESSER GENERAL PUBLIC LICENSE\\s+Version 2.1, February 1999" };
+  const md = readFileSync(join(ROOT, "DATA-LICENSES.md"), "utf8");
+  for (const [path, head] of Object.entries(texts)) {
+    const t = readFileSync(join(ROOT, path), "utf8");
+    assert.match(t, new RegExp(head), path);
+    assert.match(t, /END OF TERMS AND CONDITIONS/, `${path} is complete`);
+    assert.ok(html.includes(`href="${path}"`), `${path} linked from the credits`);
+    assert.ok(md.includes(`(${path})`), `${path} linked from DATA-LICENSES.md`);
+  }
+  assert.match(readFileSync(join(ROOT, "LICENSES/Unicode.txt"), "utf8"), /COPYRIGHT AND PERMISSION NOTICE/);
+  // the repository's own license stays plain MIT
+  assert.match(readFileSync(join(ROOT, "LICENSE"), "utf8"), /^MIT License/);
+  assert.doesNotMatch(readFileSync(join(ROOT, "LICENSE"), "utf8"), /GNU|Unicode|CC BY/);
 });
 
 test("no absolute or protocol-relative URLs in scripts and styles", () => {

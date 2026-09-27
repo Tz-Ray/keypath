@@ -1,9 +1,9 @@
 # KeyPath in the browser
 
 The web page for [KeyPath](https://github.com/Tz-Ray/cipher-project), a
-puzzle cipher that hides a message in the raw keystrokes of a Chinese,
-Japanese, Korean, Russian or Spanish keyboard, with a small key that records
-every choice on the way. The page encodes, decodes and draws the walk
+puzzle cipher that hides a message in the keystrokes you would type for it
+on a Chinese, Japanese, Korean or Russian keyboard (or in a Spanish
+accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
 the command-line tool, keypath 2.0.0, produces; the parity tests check this.
@@ -11,7 +11,8 @@ KeyPath is a puzzle, not encryption.
 
 The data under `data/` is derived from the keypath v2.0 tables (tag `v2.0`,
 tables edition `67a40391…61f2`); its sources and licenses are listed in
-[DATA-LICENSES.md](DATA-LICENSES.md).
+[DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
+[`LICENSES/`](LICENSES).
 
 ## Layout
 
@@ -27,13 +28,16 @@ tables edition `67a40391…61f2`); its sources and licenses are listed in
 | `tools/build_fonts.py` | writes `fonts/` from pinned Noto Sans CJK |
 | `tools/serve.mjs` | a static server that mounts the repo at `/keypath/`, like GitHub Pages |
 | `tools/cdp.mjs` | end-to-end checks in headless Chromium, and screenshots |
+| `tools/check_links.mjs` | checks the page's external links (network) |
+| `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
 | `tests/` | `node --test` suites; `tests/fixtures/` is generated |
 
 ## Rebuilding the data
 
-The build reads the cipher project (by default `/home/linuxuser1/cipher-project`,
-or `KEYPATH_PROJECT`) as files and uses its `keypath` package, installed into a
-local virtual environment:
+The build reads a checkout of the cipher project at tag `v2.0`, given by
+`KEYPATH_PROJECT` (default: `../cipher-project`, next to this repository),
+as files and uses its `keypath` package, installed into a local virtual
+environment:
 
 ```sh
 uv venv --python 3.11 .venv
@@ -60,7 +64,11 @@ Pages serves the `main` branch root at https://tz-ray.github.io/keypath/.
 ```sh
 npm test          # or: node --test "tests/**/*.test.js"
 node tools/cdp.mjs [--shots DIR]   # the browser checks on their own, optionally with screenshots
+node tools/check_links.mjs         # needs the network: every external link resolves when signed out
 ```
+
+The page links to the cipher project on GitHub (source, analysis, puzzle
+write-ups), so that repository must be public for those links to work.
 
 The engine suites compare the JavaScript engine with fixtures the Python
 implementation generated: about 7,400 encode/decode vectors over every live
@@ -79,7 +87,10 @@ serves the site under `/keypath/`, types messages on every keyboard and
 compares the rendered ciphertext and key with the fixtures, clicks the
 examples, reveals every challenge, walks tampered keys, checks keyboard
 navigation, IME composition, share links, reduced motion, offline reload,
-horizontal overflow from 360 px up, and that the page makes no request
-outside its own origin and logs no errors.
+horizontal overflow from 360 px up (long literals, long words and error
+paths included), touch-target sizes, focus after popovers and reveals,
+share links with a hand-picked language, puzzles through a dictionary,
+and that the page makes no request outside its own origin and logs no
+errors.
 
 Everything needs only Node.js 22 or later and this repository.

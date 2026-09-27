@@ -38,9 +38,9 @@ async function main() {
     playground.showPrecomputed(hero);
     idle(() => playground.verifyHero(hero));
   }
-  if (frag && frag.puzzle) showPuzzleBanner($("#puzzle-slot"), frag.puzzle, id => surfaces.get(id).longName);
+  if (frag && frag.puzzle) showPuzzleBanner($("#puzzle-slot"), frag.puzzle, surfaces);
   playground.initialOpen();
-  initShare({ playground });
+  initShare({ playground, getEngine });
   initChallenges({ host: $("#challenge-grid"), getEngine, registry: engine.registry, layouts: engine.layouts, legends, surfaces });
   document.documentElement.classList.add("ready");
   registerServiceWorker();

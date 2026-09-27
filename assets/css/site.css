@@ -187,11 +187,10 @@ button { cursor: pointer; }
 .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .btn.primary:hover { background: color-mix(in srgb, var(--ink) 86%, var(--bg)); }
 .btn:disabled { opacity: .45; cursor: default; }
-.btn.small { min-height: 36px; padding: 0 12px; font-size: 13px; }
-@media (pointer: coarse) { .btn.small { min-height: 44px; } }
+.btn.small { min-height: 44px; padding: 0 12px; font-size: 13px; }
 .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .icon-btn {
-  width: 40px; height: 40px; display: inline-grid; place-items: center;
+  flex: none; width: 44px; height: 44px; display: inline-grid; place-items: center;
   border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--ink-2);
 }
 .icon-btn:hover { background: var(--surface-2); color: var(--ink); }
@@ -235,7 +234,6 @@ nav a:hover { color: var(--ink); background: var(--surface-2); }
   .wordmark > span { gap: 1px; }
   .wordmark kbd { width: 15px; height: 21px; font-size: 10.5px; border-radius: 4px; }
   nav a { padding: 0 5px; font-size: 13px; }
-  .icon-btn { width: 36px; }
 }
 
 /* ------------------------------------------------------------ hero */
@@ -271,7 +269,7 @@ h1 {
   display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--surface-2);
 }
 .seg-ctl button {
-  min-height: 38px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent;
+  min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent;
   font-size: 14px; font-weight: 550; color: var(--ink-2); white-space: nowrap;
 }
 .seg-ctl button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .12); font-weight: 650; }
@@ -279,7 +277,7 @@ h1 {
   .play-head { margin-bottom: 14px; }
   .play-head h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .seg-ctl { width: 100%; }
-  .seg-ctl button { flex: 1; padding: 0 8px; font-size: 13.5px; min-height: 40px; }
+  .seg-ctl button { flex: 1; padding: 0 8px; font-size: 13.5px; }
 }
 
 .enc-grid { display: block; }
@@ -400,7 +398,9 @@ select {
   margin-top: 20px; padding: 14px 16px; border-radius: 10px;
   background: var(--surface-2); color: var(--ink); font-size: 15px;
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  overflow-wrap: anywhere;
 }
+.refusal > span { min-width: 0; }
 #dec-err { color: var(--literal); background: color-mix(in srgb, var(--literal) 9%, var(--surface)); }
 .walked {
   margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 15px;
@@ -441,7 +441,8 @@ select {
 .file-btn { position: relative; }
 .file-btn:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 #dec-out { margin-top: 20px; }
-.plain { font-size: clamp(1.35rem, 4vw, 1.9rem); font-weight: 650; line-height: 1.3; margin-bottom: 12px; }
+.plain { font-size: clamp(1.35rem, 4vw, 1.9rem); font-weight: 650; line-height: 1.3; margin-bottom: 12px; overflow-wrap: anywhere; }
+.caption, .walked { overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------------ the walk */
 .walk-slot {
@@ -634,8 +635,6 @@ button.sense:hover { background: color-mix(in srgb, var(--hop) 18%, transparent)
   margin-top: 5px; font-size: 11px; font-weight: 650; line-height: 16px; white-space: nowrap;
   color: var(--choice); font-variant-numeric: tabular-nums;
 }
-.rank .first { font-weight: 500; color: var(--ink-2); }
-@container (max-width: 479.98px) { .rank .first { display: none; } }
 
 .sound { font-size: 16px; line-height: 1.2; white-space: nowrap; }
 .py { font-size: 11px; line-height: 1.3; color: var(--ink-2); font-family: var(--font-mono); }
@@ -691,7 +690,11 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .lit-tile {
   flex-direction: column; gap: 0; padding: 2px 10px 3px; border: 1.5px dashed var(--literal); background: transparent;
 }
-.lit-text { font-size: 15px; line-height: 1.2; white-space: pre; }
+.lit-tile { max-width: min(100%, 36ch); }
+.lit-text {
+  font-size: 15px; line-height: 1.2; white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; max-width: 100%;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; text-align: center;
+}
 .lit-cap { font-size: 10px; font-weight: 650; line-height: 1.1; color: var(--literal); letter-spacing: .02em; }
 
 .walk-fig > .btn.more { margin-top: 16px; }
@@ -808,6 +811,18 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .kb-key.used { border-color: color-mix(in srgb, var(--keys) 60%, var(--key-edge)); }
 .kb-key.focus { outline: 2px solid var(--keys); outline-offset: 1px; }
 .kb-key.flash { background: var(--choice-fill); }
+/* phones: tighter gaps, the US letter small in the top corner and the
+   layout's symbol in the bottom one (like the keycaps in the walk), and the
+   use count as a dot that leaves the key face clear */
+@container (max-width: 479.98px) {
+  .kb-pic { gap: 3px; }
+  .kb-row { gap: 2px; --kbw: calc((100cqw - 24px) / 12.5); padding-left: calc(var(--indent) * (var(--kbw) + 2px)); }
+  .kb-key { border-radius: 4px; height: calc(var(--kbw) * 1.2); }
+  .kb-key .us { left: 2px; top: 0; font-size: 8px; line-height: 1.1; }
+  .kb-key .sym { inset: auto 1px 1px auto; display: block; padding: 0; font-size: min(12px, calc(var(--kbw) * .52)); }
+  .kb-key.unused .sym { display: none; }
+  .kb-key .cnt { right: 1px; top: 1px; bottom: auto; min-width: 0; width: 5px; height: 5px; padding: 0; font-size: 0; }
+}
 .kb-note { margin: 8px 0 0; font-size: 13px; color: var(--ink-2); }
 .kb-note:first-child { margin-top: 0; }
 .kb-es { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 14px; }
@@ -832,10 +847,53 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 }
 .step p { font-size: 15px; color: var(--ink-2); }
 .step p :lang(zh-Hant) { color: var(--ink); }
+/* each figure is input → output, with an optional note underneath; when a
+   card is too narrow for one line, the figure stacks with a downward arrow */
+.step { container-type: inline-size; }
 .fig {
-  order: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto;
+  order: 3; margin-top: auto;
+  display: grid; grid-template-columns: auto auto auto; grid-template-areas: "in arrow out";
+  justify-content: center; align-items: center; gap: 8px 10px;
   padding: 14px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--hairline);
   min-height: 76px;
+}
+.fig:has(> .f-note) { grid-template-areas: "in arrow out" "note note note"; }
+.fig .f-in { grid-area: in; display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; justify-self: end; }
+.fig .c-out, .fig .c-key { white-space: nowrap; }
+.fig .arrow { grid-area: arrow; line-height: 1; }
+.fig .f-out { grid-area: out; display: inline-flex; justify-self: start; }
+.fig .f-note { grid-area: note; justify-self: center; }
+/* thresholds: each figure's one-line width (measured) */
+@container (max-width: 214px) {
+  .fig.fig-1 { grid-template-columns: auto; grid-template-areas: "in" "arrow" "out"; gap: 6px; }
+  .fig.fig-1:has(> .f-note) { grid-template-areas: "in" "arrow" "out" "note"; }
+  .fig.fig-1 > :is(.f-in, .f-out, .f-note, .arrow) { justify-self: center; }
+  .fig.fig-1 .arrow { transform: rotate(90deg); }
+}
+@container (max-width: 194px) {
+  .fig.fig-2 { grid-template-columns: auto; grid-template-areas: "in" "arrow" "out"; gap: 6px; }
+  .fig.fig-2:has(> .f-note) { grid-template-areas: "in" "arrow" "out" "note"; }
+  .fig.fig-2 > :is(.f-in, .f-out, .f-note, .arrow) { justify-self: center; }
+  .fig.fig-2 .arrow { transform: rotate(90deg); }
+}
+@container (max-width: 232px) {
+  .fig.fig-3 { grid-template-columns: auto; grid-template-areas: "in" "arrow" "out"; gap: 6px; }
+  .fig.fig-3:has(> .f-note) { grid-template-areas: "in" "arrow" "out" "note"; }
+  .fig.fig-3 > :is(.f-in, .f-out, .f-note, .arrow) { justify-self: center; }
+  .fig.fig-3 .arrow { transform: rotate(90deg); }
+}
+@container (max-width: 402px) {
+  .fig.fig-4 { grid-template-columns: auto; grid-template-areas: "in" "arrow" "out"; gap: 6px; }
+  .fig.fig-4:has(> .f-note) { grid-template-areas: "in" "arrow" "out" "note"; }
+  .fig.fig-4 > :is(.f-in, .f-out, .f-note, .arrow) { justify-self: center; }
+  .fig.fig-4 .arrow { transform: rotate(90deg); }
+}
+/* four cards in a row: every figure reads top to bottom, alike */
+@media (min-width: 1024px) {
+  .fig { grid-template-columns: auto; grid-template-areas: "in" "arrow" "out"; gap: 6px; }
+  .fig:has(> .f-note) { grid-template-areas: "in" "arrow" "out" "note"; }
+  .fig > :is(.f-in, .f-out, .f-note, .arrow) { justify-self: center; }
+  .fig .arrow { transform: rotate(90deg); }
 }
 .step h3 { order: 1; }
 .step > p:not(.strip-note) { order: 2; }
@@ -864,6 +922,7 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .strip-note { color: var(--ink-2); font-size: 15px; line-height: 1.9; }
 .strip-note :lang(es) { color: var(--ink); }
 .strip { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; padding: 0 2px; }
+.strip > span + span { margin-left: .4em; }
 .strip > span { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; text-decoration-skip-ink: none; }
 .strip .seg-ja_romaji { text-decoration-color: var(--seg-ja_romaji); }
 .strip .seg-en_identity { text-decoration-color: var(--seg-en_identity); }
@@ -898,8 +957,8 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
   display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px;
   font-size: 12px; font-weight: 650; background: var(--surface-2); color: var(--ink-2);
 }
-.diff.d1, .diff.d3 { color: var(--keys); background: color-mix(in srgb, var(--keys) 11%, transparent); }
-.diff.d2, .diff.d4 { color: var(--choice); background: color-mix(in srgb, var(--choice) 11%, transparent); }
+.diff.d3 { color: var(--keys); background: color-mix(in srgb, var(--keys) 11%, transparent); }
+.diff.d4 { color: var(--choice); background: color-mix(in srgb, var(--choice) 11%, transparent); }
 .diff.d5, .diff.d6 { color: var(--literal); background: color-mix(in srgb, var(--literal) 10%, transparent); }
 .badge-solved {
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px;
@@ -926,6 +985,8 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .confirm p { font-size: 14px; margin-bottom: 8px; }
 .revealed { border-top: 1px solid var(--hairline); padding-top: 14px; }
 .revealed .plain { margin-bottom: 4px; }
+/* focus targets after a reveal, not controls: no ring */
+.revealed .plain:focus, .revealed .error:focus { outline: none; }
 .revealed .walk-slot { margin-top: 12px; }
 .chal-walk { margin-top: 12px; }
 .key-details { margin-top: 12px; border: 1px solid var(--hairline); border-radius: 12px; }
@@ -967,6 +1028,7 @@ dialog {
 dialog::backdrop { background: rgb(10 12 16 / .45); }
 dialog h2 { font-size: 1.25rem; margin-bottom: 10px; }
 dialog p { font-size: 15px; color: var(--ink-2); }
+dialog .puzzle-note { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); color: var(--ink); }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 10px 0 12px; font-size: 15px; cursor: pointer; }
 
 .toast {

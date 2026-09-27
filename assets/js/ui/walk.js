@@ -142,10 +142,10 @@ function fan(n) {
 
 function rankText(u) {
   const { unit, seg } = u;
-  if (unit.selected !== null && unit.selected !== undefined) return [T.pickedByDigit(unit.selected), ""];
-  if (seg.layout === "ja_romaji" && unit.index === null) return [T.kanaAsTyped, ""];
-  if (unit.count === 1) return [T.onlyOne, ""];
-  return [T.rank(unit.index, unit.count), unit.index === 0 ? T.rankFirst : ""];
+  if (unit.selected !== null && unit.selected !== undefined) return T.pickedByDigit(unit.selected);
+  if (seg.layout === "ja_romaji" && unit.index === null) return T.kanaAsTyped;
+  if (unit.count === 1) return T.onlyOne;
+  return T.rank(unit.index, unit.count);
 }
 
 // ------------------------------------------------------------ figure
@@ -223,7 +223,7 @@ export function renderWalk(host, trace, ctx) {
       g.classList.add("literal");
       g.setAttribute("aria-label", T.literalLabel(wordNo, w.word.literal));
       g.append(band("msg", 0, h("span.wtile.lit-tile", { title: T.literalTitle },
-        h("span.lit-text", { lang: srcTag }, shown), h("span.lit-cap", T.literalCaption))));
+        h("bdi.lit-text", { lang: srcTag }, shown), h("span.lit-cap", T.literalCaption))));
       segEl(w.si, w.seg).words.append(g);
       view.wordEls.set(`${w.si}-${w.wi}`, g);
       continue;
@@ -246,7 +246,8 @@ export function renderWalk(host, trace, ctx) {
       g.append(band(`hop${i}`, bandIndex.get(`hop${i}`),
         edgeSvg("hopline", svgLine("50%", "0", "50%", "100%", "edge hop")),
         h("span.pill", `${from} → ${to}`)));
-      const chip = h("button.sense", { type: "button", tabindex: "-1", "aria-haspopup": "dialog", "data-hop": String(i) }, T.sense(c.index, c.count));
+      const chip = h("button.sense", { type: "button", tabindex: "-1", "aria-haspopup": "dialog", "data-hop": String(i) },
+        c.lang === "en" ? T.pivotWord(c.index, c.count) : T.sense(c.index, c.count));
       chip.addEventListener("click", () => ctx.onOpenSense && ctx.onOpenSense(view, w, i, chip));
       view.stops.push(chip);
       g.append(band(`dict${i}`, bandIndex.get(`dict${i}`),
@@ -278,10 +279,10 @@ export function renderWalk(host, trace, ctx) {
     if (u.kind === "homophone") {
       const pinyin = seg.language === "zh" && seg.layout !== "ko_dubeolsik" ? ctx.layouts.numberedPinyin(unit.reading) : null;
       const ghosts = unit.head.filter(c => c !== unit.out).slice(0, 3);
-      const [rank, firstWord] = rankText(u);
+      const rank = rankText(u);
       const soundTag = seg.layout === "ko_dubeolsik" ? "ko" : seg.language === "ja" ? "ja" : "zh-Hant";
       const label = unit.count > 1 && unit.index !== null
-        ? `${unit.out}, candidate ${unit.index} of ${unit.count}, sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}, keys ${keysText}`
+        ? `${unit.out}, candidate ${unit.index + 1} of ${unit.count}, sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}, keys ${keysText}`
         : `${unit.out}, ${rank}, sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}, keys ${keysText}`;
       li.setAttribute("aria-label", label);
       const wide = cps(unit.out).length > 1;
@@ -292,7 +293,7 @@ export function renderWalk(host, trace, ctx) {
       stack.addEventListener("click", () => ctx.onOpenUnit && ctx.onOpenUnit(view, u, stack));
       stop = stack;
       li.append(
-        band("char", bandIndex.get("char"), stack, h("span.rank", { "aria-hidden": "true" }, rank, firstWord ? h("span.first", firstWord) : null)),
+        band("char", bandIndex.get("char"), stack, h("span.rank", { "aria-hidden": "true" }, rank)),
         band("choice", bandIndex.get("choice"), edgeSvg("choice", svgLine("50%", "0", "50%", "100%", "edge ch"))),
         band("sound", bandIndex.get("sound"), h("span.sound", { lang: soundTag }, unit.reading), pinyin ? h("span.py", { lang: "en" }, pinyin) : null),
         band("keyedge", bandIndex.get("keyedge"), fan(legend.length)),
@@ -316,9 +317,11 @@ export function renderWalk(host, trace, ctx) {
         const n = layout === "es_accent" && k + 1 < legend.length && /[0-9]/.test(legend[k + 1].key) ? 2 : 1;
         const caps = legend.slice(k, k + n);
         k += n;
+        // a cell over two keys (an accent digit) gets one edge to each
+        const edges = Array.from({ length: n }, (_, j) => svgLine("50%", "0", `${((j + 0.5) / n) * 100}%`, "100%", "edge key"));
         pairs.append(h("span.pair", { style: { "--n": String(n) } },
           h("span.lcell", { lang: tag }, letter),
-          edgeSvg("straight", svgLine("50%", "0", "50%", "100%", "edge key")),
+          edgeSvg("straight", ...edges),
           keycaps(caps, layout)));
       }
       li.append(pairs);
@@ -407,7 +410,7 @@ export function renderWalk(host, trace, ctx) {
     const r = view.unitEls.get(pathKey(path));
     if (!r) return;
     const tile = r.li.querySelector(".tile .glyph"), rank = r.li.querySelector(".rank");
-    view.override = { r, glyph: tile.textContent, rank: rank.innerHTML };
+    view.override = { r, glyph: tile.textContent, rank: rank.textContent };
     tile.textContent = char;
     rank.textContent = T.rank(index, count);
     r.li.classList.add("whatif");
@@ -416,7 +419,7 @@ export function renderWalk(host, trace, ctx) {
     if (!view.override) return;
     const { r, glyph, rank } = view.override;
     r.li.querySelector(".tile .glyph").textContent = glyph;
-    r.li.querySelector(".rank").innerHTML = rank;
+    r.li.querySelector(".rank").textContent = rank;
     r.li.classList.remove("whatif");
     view.override = null;
   };
@@ -476,7 +479,7 @@ export function renderTable(host, trace, ctx) {
   for (const w of m.words) {
     if (w.literal) {
       n++;
-      tbody.append(h("tr.lit-row", h("td", String(n)), h("td", { colspan: "5" }, T.tableLiteral(w.word.literal))));
+      tbody.append(h("tr.lit-row", h("td", String(n)), h("td", { colspan: "5" }, T.tableLiteral[0], h("bdi", w.word.literal), T.tableLiteral[1])));
       continue;
     }
     w.units.forEach((u, i) => {
@@ -486,13 +489,14 @@ export function renderTable(host, trace, ctx) {
         const span = String(w.units.length);
         tr.append(h("td", { rowspan: span, lang: srcTag }, w.word.source),
           h("td", { rowspan: span }, w.word.chain.length
-            ? w.word.chain.map((c, k) => [k ? " → " : "", h("span", { lang: LANG_TAGS[c.lang] }, c.word), ` (${T.sense(c.index, c.count)})`])
+            ? w.word.chain.map((c, k) => [k ? " → " : "", h("span", { lang: LANG_TAGS[c.lang] }, c.word),
+              ` (${c.lang === "en" ? T.pivotWord(c.index, c.count) : T.sense(c.index, c.count)})`])
             : "—"));
       }
       const tag = LANG_TAGS[u.seg.language];
       const pinyin = u.kind === "homophone" && u.seg.language === "zh" && u.seg.layout !== "ko_dubeolsik" ? ctx.layouts.numberedPinyin(u.unit.reading) : null;
       tr.append(
-        h("td", u.kind === "homophone" ? [h("span", { lang: tag }, u.unit.out), " ", rankText(u)[0]] : h("span", { lang: tag }, u.unit.out)),
+        h("td", u.kind === "homophone" ? [h("span", { lang: tag }, u.unit.out), " ", rankText(u)] : h("span", { lang: tag }, u.unit.out)),
         h("td", u.kind === "homophone" ? [h("span", { lang: u.seg.layout === "ko_dubeolsik" ? "ko" : tag }, u.unit.reading), pinyin ? ` ${pinyin}` : ""] : "—"),
         h("td.mono", { lang: "en", translate: "no" }, u.unit.keys));
       tbody.append(tr);

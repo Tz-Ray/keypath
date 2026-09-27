@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>KeyPath: hide a message in keystrokes</title>
-<meta name="description" content="KeyPath is a puzzle cipher. A message becomes the raw keystrokes of a Chinese, Japanese, Korean, Russian or Spanish keyboard, and a small key records the route back.">
+<meta name="description" content="KeyPath is a puzzle cipher. A message becomes the keystrokes you would type for it on a Chinese, Japanese, Korean or Russian keyboard (or in a Spanish accent-digit scheme), and a small key records the route back.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23fffdf8' stroke='%231b1d22' stroke-width='2'/%3E%3Cpath d='M5 24h22' stroke='%23b9b2a4' stroke-width='2'/%3E%3Ctext x='16' y='20' font-family='ui-monospace,monospace' font-size='15' font-weight='700' text-anchor='middle' fill='%231b1d22'%3EK%3C/text%3E%3C/svg%3E">
 <script>
 try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -71,7 +71,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h1 id="hero-h">Hide a message in the keys you'd press to type it.</h1>
       </div>
       <div class="hero-lead">
-        <p class="lead">KeyPath turns a message into the raw keystrokes of a Chinese, Japanese, Korean, Russian or Spanish keyboard. A small key records every choice on the way, so the walk back is exact.</p>
+        <p class="lead">KeyPath turns a message into the keystrokes you would type for it on a Chinese, Japanese, Korean or Russian keyboard, or in a Spanish accent-digit scheme. A small key records every choice on the way, so the walk back is exact.</p>
         <p class="honest-note" data-honesty>A puzzle, not a lock: it's built to be solved, not to keep secrets.</p>
       </div>
     </div>
@@ -207,10 +207,10 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h3>Look it up.</h3>
         <p>A word can hop into the keyboard's language through a public dictionary, always by way of English. The key notes which sense was used.</p>
         <div class="fig fig-1" aria-hidden="true">
-          <span class="wtile src" data-static="step1.source">welcome</span>
+          <span class="f-in"><span class="wtile src" data-static="step1.source">welcome</span></span>
           <span class="arrow hop">→</span>
-          <span class="wtile dict" lang="zh-Hant" data-static="step1.target">歡迎</span>
-          <span class="sense-chip">sense #<span data-static="step1.index">1</span> of <span data-static="step1.count">2</span></span>
+          <span class="f-out"><span class="wtile dict" lang="zh-Hant" data-static="step1.target">歡迎</span></span>
+          <span class="f-note sense-chip">sense <span data-static="step1.index" data-format="plus1">2</span> of <span data-static="step1.count">2</span></span>
         </div>
       </li>
       <li class="step card">
@@ -218,10 +218,10 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h3>Sound it out.</h3>
         <p>Each character is spelled by its sound, and many share one: <span data-static="step2.count">46</span> characters are read <span lang="zh-Hant">ㄧㄥˊ</span> (yíng). The key notes which one was meant.</p>
         <div class="fig fig-2" aria-hidden="true">
-          <span class="sound" lang="zh-Hant" data-static="step2.reading">ㄧㄥˊ</span>
+          <span class="f-in sound" lang="zh-Hant" data-static="step2.reading">ㄧㄥˊ</span>
           <span class="arrow">→</span>
-          <span class="tiles" lang="zh-Hant" data-static-list="step2.head"><span>營</span><span class="chosen">迎</span><span>螢</span><span>盈</span><span class="more">…</span></span>
-          <span class="rank-chip">#<span data-static="step2.index">1</span> of <span data-static="step2.count">46</span></span>
+          <span class="f-out tiles" lang="zh-Hant" data-static-list="step2.head"><span>營</span><span class="chosen">迎</span><span>螢</span><span>盈</span><span class="more">…</span></span>
+          <span class="f-note rank-chip"><span data-static="step2.index" data-format="ordinal1">2nd</span> of <span data-static="step2.count">46</span></span>
         </div>
       </li>
       <li class="step card">
@@ -229,11 +229,11 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h3>Press the keys.</h3>
         <p>The sound is typed on a real keyboard layout: on Bopomofo, <kbd class="inline">u</kbd> is <span lang="zh-Hant">ㄧ</span>, <kbd class="inline">/</kbd> is <span lang="zh-Hant">ㄥ</span> and <kbd class="inline">6</kbd> is the rising tone. The keystrokes are the whole ciphertext.</p>
         <div class="fig fig-3" aria-hidden="true">
-          <span class="keyrow" data-static-keys="step3">
+          <span class="f-in keyrow" data-static-keys="step3">
             <span class="kc"><kbd><span class="main">u</span><span class="leg" lang="zh-Hant">ㄧ</span></kbd></span><span class="kc"><kbd class="mis"><span class="main">/</span><span class="leg" lang="zh-Hant">ㄥ</span><span class="dot"></span></kbd></span><span class="kc"><kbd class="mis"><span class="main">6</span><span class="leg" lang="zh-Hant">ˊ</span><span class="dot"></span></kbd></span>
           </span>
           <span class="arrow">→</span>
-          <code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code>
+          <span class="f-out"><code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code></span>
         </div>
       </li>
       <li class="step card">
@@ -241,16 +241,14 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h3>Walk back.</h3>
         <p>With the key, decoding is a chain of lookups, exact to the byte. Without it, a solver has to recognise the keyboard and choose characters that make sense. That's the puzzle.</p>
         <div class="fig fig-4" aria-hidden="true">
-          <code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code>
-          <span class="plus">+</span>
-          <code class="c-key">{ key }</code>
+          <span class="f-in"><code class="c-out" data-static="hero.ciphertext">cj0u/6ru8</code> <span class="plus">+</span> <code class="c-key">{ key }</code></span>
           <span class="arrow">→</span>
-          <span class="wtile src" data-static="hero.text">welcome home</span>
+          <span class="f-out"><span class="wtile src" data-static="hero.text">welcome home</span></span>
         </div>
       </li>
     </ol>
     <div class="strip-callout">
-      <p class="strip-note">One line can switch keyboards mid-stream: <code class="strip" lang="en" translate="no"><span class="seg-ja_romaji" data-static="strip.parts.0.keys">sono3gatsu1</span> <span class="seg-en_identity" data-static="strip.parts.1.keys">andthesun</span> <span class="seg-zh_daqian" data-static="strip.parts.2.keys">2k7s84g4</span></code> is “<span lang="es" data-static="strip.text">la luna y el sol de la ciudad</span>” on Japanese romaji, English and Bopomofo. The digits change meaning at every switch.</p>
+      <p class="strip-note">One line can switch keyboards mid-stream: <code class="strip" lang="en" translate="no"><span class="seg-ja_romaji" data-static="strip.parts.0.keys">sono3gatsu1</span><span class="seg-en_identity" data-static="strip.parts.1.keys">andthesun</span><span class="seg-zh_daqian" data-static="strip.parts.2.keys">2k7s84g4</span></code> is “<span lang="es" data-static="strip.text">la luna y el sol de la ciudad</span>” on Japanese romaji, English and Bopomofo. The digits change meaning at every switch.</p>
     </div>
   </div>
 </section>
@@ -259,7 +257,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
   <div class="wrap honest-grid">
     <div>
       <h2 id="honest-h">A puzzle, not a lock</h2>
-      <p>KeyPath hides a message in plain sight, the way a crossword hides a word. Its dictionaries are public and its keyboards are standard, so it is not encryption and offers no security: like a book cipher, all it keeps back is the route. A short message is often solvable without the key, which is the fun of it. Don't use it to protect anything.</p>
+      <p>KeyPath hides a message in plain sight, the way a crossword hides a word. Its dictionaries are public and its keyboard layouts are published, so it is not encryption and offers no security: like a book cipher, all it keeps back is the route. A short message is often solvable without the key, which is the fun of it. Don't use it to protect anything.</p>
       <p class="small muted">Figures from the project's <a href="https://github.com/Tz-Ray/cipher-project/blob/v2.0/docs/09-analysis.md" rel="noopener">analysis</a>.</p>
     </div>
     <dl class="stat-tiles">
@@ -269,11 +267,11 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
       </div>
       <div class="tile-stat">
         <dt data-static="stats.medianCandidates" data-format="int">11</dt>
-        <dd>median number of Chinese characters that share one sound (up to <span data-static="stats.maxCandidates">215</span>).</dd>
+        <dd>median number of Chinese characters that share one sound in Bopomofo or Pinyin (up to <span data-static="stats.maxCandidates">215</span>).</dd>
       </div>
       <div class="tile-stat">
         <dt><span data-static="stats.rank0Percent" data-format="round">73</span>%</dt>
-        <dd>of Chinese choices in the project's test messages are simply the first candidate.</dd>
+        <dd>of the Chinese choices typed in Bopomofo or Pinyin in the project's test messages are simply the first candidate.</dd>
       </div>
     </dl>
   </div>
@@ -298,20 +296,21 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
       <table class="credits">
         <thead><tr><th scope="col">Source</th><th scope="col">Used for</th><th scope="col">License</th></tr></thead>
         <tbody>
-          <tr><td><a href="https://github.com/chewing/libchewing-data" rel="noopener">libchewing-data</a></td><td>Chinese readings, candidate order and phrases</td><td>LGPL-2.1-or-later</td></tr>
-          <tr><td><a href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict" rel="noopener">CC-CEDICT (MDBG)</a></td><td>English → Chinese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
-          <tr><td><a href="https://github.com/scriptin/jmdict-simplified" rel="noopener">JMdict (EDRDG), via jmdict-simplified</a></td><td>English → Japanese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
-          <tr><td><a href="https://github.com/skk-dev/dict" rel="noopener">SKK-JISYO.L</a></td><td>Japanese readings and candidates</td><td>GPL-2.0-or-later</td></tr>
-          <tr><td><a href="https://github.com/garfieldnate/kengdic" rel="noopener">kengdic</a></td><td>English → Korean dictionary hops</td><td>LGPL-2.0-or-later</td></tr>
+          <tr><td><a href="https://github.com/chewing/libchewing-data" rel="noopener">libchewing-data</a></td><td>Chinese readings, candidate order and phrases; the Pinyin syllable list</td><td><a href="LICENSES/LGPL-2.1.txt">LGPL-2.1-or-later</a></td></tr>
+          <tr><td><a href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict" rel="noopener">CC-CEDICT (MDBG)</a></td><td>Chinese ↔ English dictionary hops</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://www.edrdg.org/" rel="noopener">JMdict (EDRDG)</a>, via <a href="https://github.com/scriptin/jmdict-simplified" rel="noopener">jmdict-simplified</a></td><td>English → Japanese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://github.com/skk-dev/dict" rel="noopener">SKK-JISYO.L</a></td><td>Japanese readings and candidates</td><td><a href="LICENSES/GPL-2.0.txt">GPL-2.0-or-later</a></td></tr>
+          <tr><td><a href="https://github.com/garfieldnate/kengdic" rel="noopener">kengdic</a></td><td>English → Korean dictionary hops</td><td><a href="LICENSES/LGPL-2.0.txt">LGPL-2.0-or-later</a></td></tr>
           <tr><td><a href="https://github.com/libhangul/libhangul" rel="noopener">libhangul hanja.txt</a></td><td>Hanja candidates and readings</td><td>BSD-3-Clause</td></tr>
-          <tr><td><a href="https://download.freedict.org/dictionaries/rus-eng/" rel="noopener">FreeDict rus-eng (WikDict, from Wiktionary via DBnary)</a></td><td>English → Russian dictionary hops</td><td>CC BY-SA 3.0</td></tr>
-          <tr><td><a href="https://github.com/freedict/fd-dictionaries" rel="noopener">FreeDict spa-eng</a></td><td>English → Spanish dictionary hops</td><td>GPL-2.0-or-later</td></tr>
+          <tr><td><a href="https://download.freedict.org/dictionaries/rus-eng/" rel="noopener">FreeDict rus-eng (WikDict, from Wiktionary via DBnary)</a></td><td>Russian ↔ English dictionary hops</td><td>CC BY-SA 3.0</td></tr>
+          <tr><td><a href="https://github.com/freedict/fd-dictionaries" rel="noopener">FreeDict spa-eng</a></td><td>Spanish ↔ English dictionary hops</td><td><a href="LICENSES/GPL-2.0.txt">GPL-2.0-or-later</a></td></tr>
           <tr><td><a href="https://github.com/rspeer/wordfreq" rel="noopener">wordfreq data</a></td><td>The English word list and dictionary ordering</td><td>CC BY-SA 4.0</td></tr>
-          <tr><td><a href="https://github.com/notofonts/noto-cjk" rel="noopener">Noto Sans CJK</a></td><td>Fallback glyphs</td><td>SIL OFL 1.1</td></tr>
+          <tr><td><a href="https://www.unicode.org/ucd/" rel="noopener">Unicode Character Database</a></td><td>Which characters Unicode 14 assigns</td><td><a href="LICENSES/Unicode.txt">Unicode License</a></td></tr>
+          <tr><td><a href="https://github.com/notofonts/noto-cjk" rel="noopener">Noto Sans CJK</a></td><td>Fallback glyphs</td><td><a href="fonts/OFL.txt">SIL OFL 1.1</a></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="small">Keyboard layouts are authored in KeyPath (MIT). Full notices and attributions: <a href="DATA-LICENSES.md">DATA-LICENSES.md</a>. Source code, tables and provenance: <a href="https://github.com/Tz-Ray/cipher-project" rel="noopener">github.com/Tz-Ray/cipher-project</a>.</p>
+    <p class="small">Keyboard layouts are authored in KeyPath (MIT); the Pinyin syllable list derives from libchewing-data (LGPL-2.1-or-later). Full notices and attributions: <a href="https://github.com/Tz-Ray/keypath/blob/main/DATA-LICENSES.md" rel="noopener">data licenses</a>. Source code, tables and provenance: <a href="https://github.com/Tz-Ray/cipher-project" rel="noopener">github.com/Tz-Ray/cipher-project</a>.</p>
   </div>
 </section>
 </main>
@@ -326,6 +325,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <dialog id="puzzle-dialog" aria-labelledby="pd-h">
   <h2 id="pd-h">Make it a puzzle</h2>
   <p>The link carries only the keystrokes and a fingerprint of the answer, so your friend can check a guess. Short messages can often be solved without the key.</p>
+  <p id="puzzle-note" class="puzzle-note" role="status" hidden></p>
   <label class="check"><input type="checkbox" id="puzzle-hint"> Name the keyboard as a hint</label>
   <div class="btn-row">
     <button type="button" id="puzzle-copy" class="btn primary">Copy puzzle link</button>

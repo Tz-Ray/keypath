@@ -59,7 +59,8 @@ from keypath.tables import (  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-PROJECT = Path(os.environ.get("KEYPATH_PROJECT", "/home/linuxuser1/cipher-project"))
+# a checkout of the cipher project at tag v2.0; by default next to this repository
+PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 EDITION = "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2"
 VOCAB_SIZE = 10_000
 SEED = 20260924
@@ -120,8 +121,8 @@ STRIP = {
 }
 
 CHALLENGE_COPY = {
-    1: ("Entry", "Type it like a local", "Two characters of very common courtesy. 🇹🇼⌨️", None),
-    2: ("Step up", "Dos teclados, un mensaje",
+    1: ("Warm-up", "Type it like a local", "Two characters of very common courtesy. 🇹🇼⌨️", None),
+    2: ("Warm-up", "Dos teclados, un mensaje",
         "No keyboard picture this time, and the digits do not all mean the same thing.", "Two keyboards"),
     3: ("Easy", "The Key Right of the Space Bar",
         "Nobody pressed the key to the right of the space bar.", None),

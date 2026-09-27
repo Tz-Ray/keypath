@@ -70,7 +70,9 @@ export async function createEngine({ fetchText } = {}) {
   // ------------------------------------------------------------ detect
   function detect(text) {
     const t = text.normalize("NFC");
-    if (/[\u3040-\u30ff]/u.test(t)) return "ja";
+    // kana letters only: the katakana middle dot and the long-vowel mark
+    // (U+30FB, U+30FC) are common punctuation, also used in Chinese
+    if (/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(t)) return "ja";
     if (/\p{Script=Han}/u.test(t)) return "zh";
     if (/\p{Script=Hangul}/u.test(t)) return "ko";
     if (/\p{Script=Cyrillic}/u.test(t)) return "ru";
@@ -183,7 +185,8 @@ export async function createEngine({ fetchText } = {}) {
   }
 
   /** The unit-layer (character) text of a trace with one unit's index overridden. */
-  function whatIfParts(trace, [si, wi, ui], index) {
+  function whatIfParts(trace, path, index) {
+    const [si, wi, ui] = path || [-1, -1, -1];
     const parts = [];
     trace.segments.forEach((seg, s) => {
       const joiner = registry.spacedLanguages.includes(seg.language) ? " " : "";
@@ -207,6 +210,8 @@ export async function createEngine({ fetchText } = {}) {
     return parts;
   }
   const whatIf = (trace, path, index) => whatIfParts(trace, path, index).map(p => p.text).join("");
+  /** The unit-layer text of a trace: what the keys spell, before any dictionary hop back. */
+  const unitText = trace => whatIfParts(trace, null, 0).map(p => p.text).join("");
 
   return {
     version: registry.keypathVersion,
@@ -225,6 +230,7 @@ export async function createEngine({ fetchText } = {}) {
     list,
     whatIf,
     whatIfParts,
+    unitText,
     normalize,
     firstNewer: text => { const cp = firstNewer(text); return cp === null ? null : formatCodePoint(cp); },
     cpLength,

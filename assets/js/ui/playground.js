@@ -1,6 +1,7 @@
 // The playground: "Hide a message" (encode) and "Walk one back" (decode).
 import { $, $$, h, announce, toast, copyText, reducedMotion, cps } from "./dom.js";
 import { T, LANG_NAMES, LANG_TAGS, DEFAULT_SURFACE } from "./text.js";
+import { LOWERCASE_LANGUAGES } from "../engine/normalize.js";
 import { renderCipher, statsOf, keyspaceFormula } from "./walk.js";
 import { mountFigure } from "./figure.js";
 import { renderKeyText, bindKeyButtons } from "./keypanel.js";
@@ -75,7 +76,9 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     const text = el.msg.value;
     if (!text) { state.langMode = "detected"; state.ja = false; return; }
     const d = engine.detect(text);
-    state.ja = d === "ja";
+    // only a detected Japanese message is refused here; a chosen language
+    // is encoded as chosen (the engine treats kana as plain text then)
+    state.ja = state.langMode === "detected" && d === "ja";
     if (state.langMode === "detected" && d && d !== "ja") setLang(d);
   }
 
@@ -150,7 +153,8 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     el.walked.hidden = true;
     paintCipher(r);
     const sname = surfaceName(state.surface);
-    el.caption.textContent = T.caption(r.text, sname);
+    const [before, after] = T.caption(sname);
+    el.caption.replaceChildren(before, h("bdi", r.text), after);
     const st = statsOf(r.trace, r.key);
     const [n, m] = st.leak;
     el.stats.textContent = T.statsLine(st.k, st.choices, n ? T.leakSome(n, m) : T.leakNone);
@@ -263,13 +267,26 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     const r = state.result;
     if (!r || !state.fig || !state.fig.view) return;
     el.walked.hidden = true;
-    const e = await getEngine();
-    const back = await e.decode({ ciphertext: r.ciphertext, keyText: r.keyText });
+    let back;
+    try {
+      const e = await getEngine();
+      back = await e.decode({ ciphertext: r.ciphertext, keyText: r.keyText });
+    } catch {
+      back = { ok: false, reason: "loadFailed" };
+    }
     if (state.result !== r) return;
     await state.fig.view.walkBack();
     if (state.result !== r) return;
     el.walked.hidden = false;
-    el.walked.textContent = back.ok && back.text === r.text ? T.walkedBack(back.text) : (back.ok ? T.walkedBackOther(back.text) : T.keyInvalid(back.message));
+    if (!back.ok) {
+      el.walked.textContent = back.reason === "loadFailed" ? T.loadFailed : T.keyInvalid(back.message);
+      return;
+    }
+    // "identical" only when the decoded text is exactly what is in the box
+    const parts = back.text !== r.text ? T.walkedBackOther
+      : back.text === el.msg.value ? T.walkedBack
+      : T.walkedBackNorm(LOWERCASE_LANGUAGES.has(r.key.source_language));
+    el.walked.replaceChildren(parts[0], h("bdi", back.text), parts[1]);
   });
 
   // replay typing: the cursor steps through the keycaps, the ciphertext fills in
@@ -323,15 +340,23 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
   el.decGo.addEventListener("click", async () => {
     closePopover(false);
     el.decErr.hidden = true;
+    // an empty ciphertext is valid: a message of digits and punctuation
+    // only rides entirely in the key
     const ciphertext = el.decCipher.value.trim();
     const keyText = el.decKey.value;
-    if (!ciphertext || !keyText.trim()) return decError(T.needBoth);
-    const e = await getEngine();
-    const r = await e.decode({ ciphertext, keyText });
+    if (!keyText.trim()) return decError(T.needKey);
+    let r;
+    try {
+      const e = await getEngine();
+      r = await e.decode({ ciphertext, keyText });
+    } catch {
+      r = { ok: false, reason: "crashed" };
+    }
     if (!r.ok) {
       el.decOut.hidden = true;
       const msg = r.reason === "badJson" ? T.badJson : r.reason === "keyInvalid" ? T.keyInvalid(r.message)
-        : r.reason === "notCarried" ? T.notCarried(r.message) : r.reason === "tier2" ? T.tier2 : T.loadFailed;
+        : r.reason === "notCarried" ? T.notCarried(r.message) : r.reason === "tier2" ? T.tier2
+        : r.reason === "crashed" ? T.keyCrashed : T.loadFailed;
       return decError(msg);
     }
     el.decOut.hidden = false;
@@ -356,7 +381,11 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     el.msg.value = t;
     fitMessage();
     state.langMode = "detected";
-    if (l && engine.allowed(l).length) setLang(l);
+    if (l && engine.allowed(l).length) {
+      // the link's language wins; it reads "detected" only if detection agrees
+      setLang(l);
+      if (engine.detect(t) !== l) state.langMode = "chosen";
+    }
     if (s && engine.allowed(state.lang).includes(s)) state.surface = s;
     detectNow();
     return run(animate);

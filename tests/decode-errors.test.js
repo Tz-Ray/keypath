@@ -27,3 +27,15 @@ test("malformed JSON is badJson", async () => {
     assert.equal(r.reason, "badJson", JSON.stringify(text));
   }
 });
+
+test("deeply nested JSON is badJson, never a stack overflow", async () => {
+  const e = await engine();
+  for (const text of ['{"a":'.repeat(3000) + "1" + "}".repeat(3000), "[".repeat(5000) + "]".repeat(5000),
+    "[".repeat(200000) + "]".repeat(200000)]) {
+    const r = await e.decode({ ciphertext: "cj0u/6ru8", keyText: text });
+    assert.equal(r.reason, "badJson");
+  }
+  // the key schema is shallow; nesting well inside the limit is parsed and refused as a key
+  const r = await e.decode({ ciphertext: "cj0u/6ru8", keyText: "[".repeat(900) + "]".repeat(900) });
+  assert.equal(r.reason, "keyInvalid");
+});

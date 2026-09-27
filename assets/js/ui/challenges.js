@@ -64,7 +64,7 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
     });
 
     // reveal, behind a confirmation
-    const revealBtn = h("button.btn", { type: "button", "aria-expanded": "false" }, T.revealWalk);
+    const revealBtn = h("button.btn", { type: "button" }, T.revealWalk);
     const yes = h("button.btn.primary", { type: "button" }, T.reveal);
     const no = h("button.btn", { type: "button" }, T.cancel);
     const confirm = h("div.confirm", { hidden: true }, h("p", T.revealConfirm), h("div.btn-row", yes, no));
@@ -80,17 +80,19 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
       revealBtn.focus();
     });
     yes.addEventListener("click", async () => {
-      confirm.hidden = true;
+      yes.disabled = true;
       await reveal(c, art, out);
+      confirm.hidden = true;
+      yes.disabled = false;
     });
     art.append(h("div.reveal", revealBtn, confirm), out);
     return art;
   }
 
   async function reveal(c, art, out) {
-    const e = await getEngine();
     let data, r;
     try {
+      const e = await getEngine();
       data = await e._internal.data.json(`data/challenges/${String(c.n).padStart(2, "0")}.json`);
       r = await e.decode({ ciphertext: data.ciphertext, keyText: data.keyText });
     } catch {
@@ -98,14 +100,23 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
     }
     out.hidden = false;
     art.classList.add("open");
-    if (!r.ok) { out.replaceChildren(h("p.error", T.loadFailed)); return; }
+    if (!r.ok) {
+      // the answer stays hidden; offer the same reveal again
+      const retry = h("button.btn.small", { type: "button" }, T.retry);
+      const msg = h("p.error", { tabindex: "-1" }, T.loadFailed, " ", retry);
+      retry.addEventListener("click", () => reveal(c, art, out));
+      out.replaceChildren(msg);
+      msg.focus();
+      return;
+    }
     const walk = h("div.chal-walk.walk-slot");
     const whatIf = h("div");
     const pre = h("pre.key-pre");
     renderKeyText(pre, r.keyText, r.spans);
     const names = r.trace.segments.map(s => surfaces.get(s.surface)).filter(Boolean).map(s => s.longName);
+    const plain = h("p.plain", { lang: LANG_TAGS[r.key.source_language] || "en", tabindex: "-1" }, r.text);
     out.replaceChildren(
-      h("p.plain", { lang: LANG_TAGS[r.key.source_language] || "en" }, r.text),
+      plain,
       whatIf, walk,
       h("details.key-details", h("summary", T.theKey), pre),
       h("p.solve", h("a", { href: SOLVE_PATH(c.n), rel: "noopener" }, T.solvePath)));
@@ -114,6 +125,8 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
       message: r.text, surfaceName: names.join(", then "), whatIfSlot: whatIf,
     });
     art.scrollIntoView({ block: "nearest", behavior: "instant" });
+    // focus the answer, so keyboard and screen-reader users land on it
+    plain.focus({ preventScroll: true });
     if (fig.view) fig.view.walkBack();
   }
 }

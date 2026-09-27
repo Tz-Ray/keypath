@@ -57,7 +57,9 @@ export function parseKeyJson(text) {
   }
 
   function value(depth) {
-    if (depth > 5000) bad("nesting too deep");
+    // Python's json.loads gives up near its recursion limit (1000); a key
+    // is under ten levels deep, and this keeps well inside the JS stack
+    if (depth > 1000) bad("nesting too deep");
     ws();
     if (i >= n) bad("expecting value");
     const c = text[i];
@@ -108,7 +110,13 @@ export function parseKeyJson(text) {
     return m[1] !== undefined || m[2] !== undefined ? new PyFloat(num) : (Object.is(num, -0) ? 0 : num);
   }
 
-  const out = value(0);
+  let out;
+  try {
+    out = value(0);
+  } catch (e) {
+    if (e instanceof RangeError) throw new JsonError("nesting too deep");
+    throw e;
+  }
   ws();
   if (i !== n) bad("extra data");
   return out;

@@ -35,6 +35,16 @@ export function listAnd(items) {
 
 const stripDot = s => String(s || "").replace(/[.\s]+$/, "");
 
+/** 1 -> "1st", 2 -> "2nd", 11 -> "11th", 23 -> "23rd" */
+export function ordinal(n) {
+  const t = n % 100, u = n % 10;
+  const suffix = t >= 11 && t <= 13 ? "th" : u === 1 ? "st" : u === 2 ? "nd" : u === 3 ? "rd" : "th";
+  return `${n}${suffix}`;
+}
+
+/** Wrap user text for a plain-text context (aria, captions) so its bidi controls stay inside. */
+export const isolate = s => `\u2068${s}\u2069`;
+
 export const T = {
   // refusals, errors and toasts (§2.3)
   empty: "Type a message to see its keystrokes.",
@@ -51,17 +61,21 @@ export const T = {
   encodeError: "This message can't be walked here. The command-line tool can try it.",
   copied: "Copied.",
   linkCopied: "Link copied.",
-  walkedBack: text => `Walked back: “${text}”, identical to your message.`,
-  walkedBackOther: text => `Walked back: “${text}”.`,
+  // [before, after] around the decoded text (placed in an isolating <bdi>)
+  walkedBack: ["Walked back: “", "”, identical to your message."],
+  walkedBackNorm: lower => ["Walked back: “", `”, your message after KeyPath's normalization${lower ? " (lowercase, single spaces)" : ""}.`],
+  walkedBackOther: ["Walked back: “", "”."],
   lookingUp: "Looking up…",
-  needBoth: "Paste a ciphertext and its key.",
+  needKey: "Paste the key (and its ciphertext).",
+  keyCrashed: "This key can't be read here.",
 
   // detection label
   detected: "detected",
   chosen: "chosen",
 
   // output
-  caption: (message, keyboard) => `“${message}” typed on ${keyboard}.`,
+  // [before, after] around the message (placed in an isolating <bdi>)
+  caption: keyboard => ["“", `” typed on ${keyboard}.`],
   statsLine: (k, c, leak) => `${k} ${k === 1 ? "keystroke" : "keystrokes"} · ${c} ${c === 1 ? "choice" : "choices"} in the key · ${leak}`,
   leakNone: "nothing rides in the key as plain text",
   leakSome: (n, m) => `${n} of ${m} characters ride in the key as plain text`,
@@ -73,23 +87,24 @@ export const T = {
   // figure
   bands: { msg: "Message", dict: "Dictionary", char: "Character", sound: "Sound", letters: "Letters", keys: "Keys" },
   figCaption: (message, ciphertext, keyboard, w, u, k) =>
-    `${message} becomes ${ciphertext} on ${keyboard}: ${w} ${w === 1 ? "word" : "words"}, ${u} ${u === 1 ? "unit" : "units"}, ${k} keystrokes.`,
+    `${isolate(message)} becomes ${ciphertext} on ${keyboard}: ${w} ${w === 1 ? "word" : "words"}, ${u} ${u === 1 ? "unit" : "units"}, ${k} keystrokes.`,
   figureLabel: "The walk from message to keystrokes",
-  sense: (index, count) => `sense #${index} of ${count}`,
-  rank: (index, count) => `#${index} of ${count}`,
-  rankFirst: " · first",
+  // positions are shown counting from 1; the key stores them counting from 0
+  sense: (index, count) => `sense ${index + 1} of ${count}`,
+  pivotWord: (index, count) => `word ${index + 1} of ${count}`,
+  rank: (index, count) => `${ordinal(index + 1)} of ${count}`,
   onlyOne: "only one",
   kanaAsTyped: "kana as typed",
-  pickedByDigit: selected => `#${selected} · picked by the digit`,
+  pickedByDigit: selected => `picked by the digit ${selected + 1}`,
   literalCaption: "in the key",
   literalTitle: "No route for this text, so the key carries it as plain text.",
   misdirection: (key, symbol) => `On this keyboard "${key}" types ${symbol}.`,
   showAll: n => `Show the whole walk (${n} units)`,
-  wordLabel: (i, text, chain) => `Word ${i}: ${text}${chain.map(c => `, dictionary ${c.word}, sense ${c.index} of ${c.count}`).join("")}`,
-  literalLabel: (i, text) => `Word ${i}: in the key as plain text: “${text}”`,
+  wordLabel: (i, text, chain) => `Word ${i}: ${isolate(text)}${chain.map(c => `, dictionary ${c.word}, ${c.lang === "en" ? "word" : "sense"} ${c.index + 1} of ${c.count}`).join("")}`,
+  literalLabel: (i, text) => `Word ${i}: in the key as plain text: “${isolate(text)}”`,
   unitLabel: u => u,
   tableHead: ["#", "Message", "Dictionary", "Character", "Sound", "Keys"],
-  tableLiteral: text => `in the key: “${text}”`,
+  tableLiteral: ["in the key: “", "”"],
 
   // popovers
   // popover titles follow the reading: "ㄧㄥˊ · ying2: 46 characters share this sound"
@@ -100,12 +115,13 @@ export const T = {
   zhCaption: "Ordered by how common each character is (libchewing), ties by code point.",
   hanjaCaption: "In hanja.txt order.",
   jaCaption: "In SKK dictionary order.",
+  countNote: "Numbered from 1 here; the key counts from 0.",
   keysPick: "the key's pick",
-  whatIf: k => `With #${k} there, the same keys spell `,
+  whatIf: k => `With candidate ${k + 1} there, the same keys spell `,
   backToKey: "Back to the key",
-  senseBody: (target, count, dict, index, word) => `${target} has ${count} English ${count === 1 ? "sense" : "senses"} in ${dict}. The key records #${index}: ${word}.`,
+  senseBody: (target, count, dict, index, word) => `${target} has ${count} English ${count === 1 ? "sense" : "senses"} in ${dict}. The key records the ${ordinal(index + 1)}: ${word}.`,
   senseRule: word => `KeyPath takes the first dictionary entry for “${word}” that this keyboard can type.`,
-  pivotBody: (target, count, lang, index, word) => `${target} lists ${count} ${lang} ${count === 1 ? "word" : "words"}; the key records #${index}: ${word}.`,
+  pivotBody: (target, count, lang, index, word) => `${target} lists ${count} ${lang} ${count === 1 ? "word" : "words"}; the key records the ${ordinal(index + 1)}: ${word}.`,
   close: "Close",
 
   // challenges
@@ -123,6 +139,12 @@ export const T = {
   check: "Check",
   copy: "Copy",
   hint: keyboard => `Hint: typed on ${keyboard}.`,
+  answerLang: (source, target) => target
+    ? `Written in ${source}: answer in ${source}, or with the ${target} the keys spell.`
+    : `Written in ${source}: answer in ${source}, or in the language the keys spell.`,
+  answersIgnore: "Answers ignore spaces, punctuation and capitals.",
+  puzzleExample: "This is one of the page's own examples, so its answer is already on the page. Type your own message first.",
+  puzzleEmpty: "This message has nothing to type on the keyboard: all of it rides in the key. Add some words first.",
 
   // theme
   theme: mode => `Colour theme: ${mode}`,

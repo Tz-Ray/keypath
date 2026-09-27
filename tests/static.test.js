@@ -13,6 +13,7 @@ const S = readJson("tests/fixtures/static.json");
 const hero = readJson("data/hero.json");
 const registry = readJson("data/registry.json");
 const nf = new Intl.NumberFormat("en");
+const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th"}`;
 
 const get = path => path.split(".").reduce((o, k) => o[k], { ...S, edition8: registry.currentEdition.slice(0, 8) });
 
@@ -33,6 +34,8 @@ test("every data-static value matches the build's static.json", () => {
       : fmt === "times" ? value.join(" × ")
       : fmt === "int" ? String(Math.round(value))
       : fmt === "round" ? String(Math.round(value))
+      : fmt === "plus1" ? String(value + 1)      // positions are shown counting from 1
+      : fmt === "ordinal1" ? ordinal(value + 1)
       : String(value);
     assert.equal(textOf(el), want, path);
   }

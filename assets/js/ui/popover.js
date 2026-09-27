@@ -11,11 +11,22 @@ function ensurePanel() {
   bodyEl = h("div.pop-body");
   const closeBtn = h("button.pop-close", { type: "button", "aria-label": T.close }, h("span", { "aria-hidden": "true" }, "×"));
   closeBtn.addEventListener("click", () => closePopover(true));
-  panel = h("div.popover", { role: "dialog", "aria-modal": "false", "aria-labelledby": "pop-title", hidden: true },
+  panel = h("div.popover", { role: "dialog", "aria-modal": "false", "aria-labelledby": "pop-title", tabindex: "-1", hidden: true },
     h("div.pop-head", titleEl, closeBtn), bodyEl);
   document.body.append(panel);
   panel.addEventListener("keydown", ev => {
     if (ev.key === "Escape") { ev.preventDefault(); closePopover(true); return; }
+    if (ev.key === "Tab") {
+      // the panel sits at the end of the page: Tab past either edge closes
+      // it and goes back to the unit that opened it
+      const stops = Array.from(panel.querySelectorAll("button")).filter(b => b.tabIndex >= 0);
+      const edge = ev.shiftKey ? stops[0] : stops[stops.length - 1];
+      if (!stops.length || document.activeElement === edge || document.activeElement === panel) {
+        ev.preventDefault();
+        closePopover(true);
+      }
+      return;
+    }
     const cells = Array.from(panel.querySelectorAll(".cand"));
     const i = cells.indexOf(document.activeElement);
     if (i < 0) return;
@@ -27,6 +38,20 @@ function ensurePanel() {
     ev.preventDefault();
     const j = Math.max(0, Math.min(cells.length - 1, i + move));
     cells[j].focus();
+  });
+  // one tab stop for the candidate grid (arrow keys move inside it)
+  panel.addEventListener("focusin", ev => {
+    if (!ev.target.classList || !ev.target.classList.contains("cand")) return;
+    for (const c of panel.querySelectorAll(".cand")) c.tabIndex = c === ev.target ? 0 : -1;
+  });
+  // focus moving elsewhere on the page closes the panel, so it never covers
+  // the focused control
+  panel.addEventListener("focusout", ev => {
+    const to = ev.relatedTarget;
+    if (!panel.hidden && to && !panel.contains(to) && !(invoker && invoker.contains(to))) closePopover(false);
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && !panel.hidden) closePopover(true);
   });
   document.addEventListener("pointerdown", ev => {
     if (!panel.hidden && !panel.contains(ev.target) && !(invoker && invoker.contains(ev.target))) closePopover(false);
@@ -97,20 +122,22 @@ export function openCandidates({ invoker: inv, unit, seg, list, layouts, current
       const b = h("button.cand", {
         type: "button",
         class: `cand${isKey ? " pick" : ""}${i === chosen && !isKey ? " cur" : ""}${cps(c).length > 1 ? " wide" : ""}`,
-        "aria-label": `#${i}: ${c}${isKey ? `, ${T.keysPick}` : ""}`,
+        "aria-label": `${i + 1}: ${c}${isKey ? `, ${T.keysPick}` : ""}`,
         "aria-pressed": i === chosen ? "true" : "false",
-      }, h("span.ci", { "aria-hidden": "true" }, String(i)), h("span.cg", { lang: tag, "aria-hidden": "true" }, c));
+        tabindex: i === chosen ? "0" : "-1",
+      }, h("span.ci", { "aria-hidden": "true" }, String(i + 1)), h("span.cg", { lang: tag, "aria-hidden": "true" }, c));
       b.addEventListener("click", () => {
         onPick(i, c);
         closePopover(true);
       });
       return b;
     }));
+  if (!grid.querySelector('[tabindex="0"]') && grid.firstChild) grid.firstChild.tabIndex = 0;
   const extra = [];
   if (!list.complete && list.count > list.items.length) extra.push(h("p.pop-more", T.jaMore(list.count - list.items.length)));
   const legend = h("p.pop-legend", h("span.swatch", { "aria-hidden": "true" }), T.keysPick);
   onCloseCb = onClose || null;
-  open(inv, title, [grid, ...extra, h("p.pop-caption", caption), legend], ".cand[aria-pressed=true]");
+  open(inv, title, [grid, ...extra, h("p.pop-caption", caption, " ", T.countNote), legend], ".cand[aria-pressed=true]");
 }
 
 /** The sense popover for one hop of a word's chain. */
@@ -135,6 +162,6 @@ export function whatIfBanner(parts, k, lang, onBack) {
   const back = h("button.btn.small", { type: "button" }, T.backToKey);
   back.addEventListener("click", onBack);
   return h("div.whatif-banner", { role: "status" },
-    h("p", T.whatIf(k), h("span.wi-text", { lang: LANG_TAGS[lang] || "en" },
+    h("p", T.whatIf(k), h("bdi.wi-text", { lang: LANG_TAGS[lang] || "en" },
       parts.map(p => (p.mark ? h("mark", p.text) : p.text))), "."), back);
 }

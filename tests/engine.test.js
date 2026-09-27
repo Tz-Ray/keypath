@@ -188,7 +188,9 @@ test("detect, allowed routes and surfaces", async () => {
   assert.equal(e.allowed("en").length, 8);
   assert.deepEqual(e.allowed("ja"), []);
   const cases = { "welcome home": "en", "mañana": "es", "¿qué?": "es", "ёжик": "ru", "한국어": "ko",
-    "國家": "zh", "カタカナ and 漢字": "ja", "123 !?": null };
+    "國家": "zh", "カタカナ and 漢字": "ja", "123 !?": null,
+    // the katakana middle dot and long-vowel mark are punctuation, also used in Chinese
+    "哈利・波特": "zh", "ー・": null, "ラーメン": "ja", "ひらがな": "ja" };
   for (const [text, lang] of Object.entries(cases)) assert.equal(e.detect(text), lang, text);
 });
 
@@ -218,4 +220,20 @@ test("JS round trip on random text: decode(encode(x)) == normalize(x)", async ()
     checked++;
   }
   assert.ok(checked > 400, `${checked}`);
+});
+
+test("unitText: what the keys spell, before the dictionary hop back", async () => {
+  const e = await engine();
+  const r = await e.encode({ text: "welcome home", source: "en", surface: "zh_daqian" });
+  assert.equal(e.unitText(r.trace), "歡迎家");
+  const n = await e.encode({ text: "國家", source: "zh", surface: "zh_daqian" });
+  assert.equal(e.unitText(n.trace), "國家");
+});
+
+test("a message of digits and punctuation rides entirely in the key", async () => {
+  const e = await engine();
+  const r = await e.encode({ text: "123 !!!", source: "en", surface: "zh_daqian" });
+  assert.equal(r.ciphertext, "");
+  const d = await e.decode({ ciphertext: "", keyText: r.keyText });
+  assert.deepEqual([d.ok, d.text], [true, "123 !!!"]);
 });
