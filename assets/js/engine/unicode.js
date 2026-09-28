@@ -1,6 +1,6 @@
 // Code-point helpers and the Unicode-14 guard.
 //
-// KeyPath 2.0.0 runs on Python 3.11, whose Unicode database is 14.0.0; a
+// KeyPath 2.2.0 runs on Python 3.11, whose Unicode database is 14.0.0; a
 // browser may be newer.  By the Unicode normalization stability policy, NFC
 // of text made only of code points assigned in Unicode 14 is the same in
 // every later version, so the engine refuses anything else (and lone

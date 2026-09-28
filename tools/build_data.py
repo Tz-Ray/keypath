@@ -64,7 +64,7 @@ from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v2.0; by default next to this repository
+# a checkout of the cipher project at tag v2.2; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 VERSION = "2.2.0"
 TAG = "v2.2"
