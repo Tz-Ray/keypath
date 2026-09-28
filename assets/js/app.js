@@ -40,7 +40,12 @@ async function main() {
   }
   if (frag && frag.puzzle) showPuzzleBanner($("#puzzle-slot"), frag.puzzle, surfaces);
   playground.initialOpen();
-  initShare({ playground, getEngine });
+  initShare({ playground, getEngine, engine });
+  if (frag && frag.walk) {
+    // a #walk link: the walk back of its ciphertext and key (or the refusal)
+    playground.openWalk(frag.walk);
+    $("#try").scrollIntoView({ block: "start" });
+  }
   initChallenges({ host: $("#challenge-grid"), getEngine, registry: engine.registry, layouts: engine.layouts, legends, surfaces });
   document.documentElement.classList.add("ready");
   registerServiceWorker();

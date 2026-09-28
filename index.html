@@ -35,6 +35,8 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <link rel="modulepreload" href="assets/js/engine/rows.js">
 <link rel="modulepreload" href="assets/js/engine/decode.js">
 <link rel="modulepreload" href="assets/js/engine/keycheck.js">
+<link rel="modulepreload" href="assets/js/engine/kp1.js">
+<link rel="modulepreload" href="assets/js/engine/sha256.js">
 <link rel="modulepreload" href="assets/js/engine/dumps.js">
 <link rel="modulepreload" href="assets/js/engine/hash.js">
 <script type="module" src="assets/js/app.js"></script>
@@ -163,8 +165,14 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
               <div class="btn-row">
                 <button type="button" id="copy-key" class="btn small">Copy key</button>
                 <button type="button" id="dl-key" class="btn small">Download key.json</button>
+                <button type="button" id="copy-short-key" class="btn small">Copy short key</button>
               </div>
-              <p class="small muted">Anyone with this key can read the message.</p>
+              <p class="small muted">Anyone with this key can read the message. The short key is the same key on one line (it begins with <code>kp1.</code>), and “Walk one back” reads either form.</p>
+              <div class="btn-row">
+                <button type="button" id="copy-walk" class="btn small" aria-describedby="walk-link-copy walk-link-note">Copy walk link</button>
+              </div>
+              <p id="walk-link-note" class="small walk-note" role="status" hidden></p>
+              <p id="walk-link-copy" class="small muted">A walk link opens this page on the walk back, with the ciphertext and the key filled in. Anyone with the link can read the message.</p>
             </details>
             <details id="kbd-panel" class="panel">
               <summary>The keyboard</summary>
@@ -177,13 +185,15 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 
       <div role="tabpanel" id="panel-dec" aria-labelledby="tab-dec" hidden>
         <p class="dec-lead">Have a ciphertext and its key? Paste both to walk it back.</p>
+        <p id="dec-note" class="small dec-note" role="status" hidden></p>
         <div class="field">
           <label for="dec-cipher">Ciphertext</label>
           <textarea id="dec-cipher" class="mono" rows="2" spellcheck="false" autocomplete="off" lang="en"></textarea>
         </div>
         <div class="field">
           <label for="dec-key">Key</label>
-          <textarea id="dec-key" class="mono" rows="6" spellcheck="false" autocomplete="off" lang="en"></textarea>
+          <textarea id="dec-key" class="mono" rows="6" spellcheck="false" autocomplete="off" lang="en" aria-describedby="dec-key-hint"></textarea>
+          <p id="dec-key-hint" class="small muted">The key file's text, or its short form, which begins with <code>kp1.</code></p>
         </div>
         <div class="btn-row">
           <button type="button" id="dec-go" class="btn primary">Walk it back</button>

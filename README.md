@@ -77,13 +77,18 @@ node tools/check_links.mjs         # needs the network: every external link reso
 The engine suites compare the JavaScript engine with fixtures the Python
 implementation generated: about 10,400 encode/decode vectors over every live
 route (KeyPath's test corpora and golden vectors, seeded fuzz strings,
-edge cases), 421 walk traces, 193 tampered keys, and exhaustive digests of
+edge cases), 423 walk traces, 195 tampered keys, and exhaustive digests of
 every Chinese phrase and character on all five Chinese keyboards, every
 reading, every Cangjie and Quick code, every Korean syllable, every hanja
 reading and every English row (the Quick rows, which the page derives from
 the Cangjie rows, included). The build itself asserts that each derived
 Quick row equals the row KeyPath's own encoder gives, for every word of the
 English list.
+The short keys (kp1, one line starting `kp1.`) have their own codec in
+`assets/js/engine/kp1.js`, written from KeyPath's kp1 specification: it
+packs every key in the fixtures to the same string as the Python reference
+(about 10,000 keys), unpacks the reference's golden kp1 strings to their
+keys, and refuses every one of its reject vectors.
 
 The page suites check the copy (no leftover development text, honest
 wording, only relative or credited links), that every figure hard-coded in
@@ -99,7 +104,8 @@ horizontal overflow from 360 px up (long literals, long words and error
 paths included), the Cangjie radicals on the keyboard picture and the walk,
 touch-target sizes, focus after popovers and reveals,
 share links with a hand-picked language, puzzles through a dictionary,
-and that the page makes no request outside its own origin and logs no
-errors.
+walk links (`#walk=`, opened in a fresh browser, refused keys, markup that
+must stay text), and that the page makes no request outside its own origin
+and logs no errors.
 
 Everything needs only Node.js 22 or later and this repository.

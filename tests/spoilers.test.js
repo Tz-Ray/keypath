@@ -82,3 +82,20 @@ test("no challenge answer, or character only a challenge answer uses, is on the 
     if (/\p{Script=Han}/u.test(c)) assert.ok(!inFont(cp), `answer-only character ${c} is in a fallback font`);
   }
 });
+
+// docs/10 §9.7: a #walk link carries the key, so it spoils its message; the
+// page says so where it makes one and where it opens one, and never makes
+// one for a challenge.
+test("walk links say that anyone with the link can read the message", async () => {
+  const { T } = await import("../assets/js/ui/text.js");
+  const said = /anyone with the link can read the message/i;
+  const panel = html.slice(html.indexOf('<details id="key-panel"'), html.indexOf("</details>", html.indexOf('<details id="key-panel"')));
+  assert.ok(panel.includes('id="copy-walk"'), "the walk link control is in the key panel");
+  assert.match(panel.replace(/<[^>]+>/g, ""), said, "the key panel says who can read a walk link");
+  assert.match(T.walkOpened, said, "a page opened from a walk link says it too");
+  assert.match(T.walkLinkCopied, said, "and so does the copy confirmation");
+  assert.doesNotMatch(`${T.walkOpened} ${T.walkLinkCopied}`, /secret|hidden|safe/i);
+  // the challenges offer no walk link: a revealed walk stays on its card
+  const challengesJs = readFileSync(join(ROOT, "assets/js/ui/challenges.js"), "utf8");
+  assert.doesNotMatch(challengesJs, /#walk|walkBody|walkLinkOf|kp1/);
+});

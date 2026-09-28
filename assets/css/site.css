@@ -434,6 +434,9 @@ select {
 .panel > :last-child { margin-bottom: 14px; }
 .panel .btn-row { margin-top: 10px; }
 .panel .small.muted { margin-top: 8px; }
+.panel .walk-note { margin-top: 8px; color: var(--ink); overflow-wrap: anywhere; }
+.dec-note { margin: -6px 0 14px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); overflow-wrap: anywhere; }
+#panel-dec .field .small.muted { margin-top: 4px; }
 .key-pre {
   margin: 0; padding: 12px; border-radius: 8px; background: var(--surface-2);
   font-size: 12.5px; line-height: 1.5; max-height: 340px; overflow: auto;

@@ -46,6 +46,8 @@ from keypath.editions import edition_tables, known_editions  # noqa: E402
 from keypath.keyspec import (  # noqa: E402
     KEY_SCHEMA, KEY_VERSION, KEY_VERSIONS, V1_LANGUAGES, V1_LAYOUTS, compute_leakage, dumps_key, loads_key,
 )
+from keypath.errors import KeyValidationError, KeypathError  # noqa: E402
+from keypath.keycodec import pack as kp1_pack, unpack as kp1_unpack  # noqa: E402
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
 from keypath.layouts import zh_cangjie as cangjie_layout  # noqa: E402
 from keypath.layouts import zh_quick as quick_layout  # noqa: E402
@@ -1187,6 +1189,13 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
                     w["translation"]["index"] = 999
                     break
         add("challenge-hop-range", ch[n]["ciphertext"], k2)
+    # docs/10 §2.1 decode-error parity: a zh_cangjie (and a zh_quick) key
+    # with selector_mode inline, which both decoders refuse
+    for layout in ("zh_cangjie", "zh_quick"):
+        c, k = next((c, k) for c, k in shape_keys if k["segments"][0]["layout"] == layout)
+        k2 = copy.deepcopy(k)
+        k2["segments"][0]["selector_mode"] = "inline"
+        add(f"{layout.removeprefix('zh_')}-inline", c, k2)
     records = []
     for name, cipher, key in muts:
         text = json.dumps(key, ensure_ascii=False, indent=2) + "\n"
@@ -1459,6 +1468,91 @@ def kp1_ordinals(out: Out) -> None:
     out.write("tests/fixtures/kp1-ordinals.jsonl", text)
 
 
+# docs/10 §2.2 "Accepted but refused": each unpacks and packs back to itself,
+# and decode refuses its key; with a ciphertext of the right length for it.
+KP1_REFUSED = [
+    ("kp1.AQFnpAORFpsFAQABBQABAgEHAAEAkvYj", "cj0"),      # route translate:ru>zh: unknown hop
+    ("kp1.AQFnpAORFpsFAQABAwABAgEHAAEAMGz8", "cj0"),      # source ru, hop en>zh: not from the source
+    ("kp1.AQEujFMFrFIEAQUAAAEAAQZoE74", "gks"),           # 1.1 on edition v1.0 with ko_dubeolsik
+    ("kp1.AQAujFMFrFIAAQAAAAEAAv____8P_____w8HAJ_yXA", "su3cl3"),  # len 2^31-1, index 2^32-1
+]
+# a walk whose hint and literal are markup (docs/10 §10 M14): text, never HTML
+MARKUP = "<img src=x onerror=alert(1)>"
+
+
+def py_pack(key_text: str) -> str | None:
+    """Python's kp1 pack of a key's text, or None when it has no kp1 form
+    (or is no valid key at all); either way it must not raise otherwise."""
+    try:
+        key = json.loads(key_text)
+    except ValueError:
+        return None
+    try:
+        return kp1_pack(key)
+    except KeyValidationError:
+        return None
+
+
+def kp1_fixtures(out: Out) -> None:
+    """tests/fixtures/kp1.json: the kp1 goldens, reject vectors and
+    accepted-but-refused strings (docs/10 §2.2), and a markup walk;
+    tests/fixtures/kp1-keys.jsonl.gz: Python's pack of every key in the
+    other fixtures (null where it has no kp1 form)."""
+    golden = PROJECT / "tests" / "golden"
+    accepted = []
+    for line in (golden / "kp1.jsonl").read_text(encoding="utf-8").splitlines():
+        g = json.loads(line)
+        key = json.loads((PROJECT / g["source"]).read_text(encoding="utf-8"))
+        for step in g["path"]:
+            key = key[step]
+        assert kp1_pack(key) == g["kp1"], g["source"]
+        assert dumps_key(kp1_unpack(g["kp1"])) == dumps_key(key), g["source"]
+        accepted.append({"source": g["source"], "path": g["path"], "kp1": g["kp1"], "keyText": dumps_key(key)})
+    rejected = []
+    for line in (golden / "kp1-reject.jsonl").read_text(encoding="utf-8").splitlines():
+        g = json.loads(line)
+        try:
+            kp1_unpack(g["kp1"])
+        except KeyValidationError:
+            rejected.append({"why": g["why"], "kp1": g["kp1"]})
+            continue
+        raise SystemExit(f"kp1 reject vector accepted: {g['why']}")
+    refused = []
+    for s, cipher in KP1_REFUSED:
+        key = kp1_unpack(s)
+        assert kp1_pack(key) == s, s
+        try:
+            decode(cipher, key)
+        except KeypathError as exc:
+            refused.append({"kp1": s, "keyText": dumps_key(key), "ciphertext": cipher, "error": type(exc).__name__})
+            continue
+        raise SystemExit(f"accepted-but-refused kp1 decoded: {s}")
+    # the hero's key with a markup hint and a markup literal after its words
+    hero = py_encode(HERO[0], HERO[1], HERO[2])
+    key = copy.deepcopy(hero.key)
+    key["segments"][0]["words"].append({"literal": {"tier": 3, "text": MARKUP}})
+    key["segments"][0]["hint"] = MARKUP
+    markup = {"ciphertext": hero.ciphertext, "keyText": dumps_key(key), "kp1": kp1_pack(key),
+              "decoded": decode(hero.ciphertext, key)}
+    assert markup["decoded"].endswith(MARKUP)
+    out.json("tests/fixtures/kp1.json", {"accepted": accepted, "rejected": rejected, "refused": refused,
+                                          "markup": markup})
+    # every key of the other fixtures, once each
+    seen: set[str] = set()
+    rows = []
+    for fixture in ("vectors", "traces", "decode-errors"):
+        for rec in json.loads("[" + ",".join(gzip.decompress(out.files[f"tests/fixtures/{fixture}.jsonl.gz"])
+                                             .decode("utf-8").splitlines()) + "]"):
+            text = rec.get("expect", {}).get("keyText") if fixture == "vectors" else rec["keyText"]
+            if text is None or text in seen:
+                continue
+            seen.add(text)
+            rows.append({"fixture": fixture, "id": rec["id"], "kp1": py_pack(text)})
+    out.jsonl_gz("tests/fixtures/kp1-keys.jsonl.gz", rows)
+    print(f"[kp1] {len(accepted)} goldens, {len(rejected)} reject vectors, {len(refused)} refused; "
+          f"{len(rows)} fixture keys, {sum(r['kp1'] is not None for r in rows)} with a kp1 form")
+
+
 def guards() -> None:
     assert keypath.__version__ == VERSION, keypath.__version__
     assert tables_sha256() == EDITION, tables_sha256()
@@ -1486,6 +1580,7 @@ def build(root: Path) -> Out:
     unicode_fixture(out)
     static_fixture(out, hero, rows)
     kp1_ordinals(out)
+    kp1_fixtures(out)
     notices(out)
     files = {rel: {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
              for rel, data in sorted(out.files.items()) if rel.startswith("data/")}

@@ -35,6 +35,8 @@ const S = readJson("tests/fixtures/static.json");
 const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 const decodeErrors = readJsonl("tests/fixtures/decode-errors.jsonl.gz");
 const challenges = [1, 2, 3, 4, 5, 6].map(n => readJson(`data/challenges/0${n}.json`));
+const kp1Fixtures = readJson("tests/fixtures/kp1.json");
+const b64url = obj => Buffer.from(JSON.stringify(obj)).toString("base64url");
 
 // ------------------------------------------------------------ bookkeeping
 const results = [];
@@ -549,6 +551,127 @@ await attempt("focus", async () => {
   await press("Enter");
   await b.waitFor(`${q("#challenge-3 .revealed .plain")}`);
   check("reveal: focus lands on the answer", await b.evaluate(`document.activeElement === ${q("#challenge-3 .revealed .plain")}`), await active());
+});
+
+await attempt("walk links", async () => {
+  const capture = `Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async t => { window.__copied = t; } } })`;
+  const decoded = () => `(!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden)`;
+  // the link control in the key panel makes a #walk link with the key as kp1
+  await open(1280, 800);
+  const message = "welcome home, thank you";
+  await typeAndWait(message, "en", "zh_cangjie");
+  await b.evaluate(`${q("#key-panel")}.open = true`);
+  check("walk link: the control is enabled for a typed message",
+    await b.evaluate(`!${q("#copy-walk")}.disabled && ${q("#walk-link-note")}.hidden`));
+  check("walk link: the key panel says anyone with the link can read the message",
+    /Anyone with the link can read the message\./.test(await b.evaluate(`${q("#key-panel")}.textContent`)));
+  await b.evaluate(capture);
+  await b.evaluate(`${q("#copy-walk")}.click()`);
+  const link = await b.waitFor("window.__copied && window.__copied.includes('#walk=') && window.__copied");
+  const shortKey = await b.evaluate(`window.__keypath.engine.kp1Pack(window.__keypath.playground.state.result.key).text`);
+  check("walk link: #walk= relative to the page, carrying the kp1 key",
+    link.startsWith(srv.url + "#walk=") && JSON.parse(Buffer.from(link.split("#walk=")[1], "base64url").toString()).k === shortKey, link);
+
+  // opened in a fresh browser (a new profile: nothing cached, no service worker)
+  const b2 = await launch({ chrome, fontsConf });
+  try {
+    await b2.viewport(1280, 800);
+    // record when each part of the walk lights up
+    await b2.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+      new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
+        .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
+    await b2.navigate(link);
+    await b2.waitFor("document.documentElement.classList.contains('ready')");
+    await b2.waitFor(decoded(), 20000);
+    const got = await b2.evaluate(`[${q("#dec-text")}.textContent, ${q("#tab-dec")}.getAttribute("aria-selected"), ${q("#dec-err")}.hidden,
+      ${q("#dec-key")}.value, ${q("#dec-note")}.textContent]`);
+    check("walk link in a fresh browser: walks the message back", got[0] === message && got[1] === "true" && got[2] && got[3] === shortKey, got);
+    check("walk link in a fresh browser: says anyone with the link can read the message", /anyone with the link can read the message/.test(got[4]), got[4]);
+    await b2.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && document.querySelectorAll("#dec-walk .unit").length === document.querySelectorAll("#dec-walk .unit.lit").length`);
+    const lit = await b2.evaluate("window.__lit");
+    check("walk link in a fresh browser: the walk animates, unit by unit", lit.length >= 6 && lit[lit.length - 1] - lit[0] >= 500, lit.length);
+    const origin2 = srv.origin + "/";
+    const req2 = b2.events.filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
+    check("walk link in a fresh browser: every request stays on the page's origin",
+      req2.length > 5 && req2.every(u => u.startsWith(origin2) || u.startsWith("data:") || u.startsWith("about:")), req2.filter(u => !u.startsWith(origin2)).slice(0, 3));
+    const err2 = b2.events.filter(e => e.method === "Runtime.exceptionThrown" || (e.method === "Runtime.consoleAPICalled" && e.params.type === "error"));
+    check("walk link in a fresh browser: no exceptions and no errors", err2.length === 0, err2.slice(0, 2).map(e => js(e.params).slice(0, 300)));
+  } finally {
+    b2.close();
+  }
+
+  // a reject vector: opened as #walk, and pasted into "Walk one back", shows the refusal and no key
+  const reject = kp1Fixtures.rejected.find(g => g.why === "check mismatch");
+  await b.navigate("about:blank");
+  await b.navigate(`${srv.url}#walk=${b64url({ c: challenges[0].ciphertext, k: reject.kp1 })}`);
+  await b.waitFor("document.documentElement.classList.contains('ready')");
+  await b.waitFor(decoded());
+  const refused = await b.evaluate(`[${q("#dec-err")}.textContent, ${q("#dec-out")}.hidden, ${q("#tab-dec")}.getAttribute("aria-selected")]`);
+  check("walk link: a reject vector shows the refusal, not a key",
+    refused[0].startsWith("This short key can't be read: ") && refused[1] && refused[2] === "true", refused);
+  const upper = kp1Fixtures.rejected.find(g => g.why === "prefix is case-sensitive");
+  for (const [name, text] of [["reject vector (uppercase prefix)", upper.kp1], ["reject vector (check mismatch)", reject.kp1]]) {
+    await b.evaluate(`(() => { ${q("#dec-err")}.hidden = true; ${q("#dec-cipher")}.value = ${js(challenges[0].ciphertext)}; ${q("#dec-key")}.value = ${js(text)}; ${q("#dec-go")}.click(); })()`);
+    await b.waitFor(`!${q("#dec-err")}.hidden`);
+    const msg = await b.evaluate(`[${q("#dec-err")}.textContent, ${q("#dec-out")}.hidden]`);
+    check(`walk one back: a pasted ${name} is refused`, msg[0].startsWith("This short key can't be read: ") && msg[1], msg);
+  }
+
+  // challenge 6's kp1 pasted into "Walk one back" decodes
+  const six = kp1Fixtures.accepted.find(g => g.source === "puzzles/challenge-06/key.json");
+  await b.evaluate(`(() => { ${q("#dec-note")}.hidden = true; ${q("#dec-cipher")}.value = ${js(challenges[5].ciphertext)}; ${q("#dec-key")}.value = ${js(`\n${six.kp1}\n`)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-out")}.hidden && ${q("#dec-text")}.textContent === ${js(challenges[5].plaintext)}`);
+  check("walk one back: challenge 6's kp1 key decodes", await b.evaluate(`${q("#dec-err")}.hidden && document.querySelectorAll("#dec-walk .unit").length > 10`));
+
+  // a hint and a literal of markup: text only, no element, no dialog, no request
+  const m = kp1Fixtures.markup;
+  for (const [form, body] of [["k", { c: m.ciphertext, k: m.kp1 }], ["j", { c: m.ciphertext, j: JSON.stringify(JSON.parse(m.keyText)) }]]) {
+    const from = b.events.length;
+    await b.navigate("about:blank");
+    await b.navigate(`${srv.url}#walk=${b64url(body)}`);
+    await b.waitFor("document.documentElement.classList.contains('ready')");
+    await b.waitFor(decoded());
+    await sleep(600);
+    const page = await b.evaluate(`[${q("#dec-text")}.textContent, document.querySelectorAll("img").length,
+      [...document.querySelectorAll("#dec-walk .lit-text")].map(t => t.textContent).join("|")]`);
+    const since = b.events.slice(from);
+    const dialogs = since.filter(e => e.method === "Page.javascriptDialogOpening").length;
+    const xhits = since.filter(e => e.method === "Network.requestWillBeSent" && /\/x(\?|#|$)/.test(e.params.request.url)).length;
+    check(`walk link (${form}): markup in the hint and a literal stays text`,
+      page[0] === m.decoded && page[1] === 0 && page[2].includes("<img␣src=x␣onerror=alert(1)>") && dialogs === 0 && xhits === 0,
+      js({ page, dialogs, xhits }));
+  }
+
+  // malformed fragments are ignored: the page opens as usual
+  for (const body of [b64url({ c: "su3cl3" }), b64url({ c: "su3cl3", k: reject.kp1, x: 1 }), "A".repeat(8001)]) {
+    await b.navigate("about:blank");
+    await b.navigate(`${srv.url}#walk=${body}`);
+    await b.waitFor("document.documentElement.classList.contains('ready')");
+    await sleep(200);
+    check(`walk link: a malformed fragment is ignored (${body.slice(0, 12)}…)`,
+      await b.evaluate(`${cipherIs(hero.ciphertext)} && ${q("#tab-enc")}.getAttribute("aria-selected") === "true" && ${q("#dec-cipher")}.value === ""`));
+  }
+
+  // the control is disabled, saying why, when there is nothing to type
+  await open(360, 780);
+  await typeMessage("123 !!!", "en", "zh_daqian");
+  await b.waitFor(`${cipherIs("")} && ${q("#stats")}.textContent.startsWith("0 keystrokes")`);
+  await b.evaluate(`${q("#key-panel")}.open = true`);
+  const empty = await b.evaluate(`[${q("#copy-walk")}.disabled, ${q("#walk-link-note")}.hidden, ${q("#walk-link-note")}.textContent]`);
+  check("walk link: an empty ciphertext disables the control with its message",
+    empty[0] && !empty[1] && empty[2] === "This message has nothing to type on the keyboard, so there is no walk to share.", empty);
+  check("walk link: no horizontal scroll at 360px with the key panel open", await noHScroll(360));
+  // the 200-character zh_pinyin edge message fits a link through kp1
+  const long = vectors.find(v => v.class === "edge" && v.surface === "zh_pinyin" && Array.from(v.text).length === 200);
+  await typeAndWait(long.text, "zh", "zh_pinyin");
+  check("walk link: a 200-character Pinyin message fits a link as kp1",
+    await b.evaluate(`!${q("#copy-walk")}.disabled && ${q("#walk-link-note")}.hidden`));
+  // a #walk opened at 360px stays in its box
+  await b.navigate("about:blank");
+  await b.navigate(link);
+  await b.waitFor("document.documentElement.classList.contains('ready')");
+  await b.waitFor(`!${q("#dec-out")}.hidden`);
+  check("walk link: no horizontal scroll at 360px on a walk link", await noHScroll(360));
 });
 
 // requests and errors, for everything above

@@ -28,7 +28,11 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     copyCipher: $("#copy-cipher"),
     decCipher: $("#dec-cipher"), decKey: $("#dec-key"), decFile: $("#dec-file"), decGo: $("#dec-go"),
     decOut: $("#dec-out"), decText: $("#dec-text"), decWalk: $("#dec-walk"), decErr: $("#dec-err"), decWhatIf: $("#dec-whatif"),
+    decNote: $("#dec-note"), copyShortKey: $("#copy-short-key"),
   };
+  // listeners told of every new result (or null when there is none)
+  const resultListeners = [];
+  const tellResult = () => { for (const fn of resultListeners) fn(state.result); };
 
   const state = {
     lang: "en", langMode: "detected", surface: "zh_daqian", ja: false,
@@ -123,6 +127,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
 
   function refuse(text, retry = false) {
     state.result = null;
+    tellResult();
     el.result.hidden = true;
     el.refusal.hidden = false;
     el.refusal.replaceChildren(h("span", text));
@@ -176,6 +181,8 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     const pairs = r.trace.segments.flatMap(s => s.words.flatMap(w => (w.units || []).map(u => [u.keys, u.reading])));
     el.kbdPanel.hidden = layout === "en_identity";
     state.kb = renderKeyboard(el.kbdPic, layout, r.ciphertext, legends, { pairs });
+    el.copyShortKey.disabled = !engine.kp1Pack(r.key).ok;
+    tellResult();
   }
 
   function drawFigure(animate) {
@@ -254,6 +261,11 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     if (state.result && await copyText(state.result.ciphertext)) toast(T.copied);
   });
   bindKeyButtons($("#copy-key"), $("#dl-key"), () => (state.result ? state.result.keyText : ""));
+  // the same key as one kp1 line (docs/10 §2.2), which "Walk one back" reads too
+  el.copyShortKey.addEventListener("click", async () => {
+    const packed = state.result ? engine.kp1Pack(state.result.key) : { ok: false };
+    if (packed.ok && await copyText(packed.text)) toast(T.copied);
+  });
   el.table.addEventListener("click", () => {
     state.table = !state.table;
     el.table.setAttribute("aria-pressed", String(state.table));
@@ -337,9 +349,17 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     el.decFile.value = "";
   });
   let decFig = null;
-  el.decGo.addEventListener("click", async () => {
+  let decSeq = 0;
+  el.decGo.addEventListener("click", () => {
+    el.decNote.hidden = true;
+    return walkOneBack("auto");
+  });
+  // The one decode path: "Walk it back" (the key as JSON or kp1, told apart
+  // by its text) and #walk links (format "kp1" or "json", from the link).
+  async function walkOneBack(format) {
     closePopover(false);
     el.decErr.hidden = true;
+    const seq = ++decSeq;
     // an empty ciphertext is valid: a message of digits and punctuation
     // only rides entirely in the key
     const ciphertext = el.decCipher.value.trim();
@@ -348,13 +368,15 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     let r;
     try {
       const e = await getEngine();
-      r = await e.decode({ ciphertext, keyText });
+      r = await e.decode({ ciphertext, keyText, format });
     } catch {
       r = { ok: false, reason: "crashed" };
     }
+    if (seq !== decSeq) return;
     if (!r.ok) {
       el.decOut.hidden = true;
-      const msg = r.reason === "badJson" ? T.badJson : r.reason === "keyInvalid" ? T.keyInvalid(r.message)
+      const msg = r.reason === "badJson" ? T.badJson
+        : r.reason === "keyInvalid" ? (r.compact ? T.kp1Invalid(r.message) : T.keyInvalid(r.message))
         : r.reason === "notCarried" ? T.notCarried(r.message) : r.reason === "tier2" ? T.tier2
         : r.reason === "crashed" ? T.keyCrashed : T.loadFailed;
       return decError(msg);
@@ -369,7 +391,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
       message: r.text, surfaceName: names.join(", then "), whatIfSlot: el.decWhatIf,
     });
     if (decFig.view) decFig.view.walkBack();
-  });
+  }
   function decError(text) {
     el.decErr.hidden = false;
     el.decErr.textContent = text;
@@ -389,6 +411,19 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     if (s && engine.allowed(state.lang).includes(s)) state.surface = s;
     detectNow();
     return run(animate);
+  }
+
+  /**
+   * Open a #walk link: "Walk one back" with the link's ciphertext and key
+   * filled in, walked back through the same decode path (or refused).
+   */
+  function openWalk({ c, k, j }) {
+    selectTab(1, false);
+    el.decCipher.value = c;
+    el.decKey.value = k !== undefined ? k : j;
+    el.decNote.hidden = false;
+    el.decNote.textContent = T.walkOpened;
+    return walkOneBack(k !== undefined ? "kp1" : "json");
   }
 
   /** Show a precomputed result (the hero) without encoding. */
@@ -425,7 +460,8 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
 
   syncChips();
   return {
-    load, showPrecomputed, verifyHero, initialOpen, run,
+    load, showPrecomputed, verifyHero, initialOpen, run, openWalk,
+    onResult: fn => resultListeners.push(fn),
     get state() { return { text: el.msg.value, lang: state.lang, surface: state.surface, result: state.result }; },
     surfaceName,
   };

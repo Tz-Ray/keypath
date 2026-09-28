@@ -58,11 +58,17 @@ export const T = {
   retry: "Retry",
   badJson: "That key isn't valid JSON.",
   keyInvalid: message => `This key doesn't fit this ciphertext: ${stripDot(message)}.`,
+  kp1Invalid: message => `This short key can't be read: ${stripDot(message)}.`,
   notCarried: what => `This key needs dictionary data this page doesn't carry (${stripDot(what)}).`,
   tier2: "This page can't read free-translation keys.",
   encodeError: "This message can't be walked here.",
   copied: "Copied.",
   linkCopied: "Link copied.",
+  // walk links (#walk, docs/10 §9.7)
+  walkLinkCopied: "Link copied. Anyone with the link can read the message.",
+  walkOpened: "Opened from a walk link, which carries the ciphertext and its key: anyone with the link can read the message.",
+  walkTooLong: "This key is too long for a link; download the key instead.",
+  walkEmpty: "This message has nothing to type on the keyboard, so there is no walk to share.",
   // [before, after] around the decoded text (placed in an isolating <bdi>)
   walkedBack: ["Walked back: “", "”, identical to your message."],
   walkedBackNorm: lower => ["Walked back: “", `”, your message after KeyPath's normalization${lower ? " (lowercase, single spaces)" : ""}.`],

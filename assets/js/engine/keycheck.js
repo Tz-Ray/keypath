@@ -3,7 +3,9 @@
 // checkSchema / checkKey are adapted from cipher-project
 // scripts/build_demo.py (v2.0), MIT: a port of keypath.keyspec._check over
 // the structural KEY_SCHEMA plus the registry rules of validate_key and
-// decode's route and edition-table checks.
+// decode's route and edition-table checks.  They are split as docs/10 §2.2
+// requires: validateKey is validate_key (what kp1 unpack ends in), and
+// checkKey runs decode's own checks (checkDecodable) after it.
 //
 // parseKeyJson reads JSON the way Python's json.loads does where it matters
 // for a key: a number written with a fraction or exponent (1.0, 1e2) is a
@@ -167,19 +169,19 @@ export function splitRoute(route) {
   return [route.slice(0, i), route.slice(i)];
 }
 
-/** The key rules validate_key and decode's route and edition-table checks apply. */
-export function checkKey(key, R) {
+const surfaceOf = (R, lang, layout) => (has(R.surfaces, lang) && has(R.surfaces[lang], layout)
+  ? R.surfaces[lang][layout] : null);
+
+/**
+ * keypath.keyspec.validate_key: the schema and the registry rules, and
+ * nothing that needs the tables (docs/10 §2.2).  kp1 unpack ends here;
+ * checkKey runs decode's own checks after it.
+ */
+export function validateKey(key, R) {
   if (!IS_TYPE.object(key)) fail("key is not a JSON object");
   if (!has(key, "keypath")) fail(`$: missing required field ${show("keypath")}`);
   if (!R.keyVersions.some(v => pyEqual(key.keypath, v))) fail(`unsupported key version ${show(key.keypath)}`);
-  if (!R.editionHashes.includes(key.tables_sha256))
-    fail("key tables_sha256 is not a known table edition");
   checkSchema(key, R.keySchema, "$");
-  const listed = R.editionTables[key.tables_sha256];
-  const requireListed = (owner, files) => {
-    for (const file of files)
-      if (!listed.includes(file)) fail(`${owner} reads table ${file}, which the key's edition does not list`);
-  };
   const v1 = key.keypath === "1.0";
   const checkLanguage = (lang, where) => {
     if (!R.languages.includes(lang)) fail(`${where} ${lang} is not a registered language`);
@@ -189,10 +191,15 @@ export function checkKey(key, R) {
   key.segments.forEach((seg, si) => {
     checkLanguage(seg.language, `segment ${si} language`);
     if (v1 && !R.v1Layouts.includes(seg.layout)) fail(`a 1.0 key cannot use layout ${seg.layout}`);
-    const surface = has(R.surfaces, seg.language) && has(R.surfaces[seg.language], seg.layout)
-      ? R.surfaces[seg.language][seg.layout] : null;
+    const surface = surfaceOf(R, seg.language, seg.layout);
     if (!surface) fail(`segment ${si}: (${seg.language}, ${seg.layout}) is not a registered surface`);
     const [hops, tail] = splitRoute(seg.route);
+    // the 1.0 hop-language rule reads each hop's names, registered or not
+    if (v1) {
+      for (const hop of hops)
+        for (const code of hop.slice(HOP_PREFIX.length).split(">"))
+          if (!R.v1Languages.includes(code)) fail(`a 1.0 key cannot use language ${code} (hop ${hop})`);
+    }
     if (JSON.stringify(tail) !== JSON.stringify(surface.routeTail))
       fail(`segment ${si}: route tail ${show(tail)} is not the tail registered for (${seg.language}, ${seg.layout})`);
     // docs/10 §2.1: a surface first registered in v2.1 or later accepts only
@@ -200,18 +207,6 @@ export function checkKey(key, R) {
     const ordinal = R.kp1Surfaces.findIndex(([l, y]) => l === seg.language && y === seg.layout);
     if (!surface.selectorModes.includes(seg.selector_mode) && ordinal >= R.strictSelectorOrdinal)
       fail(`segment ${si}: ${show(seg.selector_mode)} is not a selector mode of (${seg.language}, ${seg.layout}) (its modes: ${show(surface.selectorModes)})`);
-    let from = key.source_language;
-    for (const hop of hops) {
-      if (!R.hops.includes(hop)) fail(`segment ${si}: unknown hop ${hop}`);
-      const [a, b] = hop.slice(HOP_PREFIX.length).split(">");
-      if (v1 && ![a, b].every(l => R.v1Languages.includes(l)))
-        fail(`a 1.0 key cannot use language ${[a, b].find(l => !R.v1Languages.includes(l))}`);
-      if (a !== from) fail(`segment ${si}: hop chain is not connected (${hop} after ${from})`);
-      from = b;
-    }
-    if (hops.length && from !== seg.language) fail(`segment ${si}: hops do not end at ${seg.language}`);
-    for (const hop of hops) requireListed(`segment ${si}: hop ${hop}`, R.hopTables[hop]);
-    requireListed(`segment ${si}: surface (${seg.language}, ${seg.layout})`, surface.tables);
     if (!surface.homophoneLayer)
       seg.words.forEach(word => {
         for (const unit of (has(word, "units") ? word.units : []))
@@ -219,4 +214,39 @@ export function checkKey(key, R) {
             fail(`segment ${si}: surface (${seg.language}, ${seg.layout}) has no homophone layer; its units carry no homophone_index`);
       });
   });
+}
+
+/**
+ * Decode's own key checks, for a key validateKey accepted: the edition is
+ * known, every hop is registered, the chain starts at the source language
+ * and ends at the segment's, and the edition lists every table it reads.
+ */
+export function checkDecodable(key, R) {
+  if (!R.editionHashes.includes(key.tables_sha256))
+    fail("key tables_sha256 is not a known table edition");
+  const listed = R.editionTables[key.tables_sha256];
+  const requireListed = (owner, files) => {
+    for (const file of files)
+      if (!listed.includes(file)) fail(`${owner} reads table ${file}, which the key's edition does not list`);
+  };
+  key.segments.forEach((seg, si) => {
+    const surface = surfaceOf(R, seg.language, seg.layout);
+    const [hops] = splitRoute(seg.route);
+    let from = key.source_language;
+    for (const hop of hops) {
+      if (!R.hops.includes(hop)) fail(`segment ${si}: unknown hop ${hop}`);
+      const [a, b] = hop.slice(HOP_PREFIX.length).split(">");
+      if (a !== from) fail(`segment ${si}: hop chain is not connected (${hop} after ${from})`);
+      from = b;
+    }
+    if (hops.length && from !== seg.language) fail(`segment ${si}: hops do not end at ${seg.language}`);
+    for (const hop of hops) requireListed(`segment ${si}: hop ${hop}`, R.hopTables[hop]);
+    requireListed(`segment ${si}: surface (${seg.language}, ${seg.layout})`, surface.tables);
+  });
+}
+
+/** Every key rule decode applies before walking: validate_key's, then decode's own. */
+export function checkKey(key, R) {
+  validateKey(key, R);
+  checkDecodable(key, R);
 }

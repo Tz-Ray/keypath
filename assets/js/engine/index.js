@@ -18,11 +18,13 @@ import { createEnglish } from "./rows.js";
 import { walkKey, keyNeeds, Tier2Error } from "./decode.js";
 import { KeyError, JsonError, checkKey, parseKeyJson, has } from "./keycheck.js";
 import { dumpsKeyWithSpans } from "./dumps.js";
+import * as kp1 from "./kp1.js";
 
 export { normalize } from "./normalize.js";
 export { cpCompare, cpLength, codePoints } from "./unicode.js";
 export { answerNorm, answerFold, sha256Hex, checkAnswer } from "./hash.js";
 export { dumpsKey, dumpsKeyWithSpans } from "./dumps.js";
+export { trimAscii, KP1_PREFIX } from "./kp1.js";
 
 const CHALLENGE_COUNT = 6;
 
@@ -108,22 +110,56 @@ export async function createEngine({ fetchText } = {}) {
     throw e;
   }
 
-  const decode = ({ ciphertext, keyText }) => decodeText(ciphertext, keyText, true);
+  // A key is JSON text or a kp1 string (docs/10 §2.2).  format "auto" reads
+  // kp1 when the text, trimmed of ASCII whitespace, starts with "kp1." in
+  // any case (the codec itself then insists on lowercase), else JSON.
+  const isCompact = keyText => /^kp1\./i.test(kp1.trimAscii(keyText));
+  const decode = ({ ciphertext, keyText, format = "auto" }) => decodeText(ciphertext, keyText, true, format);
 
-  async function decodeText(ciphertext, keyText, withRows) {
-    let key;
-    try { key = parseKeyJson(keyText); } catch (e) {
-      if (e instanceof JsonError) return { ok: false, reason: "badJson", message: e.message };
-      throw e;
+  async function decodeText(ciphertext, keyText, withRows, format = "json") {
+    let key, compact = null;
+    if (format === "kp1" || (format === "auto" && isCompact(keyText))) {
+      compact = kp1.trimAscii(keyText);
+      try { key = kp1.unpack(compact, registry); } catch (e) {
+        if (e instanceof KeyError) return { ok: false, reason: "keyInvalid", compact: true, message: e.message };
+        throw e;
+      }
+    } else {
+      try { key = parseKeyJson(keyText); } catch (e) {
+        if (e instanceof JsonError) return { ok: false, reason: "badJson", message: e.message };
+        throw e;
+      }
     }
     try {
       checkKey(key, registry);
       await prefetch(key, ciphertext, withRows);
       const { text, trace } = walkKey({ registry, layouts, lists, siteId }, ciphertext, key);
       const dumped = dumpsKeyWithSpans(key);
-      return { ok: true, text, trace, key, keyText: dumped.text, spans: dumped.spans };
+      return { ok: true, text, trace, key, keyText: dumped.text, spans: dumped.spans, compact };
     } catch (e) {
       return refusal(e);
+    }
+  }
+
+  // ------------------------------------------------------------ kp1
+  /** The kp1 string of a key (object or JSON text): {ok, text} | {ok: false, message}. */
+  function kp1Pack(keyOrText) {
+    try {
+      const key = typeof keyOrText === "string" ? parseKeyJson(keyOrText) : keyOrText;
+      return { ok: true, text: kp1.pack(key, registry) };
+    } catch (e) {
+      if (e instanceof KeyError || e instanceof JsonError) return { ok: false, message: e.message };
+      throw e;
+    }
+  }
+  /** The key a kp1 string carries (callers trim ASCII whitespace first): {ok, key, keyText} | {ok: false, message}. */
+  function kp1Unpack(s, accepted = registry.editionHashes) {
+    try {
+      const key = kp1.unpack(s, registry, accepted);
+      return { ok: true, key, keyText: dumpsKeyWithSpans(key).text };
+    } catch (e) {
+      if (e instanceof KeyError) return { ok: false, message: e.message };
+      throw e;
     }
   }
 
@@ -232,6 +268,9 @@ export async function createEngine({ fetchText } = {}) {
       return r.ok ? r.trace : null;
     },
     list,
+    kp1Pack,
+    kp1Unpack,
+    isCompact,
     whatIf,
     whatIfParts,
     unitText,
@@ -239,6 +278,6 @@ export async function createEngine({ fetchText } = {}) {
     firstNewer: text => { const cp = firstNewer(text); return cp === null ? null : formatCodePoint(cp); },
     cpLength,
     // internals for tests and tools
-    _internal: { data, lists, native, english, siteId, surfaceById, registerSlices, loadChallengeLists },
+    _internal: { data, lists, native, english, siteId, surfaceById, registerSlices, loadChallengeLists, kp1 },
   };
 }
