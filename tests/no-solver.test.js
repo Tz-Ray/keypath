@@ -49,13 +49,82 @@ function isSplit(x) {
   return names.some(name => isPieces(piecesOf(x.filter(o => isObject(o) && typeof o[name] === "string").map(o => o[name]))));
 }
 
+/**
+ * The strings in `value`, depth first in property, entry and element order,
+ * each with the name of the nearest property above it ("" at the top).
+ * With `names`, property names and string Map keys count as strings too
+ * (units as {tgno: "歡", …}); with `joined`, an array of strings counts as
+ * the one string it joins to (units as lists of keys, at any depth).
+ */
+function stringsOf(value, { names = false, joined = false } = {}) {
+  const out = [];
+  const seen = new Set();
+  const walk = (v, name) => {
+    if (typeof v === "string") { out.push([name, v]); return; }
+    if (v === null || typeof v !== "object" || seen.has(v)) return;
+    seen.add(v);
+    if (Array.isArray(v)) {
+      if (joined && v.length > 0 && v.every(x => typeof x === "string")) out.push([name, v.join("")]);
+      else for (const x of v) walk(x, name);
+      return;
+    }
+    const entries = v instanceof Map ? [...v.entries()] : v instanceof Set ? [...v.values()].map(x => [null, x]) : Object.entries(v);
+    for (const [key, x] of entries) {
+      if (typeof key !== "string") { walk(x, name); continue; }
+      if (names) out.push([name, key]);
+      walk(x, key);
+    }
+  };
+  walk(value, "");
+  return out;
+}
+
+/** Whether some consecutive pieces of `strings` are a split of the stream. */
+function holdsWindow(strings) {
+  const pieces = piecesOf(strings);
+  for (let i = 0; i < pieces.length; i++) {
+    let text = "";
+    for (let j = i; j < pieces.length && STREAM.startsWith(text + pieces[j]); j++) {
+      text += pieces[j];
+      if (text === STREAM && isPieces(pieces.slice(i, j + 1))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether the strings of `value`, whatever its shape, hold a split of the
+ * stream: all of them in order, or those under one property name (units as
+ * {keys, reading, …} in the words of a walk, the engine's own trace shape,
+ * with the unit's other strings between them), each also with property
+ * names, or with arrays of strings joined.
+ */
+function stringsSplit(value) {
+  for (const names of [false, true]) {
+    for (const joined of [false, true]) {
+      const found = stringsOf(value, { names, joined });
+      if (holdsWindow(found.map(([, text]) => text))) return true;
+      if (names) continue;
+      const byName = new Map();
+      for (const [name, text] of found) byName.set(name, [...(byName.get(name) ?? []), text]);
+      if ([...byName.values()].some(holdsWindow)) return true;
+    }
+  }
+  return false;
+}
+
 /** Whether `value` is, or holds anywhere inside it, a split of the stream. */
-function holdsSplits(value, seen = new Set()) {
+function holdsSplits(value) {
+  return holdsShapedSplits(value) || stringsSplit(value);
+}
+
+/** Whether `value` or anything inside it has one of isSplit's shapes. */
+function holdsShapedSplits(value, seen = new Set()) {
   if (isSplit(value)) return true;
   if (value === null || typeof value !== "object" || seen.has(value)) return false;
   seen.add(value);
   const items = value instanceof Map || value instanceof Set ? [...value.values()] : Object.values(value);
-  return items.some(x => holdsSplits(x, seen));
+  return items.some(x => holdsShapedSplits(x, seen));
 }
 
 /** The ways a function could be handed the stream with no layout. */
@@ -90,6 +159,22 @@ test("the detector finds splits", () => {
     "tgno-yhvl-jmso", "tgno\nyhvl\njmso", "tgno 歡 yhvl 迎 jmso 家", "[tgno][yhvl][jmso]"])
     assert.ok(holdsSplits(text), text);
   assert.ok(holdsSplits(["tgno|yhvl", "jmso"]));
+  // the engine's own walk: units nested in words, a split across words
+  const walk = (...words) => ({ ok: true, text: "歡迎家", trace: { ciphertext: STREAM, segments: [{ surface: "zh_cangjie", words }] } });
+  assert.ok(holdsSplits(walk({ source: "歡迎", units: [{ keys: "tgno", at: 0 }, { keys: "yhvl", at: 4 }] },
+    { source: "家", units: [{ keys: "jmso", at: 8 }] })));
+  assert.ok(holdsSplits({ words: [{ units: [{ keys: "tgno" }] }, { units: [{ keys: "yhvl" }] }, { units: [{ keys: "jmso" }] }] }));
+  // with a unit's other strings between its keys, or its keys anywhere in it
+  assert.ok(holdsSplits(walk({ source: "歡迎", units: [{ keys: "tgno", reading: "fun", layout: "zh_cangjie" },
+    { keys: "yhvl", reading: "jing", layout: "zh_cangjie" }] }, { source: "家", units: [{ keys: "jmso", reading: "gaa" }] })));
+  assert.ok(holdsSplits([{ unit: { keys: "tgno" }, tag: "a" }, { unit: { keys: "yhvljmso" }, tag: "b" }]));
+  assert.ok(holdsSplits({ first: "tgno", rest: ["yhvl", "jmso"] }));
+  assert.ok(holdsSplits(["t", "g", "n", "o", "yhvljmso"]));
+  assert.ok(holdsSplits({ ciphertext: STREAM, units: [{ keys: "tgno" }, { keys: "yhvl" }, { keys: "jmso" }] }), "after the stream whole");
+  // units as property names or Map keys; keys as lists, at any depth
+  assert.ok(holdsSplits({ tgno: "歡", yhvl: "迎", jmso: "家" }));
+  assert.ok(holdsSplits(new Map([["tgno", 0], ["yhvl", 1], ["jmso", 2]])));
+  assert.ok(holdsSplits({ words: [{ units: [{ keys: [..."tgno"] }, { keys: [..."yhvl"] }] }, { units: [{ keys: [..."jmso"] }] }] }));
   // not splits: code points, one unit, the stream quoted or annotated whole
   assert.ok(!holdsSplits([...STREAM]), "a string's code points are no split");
   assert.ok(!holdsSplits([...STREAM].map(keys => ({ keys }))), "code points as objects are no split");
@@ -99,6 +184,10 @@ test("the detector finds splits", () => {
   assert.ok(!holdsSplits(`${STREAM} · (zh, zh_cangjie) · well-formed: no`));
   assert.ok(!holdsSplits({ ok: false, reason: "noLayout" }));
   assert.ok(!holdsSplits(STREAM));
+  assert.ok(!holdsSplits([STREAM, STREAM]), "the stream twice is no split");
+  assert.ok(!holdsSplits(walk({ source: "歡迎家", units: [{ keys: STREAM, at: 0, reading: "fun jing gaa" }] })), "one unit is no split");
+  assert.ok(!holdsSplits(walk(...[...STREAM].map(keys => ({ source: "?", units: [{ keys, at: 0 }] })))), "code points in a walk are no split");
+  assert.ok(!holdsSplits({ [STREAM]: { keys: STREAM } }));
 });
 
 test("the detector catches a splitter that hides behind the allowlist", async () => {
@@ -108,6 +197,11 @@ test("the detector catches a splitter that hides behind the allowlist", async ()
     s => ({ ok: true, units: [{ keys: s.slice(0, 4) }, { keys: s.slice(4) }] }),
     s => `${s.slice(0, 4)}|${s.slice(4, 8)}|${s.slice(8)}`,
     s => [[...s.slice(0, 4)], [...s.slice(4)]],
+    // the engine's own walk shape: units nested per word
+    s => ({ ok: true, text: "歡迎家", trace: { ciphertext: s, segments: [{ surface: "zh_cangjie", words: [
+      { source: "歡迎", units: [{ keys: s.slice(0, 4), at: 0 }, { keys: s.slice(4, 8), at: 4 }] },
+      { source: "家", units: [{ keys: s.slice(8), at: 8 }] }] }] } }),
+    s => ({ words: [{ units: [{ keys: s.slice(0, 4) }] }, { units: [{ keys: s.slice(4, 8) }] }, { units: [{ keys: s.slice(8) }] }] }),
   ];
   for (const fn of splitters) assert.ok(holdsSplits(await answer(fn, CALLS[0])), String(fn));
 });

@@ -2,7 +2,7 @@
 // headless Chromium, opens one page and exposes send/evaluate/screenshot.
 // No dependencies: Node's built-in WebSocket and fetch.
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 
@@ -37,19 +37,37 @@ export function fontConfig(fontDir, outDir) {
   return path;
 }
 
-// Every browser this process launched and has not closed, and every
-// profile directory not yet removed.  The browsers go down with the process
-// however it ends: normally, on an uncaught error, or on SIGTERM / SIGINT /
-// SIGHUP (a test runner's timeout, ^C), so no headless browser outlives its
-// driver.
-const live = new Set();
-const profiles = new Set();
+// Every browser this process launched whose profile directory is not yet
+// removed, by profile.  The browsers go down with the process however it
+// ends: normally, on an uncaught error, or on SIGTERM / SIGINT / SIGHUP (a
+// test runner's timeout, ^C), and their profiles with them, so no headless
+// browser and no profile outlives its driver.
+const launched = new Map();
 
 function removeProfile(profile) {
-  try {
-    rmSync(profile, { recursive: true, force: true });
-    profiles.delete(profile);
-  } catch { /* still in use */ }
+  try { rmSync(profile, { recursive: true, force: true }); } catch { /* still in use */ }
+  if (!existsSync(profile)) launched.delete(profile);
+}
+
+/** Blocks for `ms` milliseconds: the exit handler cannot await. */
+const pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Whether a process of process group `group` still runs; a zombie (dead,
+ * not yet reaped) does not.  Read from /proc; without one, whether the
+ * group can still be signalled.
+ */
+function groupRuns(group) {
+  let pids;
+  try { pids = readdirSync("/proc").filter(name => /^[0-9]+$/.test(name)); } catch {
+    try { process.kill(-group, 0); return true; } catch { return false; }
+  }
+  return pids.some(pid => {
+    let stat;
+    try { stat = readFileSync(`/proc/${pid}/stat`, "utf8"); } catch { return false; }
+    const [state, , pgrp] = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    return pgrp === String(group) && state !== "Z" && state !== "X";
+  });
 }
 
 let hooked = false;
@@ -57,8 +75,21 @@ function hookExit() {
   if (hooked) return;
   hooked = true;
   process.on("exit", () => {
-    for (const proc of live) { try { proc.kill(); } catch { /* gone */ } }
-    for (const profile of [...profiles]) removeProfile(profile);
+    // Each browser runs in a process group of its own (detached), so one
+    // SIGKILL ends it with its zygotes, renderers and utility processes; a
+    // browser merely asked to stop would still be shutting down, and write
+    // Default/Session Storage into its profile, after the profile is gone.
+    // A browser already reaped is skipped: its pid may be another's by now.
+    const browsers = [...launched.values()].filter(proc => proc.exitCode === null && proc.signalCode === null);
+    for (const proc of browsers) {
+      try { process.kill(-proc.pid, "SIGKILL"); } catch { try { proc.kill("SIGKILL"); } catch { /* gone */ } }
+    }
+    const t0 = Date.now();
+    while (browsers.some(proc => groupRuns(proc.pid)) && Date.now() - t0 < 2000) pause(20);
+    for (let i = 0; i < 3 && launched.size; i++) {
+      if (i) pause(50);
+      for (const profile of [...launched.keys()]) removeProfile(profile);
+    }
   });
   for (const [signal, number] of [["SIGTERM", 15], ["SIGINT", 2], ["SIGHUP", 1]])
     process.once(signal, () => process.exit(128 + number));
@@ -83,18 +114,16 @@ export async function launch({ chrome = findChrome(), fontsConf = null } = {}) {
   const env = { ...process.env };
   if (fontsConf) env.FONTCONFIG_FILE = fontsConf;
   hookExit();
-  profiles.add(profile);
   const proc = spawn(chrome, [
     "--headless", "--no-sandbox", "--disable-gpu", "--hide-scrollbars", "--mute-audio",
     "--no-first-run", "--no-default-browser-check", "--disable-extensions",
     "--disable-background-networking", "--disable-component-update", "--disable-sync",
     "--disable-features=Translate,OptimizationHints,MediaRouter",
     "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank",
-  ], { stdio: "ignore", env });
-  live.add(proc);
+  ], { stdio: "ignore", env, detached: true });
+  launched.set(profile, proc);
   const running = () => proc.exitCode === null && proc.signalCode === null;
   const stop = () => {
-    live.delete(proc);
     if (running()) {
       proc.once("exit", () => removeProfile(profile));
       try { proc.kill(); } catch { /* gone */ }
@@ -187,5 +216,5 @@ export async function launch({ chrome = findChrome(), fontsConf = null } = {}) {
   await send("Runtime.enable");
   await send("Network.enable");
   await send("Log.enable");
-  return { send, evaluate, waitFor, viewport, media, screenshot, navigate, close, events, listeners, port, pid: proc.pid };
+  return { send, evaluate, waitFor, viewport, media, screenshot, navigate, close, events, listeners, port, pid: proc.pid, profile };
 }
