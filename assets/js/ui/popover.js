@@ -110,6 +110,9 @@ export function openCandidates({ invoker: inv, unit, seg, list, layouts, current
   } else if (seg.language === "ja") {
     title = [h("span", { lang: "ja" }, unit.reading), T.jaTitle(list.count)];
     caption = T.jaCaption;
+  } else if (seg.layout === "zh_cangjie" || seg.layout === "zh_quick") {
+    title = [h("span", { lang: "en" }, unit.reading), " · ", h("span", { lang: "zh-Hant" }, layouts.radicalsOf(unit.reading)), T.shapeTitle(list.count)];
+    caption = T.shapeCaption;
   } else {
     const py = layouts.numberedPinyin(unit.reading);
     title = [h("span", { lang: "zh-Hant" }, unit.reading), py ? ` · ${py}` : "", T.zhTitle(list.count)];

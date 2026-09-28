@@ -8,7 +8,7 @@
   font-family: "KeyPath Glyphs";
   src: url("../../fonts/glyphs-tc.woff2") format("woff2");
   font-display: swap;
-  unicode-range: U+2C7, U+2CA-2CB, U+2D9, U+3041-3096, U+3105-312F, U+3572, U+3732, U+3D88, U+3E55, U+42FC, U+4552, U+4EE4, U+4EF6, U+4F3D, U+4F73, U+50A2, U+50CC, U+5185, U+52A0, U+53EF, U+5496, U+55B6, U+5609, U+56BE, U+56FD, U+570B, U+584B, U+593E, U+5AC8, U+5B34, U+5B8A, U+5BB6, U+5C40, U+5DC6, U+5E4F, U+5EEE, U+5EFA, U+60A3, U+61FD, U+62C1, U+63DB, U+64EE, U+650D, U+67B7, U+6979, U+6AFF, U+6B22, U+6B4C, U+6B53, U+6B61, U+6BE0, U+6C38, U+6CC7, U+6ECE, U+6FD9-6FDA, U+6FF4, U+7005, U+701B, U+7020, U+702F, U+7192, U+71DF, U+728C, U+7296, U+72BF, U+7333, U+737E, U+73C8, U+7469, U+75C2, U+76C1, U+76C8, U+76E4, U+78D0, U+799C, U+7B33, U+7C5D, U+7C6F, U+7E08, U+7F43, U+801E, U+803A, U+80D6, U+8175, U+822C, U+82F1, U+8304, U+83CA, U+843E, U+846D, U+85C0, U+8647, U+8747, U+87A2, U+8805, U+8888, U+892E, U+898B-898C, U+89AE, U+8B0D, U+8B99, U+8C6D, U+8C72, U+8C91, U+8C9B, U+8D0F, U+8DCF, U+8FCE, U+8FE6, U+9084, U+9144, U+919F, U+926B, U+9375, U+93A3, U+93B5, U+9593, U+97A0, U+9818, U+9A69, U+9C79, U+9D05, U+9D10, U+9D4D, U+9E9A;
+  unicode-range: U+2C7, U+2CA-2CB, U+2D9, U+3041-3096, U+3105-312F, U+3572, U+3732, U+3D88, U+3E55, U+42FC, U+4552, U+4E00, U+4E2D, U+4EBA, U+4EE4, U+4EF6, U+4F3D, U+4F73, U+5009, U+50A2, U+50CC, U+5185, U+52A0, U+5341, U+535C, U+53E3, U+53EF, U+5496, U+55B6, U+5609, U+56BE, U+56FD, U+570B, U+571F, U+584B, U+5927, U+593E, U+5973, U+5AC8, U+5B34, U+5B8A, U+5B9A, U+5BB6, U+5C38, U+5C40, U+5C71, U+5DC6, U+5E4F, U+5EEE, U+5EFA, U+5EFF, U+5F13, U+5FC3, U+60A3, U+61FD, U+6208, U+624B, U+62C1, U+63DB, U+64EE, U+650D, U+6587, U+65B0, U+65E5, U+6708, U+6728, U+67B7, U+6979, U+6AFF, U+6B22, U+6B3A, U+6B4C, U+6B53, U+6B61, U+6BE0, U+6C34, U+6C38, U+6CC7, U+6ECE, U+6F22, U+6FD9-6FDA, U+6FF4, U+7005, U+701B, U+7020, U+702F, U+706B, U+7192, U+71DF, U+728C, U+7296, U+72BF, U+7333, U+737E, U+73C8, U+7469, U+7530, U+75C2, U+76C1, U+76C8, U+76E4, U+78D0, U+799C, U+7AF9, U+7B33, U+7C5D, U+7C6F, U+7E08, U+7E41, U+7F43, U+7F91, U+801E, U+803A, U+80D6, U+8175, U+822C, U+82F1, U+8304, U+83B0, U+83CA, U+840A, U+843E, U+846D, U+8499, U+85C0, U+8647, U+8747, U+87A2, U+8805, U+8888, U+892E, U+898B-898C, U+89AE, U+8B0D, U+8B99, U+8C6D, U+8C72, U+8C91, U+8C9B, U+8D0F, U+8DCF, U+8EDF, U+8EFC, U+8FCE, U+8FD1, U+8FE6, U+901F, U+9084, U+90E8, U+9144, U+919F, U+91D1, U+926B, U+9375, U+93A3, U+93B5, U+9593, U+96E3, U+97A0, U+9818, U+9A69, U+9AD4, U+9C79, U+9D05, U+9D10, U+9D4D, U+9E9A;
 }
 @font-face {
   font-family: "KeyPath Glyphs";
@@ -37,6 +37,8 @@
 
   --seg-zh_daqian: #0F766E;
   --seg-zh_pinyin: #0E6A8A;
+  --seg-zh_cangjie: #3F6212;
+  --seg-zh_quick: #A21CAF;
   --seg-zh_hanja: #7A4B00;
   --seg-ja_romaji: #B4235A;
   --seg-ko_dubeolsik: #4338CA;
@@ -83,6 +85,8 @@
     --focus: #6CB6FF;
     --seg-zh_daqian: #4FD1C5;
     --seg-zh_pinyin: #5CC8EC;
+    --seg-zh_cangjie: #A3E07A;
+    --seg-zh_quick: #F0ABFC;
     --seg-zh_hanja: #F0B45A;
     --seg-ja_romaji: #F58AB1;
     --seg-ko_dubeolsik: #A5B4FC;
@@ -112,6 +116,8 @@
   --focus: #6CB6FF;
   --seg-zh_daqian: #4FD1C5;
   --seg-zh_pinyin: #5CC8EC;
+  --seg-zh_cangjie: #A3E07A;
+  --seg-zh_quick: #F0ABFC;
   --seg-zh_hanja: #F0B45A;
   --seg-ja_romaji: #F58AB1;
   --seg-ko_dubeolsik: #A5B4FC;
@@ -478,7 +484,7 @@ select {
 .walk-legend .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .walk-legend .lg-dict .dot { background: var(--hop); }
 .walk-legend .lg-char .dot { background: var(--choice); }
-.walk-legend .lg-sound .dot { background: var(--ink-2); }
+.walk-legend .lg-sound .dot, .walk-legend .lg-shape .dot { background: var(--ink-2); }
 .walk-legend .lg-keys .dot, .walk-legend .lg-letters .dot { background: var(--keys); }
 .walk-body { display: flex; align-items: flex-start; justify-content: center; }
 .walk-gutter { display: none; flex: none; width: 108px; }
@@ -494,7 +500,7 @@ select {
 .walk-gutter .band span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .walk-gutter .b-dict span::before { background: var(--hop); }
 .walk-gutter .b-char span::before { background: var(--choice); }
-.walk-gutter .b-sound span::before { background: var(--ink-2); }
+.walk-gutter .b-sound span::before, .walk-gutter .b-shape span::before { background: var(--ink-2); }
 .walk-gutter .b-keys span::before, .walk-gutter .b-letters span::before { background: var(--keys); }
 .walk-host.multi .walk-legend { display: flex; }
 
@@ -505,7 +511,7 @@ select {
 .b-bracket { height: var(--h-bracket); }
 .b-char { height: var(--h-char); }
 .b-choice { height: var(--h-choice); }
-.b-sound { height: var(--h-sound); }
+.b-sound, .b-shape { height: var(--h-sound); }
 .b-letters { height: var(--h-letters); }
 .has-homophone .unit .b-letters { height: var(--h-sound); }
 .b-keyedge { height: var(--h-keyedge); }
@@ -526,6 +532,8 @@ select {
 }
 .seg[data-surface="zh_daqian"] { --seg: var(--seg-zh_daqian); }
 .seg[data-surface="zh_pinyin"] { --seg: var(--seg-zh_pinyin); }
+.seg[data-surface="zh_cangjie"] { --seg: var(--seg-zh_cangjie); }
+.seg[data-surface="zh_quick"] { --seg: var(--seg-zh_quick); }
 .seg[data-surface="zh_hanja"] { --seg: var(--seg-zh_hanja); }
 .seg[data-surface="ja_romaji"] { --seg: var(--seg-ja_romaji); }
 .seg[data-surface="ko_dubeolsik"] { --seg: var(--seg-ko_dubeolsik); }
@@ -533,6 +541,8 @@ select {
 .seg[data-surface="es_accent"] { --seg: var(--seg-es_accent); }
 .cipher .cu[data-surface="zh_daqian"] { --seg: var(--seg-zh_daqian); }
 .cipher .cu[data-surface="zh_pinyin"] { --seg: var(--seg-zh_pinyin); }
+.cipher .cu[data-surface="zh_cangjie"] { --seg: var(--seg-zh_cangjie); }
+.cipher .cu[data-surface="zh_quick"] { --seg: var(--seg-zh_quick); }
 .cipher .cu[data-surface="zh_hanja"] { --seg: var(--seg-zh_hanja); }
 .cipher .cu[data-surface="ja_romaji"] { --seg: var(--seg-ja_romaji); }
 .cipher .cu[data-surface="ko_dubeolsik"] { --seg: var(--seg-ko_dubeolsik); }
@@ -712,7 +722,7 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .walk-host.walking .wg:not(.lit) > .band { opacity: .22; }
 .walk-host.walking .unit.lit > .b-keys { transition-delay: 0ms; }
 .walk-host.walking .unit.lit > .b-keyedge, .walk-host.walking .unit.lit > .pairs { transition-delay: 25ms; }
-.walk-host.walking .unit.lit > .b-sound, .walk-host.walking .unit.lit > .b-letters { transition-delay: 50ms; }
+.walk-host.walking .unit.lit > .b-sound, .walk-host.walking .unit.lit > .b-shape, .walk-host.walking .unit.lit > .b-letters { transition-delay: 50ms; }
 .walk-host.walking .unit.lit > .b-choice { transition-delay: 75ms; }
 .walk-host.walking .unit.lit > .b-char { transition-delay: 100ms; }
 .walk-host.walking .unit.lit .stack .tile { box-shadow: 0 0 0 4px color-mix(in srgb, var(--choice) 22%, transparent); }

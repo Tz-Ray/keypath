@@ -1,5 +1,6 @@
-// Hop-free encoders, ported from keypath 2.0.0:
+// Hop-free encoders, ported from keypath 2.2.0:
 //   zh on Dàqiān / Pinyin  - zh.greedy_segment + make_surface.encode_native + word_units
+//   zh on Cangjie / Quick   - the same segmentation + zh_coded.make_surface's encode_word
 //   zh on Dubeolsik (hanja) - zh_ko_hanja.encode_native / encode_word
 //   ko, ru, es, en          - tokenized_native_encoder over each surface's encode_word
 //
@@ -8,6 +9,11 @@
 // readings, the initial-sound law) are baked by tools/build_data.py into the
 // phrase shards data/zh/p/XX.txt as per-character reading digits and final
 // hangul readings, so this module applies them without re-deriving them.
+//
+// Cangjie and Quick give each character one code: data/quick.json holds the
+// Quick lists and data/cangjie/{a..y}.json the Cangjie lists by first
+// letter (a character's Quick code starts with the same letter, which is
+// how a character's Cangjie shard is found).  Both keep the table's order.
 import { assembleWords, regexTokens, tokensToItems } from "./assemble.js";
 import { LayoutError } from "./layouts.js";
 
@@ -15,6 +21,10 @@ const B36 = "0123456789abcdefghijklmnopqrstuvwxyz";
 export const ZH_CORE = "data/zh/core.json";
 export const HANJA_CORE = "data/hanja/core.json";
 export const shardPath = cp => `data/zh/p/${(cp & 0xff).toString(16).padStart(2, "0")}.txt`;
+export const QUICK = "data/quick.json";
+export const SHAPE_LETTERS = "abcdefghijklmnopqrstuvwxy";
+export const cangjiePath = letter => `data/cangjie/${letter}.json`;
+export const SHAPE_EDGE = { zh_cangjie: "shape:zh_cangjie", zh_quick: "shape:zh_quick" };
 
 export function createNative({ data, layouts, lists }) {
   // ------------------------------------------------------------- zh core
@@ -61,6 +71,71 @@ export function createNative({ data, layouts, lists }) {
       hanjaLoading.catch(() => { hanjaLoading = null; });
     }
     return hanjaLoading;
+  }
+
+  // ------------------------------------------------ Cangjie and Quick lists
+  let quick = null;    // {lists: Map(code -> [chars]), codeOf: Map(char -> code)}
+  let quickLoading = null;
+  function loadQuick() {
+    if (!quickLoading) {
+      quickLoading = data.json(QUICK).then(obj => {
+        const byCode = new Map(), codeOf = new Map();
+        for (const [code, chars] of Object.entries(obj)) {
+          const arr = Array.from(chars);
+          byCode.set(code, arr);
+          lists.setFull(SHAPE_EDGE.zh_quick, code, arr);
+          for (const ch of arr) codeOf.set(ch, code);
+        }
+        lists.markComplete(SHAPE_EDGE.zh_quick);
+        quick = { lists: byCode, codeOf };
+        return quick;
+      });
+      quickLoading.catch(() => { quickLoading = null; });
+    }
+    return quickLoading;
+  }
+
+  const cangjie = { lists: new Map(), codeOf: new Map(), letters: new Set() };
+  const cangjieLoads = new Map();
+  // a code is known for sure once the shard of its first letter is loaded
+  lists.markCompleteWhen(SHAPE_EDGE.zh_cangjie, code => cangjie.letters.has(code[0]));
+  function loadCangjieShard(letter) {
+    let p = cangjieLoads.get(letter);
+    if (!p) {
+      p = data.json(cangjiePath(letter)).then(obj => {
+        for (const [code, chars] of Object.entries(obj)) {
+          const arr = Array.from(chars);
+          cangjie.lists.set(code, arr);
+          lists.setFull(SHAPE_EDGE.zh_cangjie, code, arr);
+          for (const ch of arr) cangjie.codeOf.set(ch, code);
+        }
+        cangjie.letters.add(letter);
+      });
+      cangjieLoads.set(letter, p);
+      p.catch(() => cangjieLoads.delete(letter));
+    }
+    return p;
+  }
+  const loadCangjieShards = letters => Promise.all([...new Set(letters)].filter(l => SHAPE_LETTERS.includes(l)).map(loadCangjieShard));
+  const loadAllShapes = () => Promise.all([loadQuick(), loadCangjieShards([...SHAPE_LETTERS])]);
+  /** The Cangjie shards the characters of `cps` need (found through their Quick codes). */
+  async function loadCangjieFor(cps) {
+    const q = await loadQuick();
+    await loadCangjieShards(cps.map(ch => q.codeOf.get(ch)).filter(Boolean).map(code => code[0]));
+  }
+
+  /** zh_coded encode_word: [units, keys], or null when some character has no code. */
+  function shapeWordUnits(word, sid) {
+    const table = sid === "zh_quick" ? quick : cangjie;
+    const units = [];
+    let keys = "";
+    for (const ch of Array.from(word)) {
+      const code = table.codeOf.get(ch);
+      if (code === undefined) return null;
+      units.push({ len: code.length, homophone_index: table.lists.get(code).indexOf(ch) });
+      keys += code;
+    }
+    return units.length ? [units, keys] : null;
   }
 
   // ------------------------------------------------------- phrase shards
@@ -151,17 +226,19 @@ export function createNative({ data, layouts, lists }) {
   /** A zh word encoded on a zh surface: [units, keys] or null when some char is not in zh. */
   function encodeZhWord(word, sid) {
     if (sid === "zh_hanja") return hanjaWordUnits(word);
+    if (Object.prototype.hasOwnProperty.call(SHAPE_EDGE, sid)) return shapeWordUnits(word, sid);
     if (!Array.from(word).every(inZh)) return null;
     return zhWordUnits(word, zhKeysFor(sid));
   }
 
   async function prepareZh(text, sid) {
     const cps = Array.from(text);
-    await Promise.all([loadZhCore(), sid === "zh_hanja" ? loadHanjaCore() : null, loadShardsFor(cps)]);
+    await Promise.all([loadZhCore(), sid === "zh_hanja" ? loadHanjaCore() : null, loadShardsFor(cps),
+      sid === "zh_quick" ? loadQuick() : sid === "zh_cangjie" ? loadCangjieFor(cps) : null]);
     return cps;
   }
 
-  /** The hop-free zh segment on zh_daqian / zh_pinyin / zh_hanja: {words, parts}. */
+  /** The hop-free zh segment on a zh surface: {words, parts}. */
   async function encodeZh(text, sid) {
     const cps = await prepareZh(text, sid);
     const items = segment(cps).map(word => {
@@ -207,8 +284,9 @@ export function createNative({ data, layouts, lists }) {
 
   return {
     loadZhCore, loadHanjaCore, loadShardsFor, loadAllShards,
+    loadQuick, loadCangjieShard, loadCangjieShards, loadAllShapes,
     encodeZh, encodeBijective, encodeZhWord, encodeBijectiveWord, segment,
-    zhState: () => zh, hanjaState: () => hanja, phrases,
+    zhState: () => zh, hanjaState: () => hanja, quickState: () => quick, cangjieState: () => cangjie, phrases,
     TOKENIZERS,
   };
 }

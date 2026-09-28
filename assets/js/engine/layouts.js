@@ -1,4 +1,4 @@
-// Ports of keypath/layouts/*.py (KeyPath 2.0.0), both directions, built
+// Ports of keypath/layouts/*.py (KeyPath 2.2.0), both directions, built
 // from data/layouts.json.  The keys -> text readers are adapted from
 // cipher-project scripts/build_demo.py (v2.0), MIT.
 //
@@ -263,9 +263,28 @@ export function makeLayouts(L) {
     return out.join("");
   }
 
+  // ---------------------------------------------- zh_cangjie, zh_quick
+  // A unit is one character's code, typed as written: 1-5 letters a-y on
+  // Cangjie, 1-2 on Quick (z is unused).  Whether a well-shaped unit is a
+  // code of the table is the candidate lists' business.
+  const radicals = L.zh_cangjie.radicals;
+  function shapeCode(chunk, layout) {
+    if (!chunk) fail("empty keystroke unit");
+    for (const ch of chunk)
+      if (!has(radicals, ch)) fail(`key '${ch}' in unit ${chunk} is not a shape key on layout ${layout} (a-y; z is unused)`);
+    const max = L[layout].maxLetters;
+    if (chunk.length > max) fail(`unit ${chunk} has ${chunk.length} letters; a code on layout ${layout} has 1-${max}`);
+    return chunk;
+  }
+  /** A Cangjie code's Quick code: the code itself up to 2 letters, else its first and last. */
+  const quickOf = code => (code.length <= 2 ? code : code[0] + code[code.length - 1]);
+  /** "ab" -> 日月 (display only). */
+  const radicalsOf = code => Array.from(code, ch => (has(radicals, ch) ? radicals[ch] : "?")).join("");
+
   return {
     data: L,
     daqianKeys, daqianReading, pinyinKeys, pinyinReading,
+    shapeCode, quickOf, radicalsOf, radicals,
     koKeys, koUnit, koDecompose, isKoUnit,
     koUnits: () => { koEnumeration(); return koForward; },
     ruKeysForWord, ruWord, esKeysForWord, esWord, esWordChars,

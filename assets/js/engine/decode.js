@@ -1,9 +1,10 @@
 // The decoder: a port of keypath.walk.decode that also builds the Trace
 // (the walk the page draws).  Adapted from cipher-project
 // scripts/build_demo.py (v2.0), MIT: decodeUnits / decodeKeypath and the
-// layout readers, extended with ja_romaji (keyed and inline selectors) and
-// en_identity, and reading every candidate list through the list store so
-// the page refuses, never misreads, when it lacks a list.
+// layout readers, extended with ja_romaji (keyed and inline selectors),
+// en_identity and the Cangjie and Quick shape codes, and reading every
+// candidate list through the list store so the page refuses, never
+// misreads, when it lacks a list.
 import { cpLength } from "./unicode.js";
 import { KeyError, has, splitRoute, HOP_PREFIX } from "./keycheck.js";
 import { LayoutError } from "./layouts.js";
@@ -41,6 +42,10 @@ function makeUnitReader({ layouts, lists }) {
     "zh/zh_daqian": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.daqianReading(chunk)), unitIndex(unit)),
     "zh/zh_pinyin": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.pinyinReading(chunk)), unitIndex(unit)),
     "zh/ko_dubeolsik": (chunk, unit) => homophone("homophone:ko_hanja", guard(chunk, () => layouts.koUnit(chunk)), unitIndex(unit)),
+    // a shape unit's reading is its code; a well-shaped chunk that is no code
+    // of the table is malformed (the list store knows once its part is loaded)
+    "zh/zh_cangjie": (chunk, unit) => homophone("shape:zh_cangjie", guard(chunk, () => layouts.shapeCode(chunk, "zh_cangjie")), unitIndex(unit)),
+    "zh/zh_quick": (chunk, unit) => homophone("shape:zh_quick", guard(chunk, () => layouts.shapeCode(chunk, "zh_quick")), unitIndex(unit)),
     "ko/ko_dubeolsik": chunk => bijective(guard(chunk, () => layouts.koUnit(chunk))),
     "ru/ru_jcuken": chunk => bijective(guard(chunk, () => layouts.ruWord(chunk))),
     "es/es_accent": chunk => bijective(guard(chunk, () => layouts.esWord(chunk))),
@@ -154,13 +159,23 @@ export function walkKey(ctx, cipher, key) {
   };
 }
 
-/** What a key needs loaded before walking: {zh, hanja, rows: [sid], challenges}. */
-export function keyNeeds(key, { siteId, liveEnglishTargets }) {
-  const needs = { zh: false, hanja: false, rows: new Set(), challenges: false };
+/**
+ * What a key needs loaded before walking over `cipher`: {zh, hanja, quick,
+ * cangjie: first letters of its Cangjie units, rows: [sid], challenges}.
+ */
+export function keyNeeds(key, cipher, { siteId, liveEnglishTargets }) {
+  const needs = { zh: false, hanja: false, quick: false, cangjie: new Set(), rows: new Set(), challenges: false };
+  let pos = 0;
   for (const seg of key.segments) {
     const [hops, tail] = splitRoute(seg.route);
     if (tail[0] === "homophone:zh") needs.zh = true;
     if (tail[0] === "homophone:ko_hanja") needs.hanja = true;
+    if (tail[0] === "shape:zh_quick") needs.quick = true;
+    for (const word of seg.words)
+      for (const unit of has(word, "units") && Array.isArray(word.units) ? word.units : []) {
+        if (tail[0] === "shape:zh_cangjie" && pos < cipher.length) needs.cangjie.add(cipher[pos]);
+        if (has(unit, "len") && Number.isInteger(unit.len) && unit.len > 0) pos += unit.len;
+      }
     const sid = siteId(seg.language, seg.layout);
     const viaRows = key.source_language === "en" && hops.length === 1 && liveEnglishTargets.includes(sid)
       && hops[0] === `${HOP_PREFIX}en>${seg.language}`;

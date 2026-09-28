@@ -10,12 +10,16 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 
 test("the corpus covers every class and live surface", () => {
   const classes = new Set(vectors.map(v => v.class));
-  for (const c of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
+  for (const c of ["site", "golden-shape", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
     "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "edge"])
     assert.ok(classes.has(c), c);
   const surfaces = new Set(vectors.filter(v => !v.jsRefusal && !v.expect.error).map(v => v.surface));
-  assert.equal(surfaces.size, 8);
-  assert.ok(vectors.length > 7000, `${vectors.length} vectors`);
+  assert.equal(surfaces.size, 10);
+  assert.ok(vectors.length > 10000, `${vectors.length} vectors`);
+  // every live surface has fuzz, and Cangjie and Quick the zh corpus and the en one
+  for (const sid of ["zh_cangjie", "zh_quick"])
+    for (const c of ["corpus-zh", "corpus-en", "fuzz-zh", "fuzz-en-x", "golden-shape"])
+      assert.ok(vectors.some(v => v.class === c && v.surface === sid), `${c} on ${sid}`);
 });
 
 const byClass = new Map();

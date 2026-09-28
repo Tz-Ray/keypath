@@ -27,7 +27,7 @@ const lum = hex => {
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 
 const TEXT = ["ink", "ink-2", "keys", "choice", "hop", "literal"];
-const SEGS = ["zh_daqian", "zh_pinyin", "zh_hanja", "ja_romaji", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity"].map(s => `seg-${s}`);
+const SEGS = ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja", "ja_romaji", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity"].map(s => `seg-${s}`);
 
 test("both dark-theme blocks define the same tokens", () => {
   assert.deepEqual(darkMedia, darkAttr);

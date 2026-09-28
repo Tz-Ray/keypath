@@ -15,6 +15,8 @@ export const DEFAULT_SURFACE = { zh: "zh_daqian", ko: "ko_dubeolsik", ru: "ru_jc
 export const SURFACE_BADGE = {
   zh_daqian: "Bopomofo · Chinese",
   zh_pinyin: "Pinyin · Chinese",
+  zh_cangjie: "Cangjie · Chinese",
+  zh_quick: "Quick · Chinese",
   zh_hanja: "Korean keyboard · Chinese hanja",
   ja_romaji: "Romaji · Japanese",
   ko_dubeolsik: "Dubeolsik · Korean",
@@ -85,7 +87,7 @@ export const T = {
   unitMarks: "Unit marks",
 
   // figure
-  bands: { msg: "Message", dict: "Dictionary", char: "Character", sound: "Sound", letters: "Letters", keys: "Keys" },
+  bands: { msg: "Message", dict: "Dictionary", char: "Character", sound: "Sound", shape: "Shape", letters: "Letters", keys: "Keys" },
   figCaption: (message, ciphertext, keyboard, w, u, k) =>
     `${isolate(message)} becomes ${ciphertext} on ${keyboard}: ${w} ${w === 1 ? "word" : "words"}, ${u} ${u === 1 ? "unit" : "units"}, ${k} keystrokes.`,
   figureLabel: "The walk from message to keystrokes",
@@ -104,15 +106,20 @@ export const T = {
   literalLabel: (i, text) => `Word ${i}: in the key as plain text: “${isolate(text)}”`,
   unitLabel: u => u,
   tableHead: ["#", "Message", "Dictionary", "Character", "Sound", "Keys"],
+  tableShape: "Shape",
+  tableSoundShape: "Sound or shape",
   tableLiteral: ["in the key: “", "”"],
 
   // popovers
   // popover titles follow the reading: "ㄧㄥˊ · ying2: 46 characters share this sound"
-  zhTitle: count => `: ${count} characters share this sound`,
+  zhTitle: count => (count === 1 ? ": 1 character has this sound" : `: ${count} characters share this sound`),
+  // "tgno · 廿土弓人: 3 characters share this code"
+  shapeTitle: count => (count === 1 ? ": 1 character has this code" : `: ${count} characters share this code`),
   hanjaTitle: count => `: ${count} hanja share this syllable`,
   jaTitle: count => `: ${count} ${count === 1 ? "word shares" : "words share"} this reading`,
   jaMore: n => `+${n} more in the full dictionary`,
   zhCaption: "Ordered by how common each character is (libchewing), ties by code point.",
+  shapeCaption: "Codes from Unihan. Ordered by how common each character is (libchewing), ties by code point.",
   hanjaCaption: "In hanja.txt order.",
   jaCaption: "In SKK dictionary order.",
   countNote: "Numbered from 1 here; the key counts from 0.",

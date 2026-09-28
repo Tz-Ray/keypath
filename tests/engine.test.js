@@ -139,8 +139,8 @@ test("encode refusals", async () => {
 
 test("the examples on every keyboard", async () => {
   const e = await engine();
-  const all = { zh_daqian: "cj0u/6ru8", zh_pinyin: "huan1ying2jia1", zh_hanja: "ghksdudrk",
-    ko_dubeolsik: "ghksduddkstlrcj", ru_jcuken: "ghbdtncndjdfnmljvf", ja_romaji: "kanngeikokunai",
+  const all = { zh_daqian: "cj0u/6ru8", zh_pinyin: "huan1ying2jia1", zh_cangjie: "tgnoyhvljmso", zh_quick: "toyljo",
+    zh_hanja: "ghksdudrk", ko_dubeolsik: "ghksduddkstlrcj", ru_jcuken: "ghbdtncndjdfnmljvf", ja_romaji: "kanngeikokunai",
     es_accent: "bienvenida", en_identity: "welcomehome" };
   for (const [surface, ciphertext] of Object.entries(all))
     assert.equal((await e.encode({ text: "welcome home", source: "en", surface })).ciphertext, ciphertext, surface);
@@ -193,10 +193,10 @@ test("decode refusals: invalid key, missing data, free translation", async () =>
 
 test("detect, allowed routes and surfaces", async () => {
   const e = await engine();
-  assert.deepEqual(e.surfaces.map(s => s.id), ["zh_daqian", "zh_pinyin", "zh_hanja", "ja_romaji",
-    "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity"]);
-  assert.deepEqual(e.allowed("zh"), ["zh_daqian", "zh_pinyin", "zh_hanja"]);
-  assert.equal(e.allowed("en").length, 8);
+  assert.deepEqual(e.surfaces.map(s => s.id), ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja",
+    "ja_romaji", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity"]);
+  assert.deepEqual(e.allowed("zh"), ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja"]);
+  assert.equal(e.allowed("en").length, 10);
   assert.deepEqual(e.allowed("ja"), []);
   const cases = { "welcome home": "en", "mañana": "es", "¿qué?": "es", "ёжик": "ru", "한국어": "ko",
     "國家": "zh", "カタカナ and 漢字": "ja", "123 !?": null,
@@ -247,4 +247,82 @@ test("a message of digits and punctuation rides entirely in the key", async () =
   assert.equal(r.ciphertext, "");
   const d = await e.decode({ ciphertext: "", keyText: r.keyText });
   assert.deepEqual([d.ok, d.text], [true, "123 !!!"]);
+});
+
+test("Cangjie and Quick: the docs/10 §4.1-4.2 facts, refusals and candidate lists", async () => {
+  const e = await freshEngine();
+  const enc = (text, source, surface) => e.encode({ text, source, surface });
+  const units = r => r.trace.segments.flatMap(s => s.words.flatMap(w => w.units || []));
+  // 歡迎家, from English: keys, indices and set sizes on both keyboards
+  const cj = await enc("welcome home", "en", "zh_cangjie");
+  assert.equal(cj.ciphertext, "tgnoyhvljmso");
+  assert.deepEqual(units(cj).map(u => [u.keys, u.index, u.count]), [["tgno", 0, 3], ["yhvl", 0, 1], ["jmso", 0, 1]]);
+  assert.deepEqual(units(cj).map(u => u.reading), ["tgno", "yhvl", "jmso"]);
+  const qk = await enc("welcome home", "en", "zh_quick");
+  assert.equal(qk.ciphertext, "toyljo");
+  assert.deepEqual(units(qk).map(u => [u.keys, u.index, u.count]), [["to", 0, 59], ["yl", 4, 38], ["jo", 0, 29]]);
+  assert.equal(e.unitText(qk.trace), "歡迎家");
+  // native Chinese
+  for (const [text, c, q] of [["明", "ab", "ab"], ["你好", "onfvnd", "ofvd"], ["中國", "lwirm", "lwm"], ["森林", "ddddd", "dddd"]]) {
+    assert.equal((await enc(text, "zh", "zh_cangjie")).ciphertext, c, text);
+    assert.equal((await enc(text, "zh", "zh_quick")).ciphertext, q, text);
+  }
+  const ri = await enc("日曰", "zh", "zh_cangjie");
+  assert.deepEqual(units(ri).map(u => [u.keys, u.index, u.count]), [["a", 0, 2], ["a", 1, 2]]);
+  // a compatibility ideograph normalizes (NFC) to its twin; 〇 has no code, so it rides in the key
+  assert.deepEqual(units(await enc("兀", "zh", "zh_cangjie")).map(u => [u.keys, u.index, u.out]), [["mu", 0, "兀"]]);
+  const lit = await enc("〇", "zh", "zh_cangjie");
+  assert.deepEqual([lit.ciphertext, lit.leak], ["", [1, 1]]);
+  // candidate lists (the popover): complete, in table order
+  const l = await e.list("shape:zh_cangjie", "tgno");
+  assert.deepEqual([l.count, l.complete, l.items[0]], [3, true, "歡"]);
+  const lq = await e.list("shape:zh_quick", "yl");
+  assert.deepEqual([lq.count, lq.complete, lq.items[4]], [38, true, "迎"]);
+  // refusals: keyed only (docs/10 §2.1), and a well-shaped chunk that is no code is malformed, not missing data
+  const key = JSON.parse(cj.keyText);
+  const inline = structuredClone(key);
+  inline.segments[0].selector_mode = "inline";
+  assert.equal((await e.decode({ ciphertext: cj.ciphertext, keyText: JSON.stringify(inline) })).reason, "keyInvalid");
+  const fresh = await freshEngine();
+  const notCode = await fresh.decode({ ciphertext: "yyyyyhvljmso", keyText: JSON.stringify({ ...key,
+    segments: [{ ...key.segments[0], words: [{ ...key.segments[0].words[0], units: [{ len: 5, homophone_index: 0 }, { len: 4, homophone_index: 0 }] }, key.segments[0].words[1]] }] }) });
+  assert.equal(notCode.reason, "keyInvalid", JSON.stringify(notCode));
+  for (const [cipher, layout, len] of [["abc", "zh_quick", 3], ["az", "zh_cangjie", 2]]) {
+    const r = await fresh.decode({ ciphertext: cipher, keyText: JSON.stringify({ keypath: "1.1", tables_sha256: e.edition, source_language: "zh",
+      segments: [{ language: "zh", layout, route: [`shape:${layout}`, `keystroke:${layout}`], selector_mode: "keyed", words: [{ units: [{ len, homophone_index: 0 }] }] }] }) });
+    assert.equal(r.reason, "keyInvalid", `${layout} ${cipher}`);
+  }
+  // the v2.0 edition does not list zh_cangjie.tsv
+  const old = { ...key, tables_sha256: "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2" };
+  assert.equal((await e.decode({ ciphertext: cj.ciphertext, keyText: JSON.stringify(old) })).reason, "keyInvalid");
+});
+
+test("a Quick key loads the Cangjie rows it derives from, not files of its own", async () => {
+  const seen = [];
+  const { createEngine } = await import("../assets/js/engine/index.js");
+  const { fetchText } = await import("./helpers.js");
+  const e = await createEngine({ fetchText: p => { seen.push(p); return fetchText(p); } });
+  const r = await e.encode({ text: "welcome home", source: "en", surface: "zh_quick" });
+  assert.equal(r.ciphertext, "toyljo");
+  assert.ok(!seen.some(p => p.startsWith("data/en/zh_quick/")), seen.join(" "));
+  assert.ok(seen.includes("data/en/zh_cangjie/w.json") && seen.includes("data/quick.json"));
+  // a fresh engine decodes the key: all 26 Cangjie row files, Quick recoded
+  const seen2 = [];
+  const d = await (await createEngine({ fetchText: p => { seen2.push(p); return fetchText(p); } })).decode({ ciphertext: r.ciphertext, keyText: r.keyText });
+  assert.deepEqual([d.ok, d.text], [true, "welcome home"]);
+  assert.equal(seen2.filter(p => p.startsWith("data/en/zh_cangjie/")).length, 26);
+  assert.ok(!seen2.some(p => p.startsWith("data/en/zh_quick/") || p.startsWith("data/cangjie/")));
+});
+
+test("the Cangjie keyboard legends are read from the table (docs/10 §4.1)", () => {
+  const { radicals } = readJson("data/layouts.json").zh_cangjie;
+  assert.deepEqual(Object.keys(radicals), [..."abcdefghijklmnopqrstuvwxy"]);
+  for (const [key, radical] of Object.entries(radicals)) {
+    const shard = readJson(`data/cangjie/${key}.json`);
+    if (key === "x") {
+      // 難 is the conventional difficult-character key: no character's code is x alone
+      assert.equal(radical, "難");
+      assert.ok(!Object.hasOwn(shard, "x"));
+    } else assert.ok(Array.from(shard[key] || "").includes(radical), `${key}: ${radical} is not coded ${key}`);
+  }
 });

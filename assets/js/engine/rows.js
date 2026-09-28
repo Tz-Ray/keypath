@@ -11,6 +11,13 @@
 // makes it); a word outside the vocabulary is refused, never guessed.
 // Loading a row file also registers the lists the decoder reads: the hop
 // list of each target and, for ja_romaji, the SKK candidates it names.
+//
+// A derived surface (registry.derivedRows, docs/10 §9.7) ships no row files:
+// its rows are computed from its base surface's.  Quick rows are the Cangjie
+// rows with each unit's code recoded to its Quick code (the code up to 2
+// letters, else its first and last) and the index the character's place in
+// that Quick list; tools/build_data.py asserts that this gives Python's own
+// row for every vocabulary word.
 import { assembleWords, regexTokens, tokensToItems } from "./assemble.js";
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
@@ -20,7 +27,7 @@ const TYPED_WORD = /[\p{L}\p{M}'’]*[a-z][\p{L}\p{M}'’]*/gu;
 export const vocabPath = letter => `data/en/vocab/${letter}.json`;
 export const rowsPath = (sid, letter) => `data/en/${sid}/${letter}.json`;
 
-export function createEnglish({ data, layouts, lists, surfaceById }) {
+export function createEnglish({ data, layouts, lists, surfaceById, derivedRows = {}, native }) {
   const vocab = new Map();       // letter -> Set
   const rows = new Map();        // sid/letter -> object
   const pending = new Map();
@@ -54,10 +61,44 @@ export function createEnglish({ data, layouts, lists, surfaceById }) {
     }
   }
 
-  const loadRows = (sid, letter) => once(`r/${sid}/${letter}`, () => data.json(rowsPath(sid, letter)).then(table => {
-    rows.set(`${sid}/${letter}`, table);
-    register(sid, table);
-  }));
+  /** Quick's row from Cangjie's: [target, hopIndex, hopCount, keys, lens, idx] recoded unit by unit. */
+  function quickRow(row) {
+    const [target, hopIndex, hopCount, keys, lens] = row;
+    const chars = Array.from(target);
+    if (chars.length !== lens.length) throw new Error(`the row of ${target} is not one unit per character`);
+    const quick = native.quickState();
+    const qkeys = [], qlens = [], qidx = [];
+    let pos = 0;
+    lens.forEach((n, i) => {
+      const code = layouts.quickOf(keys.slice(pos, pos + n));
+      pos += n;
+      const list = quick.lists.get(code);
+      const at = list ? list.indexOf(chars[i]) : -1;
+      if (at < 0) throw new Error(`${chars[i]} is not in the Quick list ${code}`);
+      qkeys.push(code);
+      qlens.push(code.length);
+      qidx.push(at);
+    });
+    return [target, hopIndex, hopCount, qkeys.join(""), qlens, qidx];
+  }
+  const DERIVE = { zh_quick: { load: () => native.loadQuick(), row: quickRow } };
+  const isDerived = sid => Object.prototype.hasOwnProperty.call(derivedRows, sid);
+
+  const loadRows = (sid, letter) => once(`r/${sid}/${letter}`, () => {
+    if (isDerived(sid)) {
+      const base = derivedRows[sid];
+      return Promise.all([loadRows(base, letter), DERIVE[sid].load()]).then(() => {
+        const table = {};
+        for (const [word, row] of Object.entries(rows.get(`${base}/${letter}`))) table[word] = DERIVE[sid].row(row);
+        rows.set(`${sid}/${letter}`, table);
+        register(sid, table);
+      });
+    }
+    return data.json(rowsPath(sid, letter)).then(table => {
+      rows.set(`${sid}/${letter}`, table);
+      register(sid, table);
+    });
+  });
 
   const loadAllRows = sid => Promise.all([...LETTERS].map(letter => loadRows(sid, letter)));
 

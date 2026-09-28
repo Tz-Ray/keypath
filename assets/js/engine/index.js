@@ -47,7 +47,7 @@ export async function createEngine({ fetchText } = {}) {
   const liveEnglishTargets = registry.allowed.en.filter(sid => byId.get(sid).language !== "en");
 
   const native = createNative({ data, layouts, lists });
-  const english = createEnglish({ data, layouts, lists, surfaceById });
+  const english = createEnglish({ data, layouts, lists, surfaceById, derivedRows: registry.derivedRows, native });
 
   let challengeLists = null;
   function loadChallengeLists() {
@@ -88,11 +88,13 @@ export async function createEngine({ fetchText } = {}) {
   // surfaces, every English row file of an en->X surface (unless encode
   // just registered the rows it used), and the challenge slices for any
   // other hop.
-  async function prefetch(key, withRows) {
-    const needs = keyNeeds(key, { siteId, liveEnglishTargets });
+  async function prefetch(key, ciphertext, withRows) {
+    const needs = keyNeeds(key, ciphertext, { siteId, liveEnglishTargets });
     await Promise.all([
       needs.zh ? native.loadZhCore() : null,
       needs.hanja ? native.loadHanjaCore() : null,
+      needs.quick ? native.loadQuick() : null,
+      native.loadCangjieShards([...needs.cangjie]),
       ...(withRows ? [...needs.rows].map(sid => english.loadAllRows(sid)) : []),
       needs.challenges ? loadChallengeLists() : null,
     ]);
@@ -116,7 +118,7 @@ export async function createEngine({ fetchText } = {}) {
     }
     try {
       checkKey(key, registry);
-      await prefetch(key, withRows);
+      await prefetch(key, ciphertext, withRows);
       const { text, trace } = walkKey({ registry, layouts, lists, siteId }, ciphertext, key);
       const dumped = dumpsKeyWithSpans(key);
       return { ok: true, text, trace, key, keyText: dumped.text, spans: dumped.spans };
@@ -180,6 +182,8 @@ export async function createEngine({ fetchText } = {}) {
   async function list(edge, value) {
     if (edge === "homophone:zh") await native.loadZhCore();
     if (edge === "homophone:ko_hanja") await native.loadHanjaCore();
+    if (edge === "shape:zh_quick") await native.loadQuick();
+    if (edge === "shape:zh_cangjie" && typeof value === "string" && value) await native.loadCangjieShards([value[0]]);
     const d = lists.describe(edge, value);
     return d || { count: 0, items: [], complete: false };
   }

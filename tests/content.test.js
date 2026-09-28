@@ -85,6 +85,7 @@ const UPSTREAM = [
   "https://github.com/rspeer/wordfreq",
   "https://github.com/notofonts/noto-cjk",
   "https://www.unicode.org/ucd/",
+  "https://www.unicode.org/reports/tr38/",
 ];
 const REPO = "https://github.com/Tz-Ray/keypath";
 const DATA_LICENSES = `${REPO}/blob/main/DATA-LICENSES.md`;
@@ -116,17 +117,28 @@ test("links are relative, into this repository on GitHub, or to a credited upstr
   assert.ok(urls.includes(DATA_LICENSES));
 });
 
-test("the (L)GPL data ships with the license texts, linked from the credits", () => {
-  const texts = { "LICENSES/GPL-2.0.txt": "GNU GENERAL PUBLIC LICENSE\\s+Version 2, June 1991",
-    "LICENSES/LGPL-2.0.txt": "GNU LIBRARY GENERAL PUBLIC LICENSE\\s+Version 2, June 1991",
-    "LICENSES/LGPL-2.1.txt": "GNU LESSER GENERAL PUBLIC LICENSE\\s+Version 2.1, February 1999" };
+test("the (L)GPL and Unicode V3 data ships with the license texts, linked from the credits", () => {
+  // [head, tail]: the GPL texts end with their terms; the Unicode License V3
+  // notice (docs/10 §9.2) is the 39 lines of https://www.unicode.org/license.txt
+  const texts = { "LICENSES/GPL-2.0.txt": ["GNU GENERAL PUBLIC LICENSE\\s+Version 2, June 1991", "END OF TERMS AND CONDITIONS"],
+    "LICENSES/LGPL-2.0.txt": ["GNU LIBRARY GENERAL PUBLIC LICENSE\\s+Version 2, June 1991", "END OF TERMS AND CONDITIONS"],
+    "LICENSES/LGPL-2.1.txt": ["GNU LESSER GENERAL PUBLIC LICENSE\\s+Version 2.1, February 1999", "END OF TERMS AND CONDITIONS"],
+    "LICENSES/Unicode-3.0.txt": ["^UNICODE LICENSE V3\\n", "prior written\\nauthorization of the copyright holder\\.\\n$"] };
   const md = readFileSync(join(ROOT, "DATA-LICENSES.md"), "utf8");
-  for (const [path, head] of Object.entries(texts)) {
+  for (const [path, [head, tail]] of Object.entries(texts)) {
     const t = readFileSync(join(ROOT, path), "utf8");
     assert.match(t, new RegExp(head), path);
-    assert.match(t, /END OF TERMS AND CONDITIONS/, `${path} is complete`);
+    assert.match(t, new RegExp(tail), `${path} is complete`);
     assert.ok(html.includes(`href="${path}"`), `${path} linked from the credits`);
     assert.ok(md.includes(`(${path})`), `${path} linked from DATA-LICENSES.md`);
+  }
+  const v3 = readFileSync(join(ROOT, "LICENSES/Unicode-3.0.txt"), "utf8");
+  assert.equal(v3.split("\n").length - 1, 39);
+  assert.match(v3, /Copyright © 1991-2026 Unicode, Inc\./);
+  // every DATA-LICENSES row for the Unihan-derived paths links the V3 notice
+  for (const path of ["data/cangjie/", "data/quick.json", "data/en/zh_cangjie/"]) {
+    const row = md.split("\n").find(l => l.startsWith("| `") && l.includes(`\`${path}`));
+    assert.ok(row && row.includes("(LICENSES/Unicode-3.0.txt)"), `DATA-LICENSES row for ${path}`);
   }
   assert.match(readFileSync(join(ROOT, "LICENSES/Unicode.txt"), "utf8"), /COPYRIGHT AND PERMISSION NOTICE/);
   // the repository's own license stays plain MIT
@@ -192,19 +204,5 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
     // the setter's notes cite unpublished documents; #4's once gave away #5
     assert.doesNotMatch(md, /^## (Leakage|How it was minted|Fairness checklist|Playtest)/m, `#${c.n}`);
     assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);
-  }
-});
-
-test("every directory of copyleft-derived data says it was changed, with links that resolve", () => {
-  const dirs = ["data", "data/zh", "data/en/zh_daqian", "data/en/zh_pinyin", "data/en/zh_hanja", "data/en/ja_romaji",
-    "data/en/ko_dubeolsik", "data/en/es_accent", "data/challenges", "tests/fixtures"];
-  const md = readFileSync(join(ROOT, "DATA-LICENSES.md"), "utf8");
-  assert.match(md, /^## Changes to the GPL and LGPL sources$/m);
-  assert.doesNotMatch(md, /can be regenerated from its sources/);
-  for (const dir of dirs) {
-    const notice = readFileSync(join(ROOT, dir, "NOTICE"), "utf8");
-    assert.match(notice, /modified versions of:[\s\S]*changed by the KeyPath project on 20\d\d-\d\d-\d\d/, dir);
-    for (const [, rel] of notice.matchAll(/((?:\.\.\/)+[\w./-]+\.(?:txt|md))/g))
-      assert.ok(existsSync(join(ROOT, dir, rel)), `${dir}/NOTICE: ${rel}`);
   }
 });

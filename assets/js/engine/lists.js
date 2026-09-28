@@ -5,7 +5,8 @@
 // hanja cores) know every item; others are registered piecemeal from the
 // English rows and the challenge slices, so they may know only some indices.
 // `complete` edges know every value too: a value missing there is a
-// malformed unit, not missing data.
+// malformed unit, not missing data.  An edge loaded in parts (the Cangjie
+// lists, sharded by first letter) says which values it knows completely.
 
 export class NotCarried extends Error {}
 export class PickError extends Error {}
@@ -13,6 +14,8 @@ export class PickError extends Error {}
 export function createLists() {
   const edges = new Map();          // edge -> Map(value -> {count, entries})
   const completeEdges = new Set();
+  const completeWhen = new Map();   // edge -> value => whether that part is loaded
+  const knowsAll = (edge, value) => completeEdges.has(edge) || (completeWhen.has(edge) && completeWhen.get(edge)(value));
 
   const edgeMap = edge => {
     let m = edges.get(edge);
@@ -51,7 +54,7 @@ export function createLists() {
   function pick(edge, value, index, what) {
     const list = get(edge, value);
     if (!list) {
-      if (completeEdges.has(edge)) throw new PickError(`${value} has no ${edge} candidates`);
+      if (knowsAll(edge, value)) throw new PickError(`${value} has no ${edge} candidates`);
       throw new NotCarried(`the ${edge} candidates of ${value}`);
     }
     if (index === undefined || index === null) throw new PickError(`missing ${what} for ${value}`);
@@ -75,6 +78,7 @@ export function createLists() {
   return {
     setFull, addEntry, pick, describe, get,
     markComplete: edge => completeEdges.add(edge),
+    markCompleteWhen: (edge, knows) => completeWhen.set(edge, knows),
     isComplete: edge => completeEdges.has(edge),
   };
 }

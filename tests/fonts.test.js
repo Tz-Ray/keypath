@@ -57,3 +57,14 @@ test("the fonts cover every CJK character the page's own text shows", () => {
     for (const ch of new Set(readFileSync(join(ROOT, f), "utf8")))
       if (cjk.test(ch)) assert.ok(covers(all, ch.codePointAt(0)), `${f}: ${ch}`);
 });
+
+test("site.css gives each font exactly the unicode-range of its subset", () => {
+  const css = readFileSync(join(ROOT, "assets/css/site.css"), "utf8");
+  const faces = [...css.matchAll(/@font-face \{([\s\S]*?)\}/g)].map(m => m[1]);
+  assert.equal(faces.length, 2);
+  for (const file of ["glyphs-tc.woff2", "glyphs-kr.woff2"]) {
+    const face = faces.find(f => f.includes(`fonts/${file}`));
+    assert.ok(face, file);
+    assert.equal(face.match(/unicode-range: ([^;]*);/)[1], ranges[file], file);
+  }
+});

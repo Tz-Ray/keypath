@@ -112,6 +112,8 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <div class="chip-row">
             <label class="chip"><input type="radio" name="kbd" value="zh_daqian" checked><span class="g" lang="zh-Hant" aria-hidden="true">ㄅ</span><span class="t">Bopomofo (Taiwan)</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="zh_pinyin"><span class="g" aria-hidden="true">pīn</span><span class="t">Pinyin</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="zh_cangjie"><span class="g" lang="zh-Hant" aria-hidden="true">倉</span><span class="t">Cangjie</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="zh_quick"><span class="g" lang="zh-Hant" aria-hidden="true">速</span><span class="t">Quick</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="zh_hanja"><span class="g" lang="zh-Hant" aria-hidden="true">漢</span><span class="t">Chinese on a Korean keyboard</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="ja_romaji"><span class="g" lang="ja" aria-hidden="true">か</span><span class="t">Japanese romaji</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="ko_dubeolsik"><span class="g" lang="ko" aria-hidden="true">한</span><span class="t">Korean</span><span class="tip vh"></span></label>
@@ -216,7 +218,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
       <li class="step card">
         <span class="step-n" aria-hidden="true">2</span>
         <h3>Sound it out.</h3>
-        <p>Each character is spelled by its sound, and many share one: <span data-static="step2.count">46</span> characters are read <span lang="zh-Hant">ㄧㄥˊ</span> (yíng). The key notes which one was meant.</p>
+        <p>Each character is spelled by its sound (on Cangjie and Quick, by its shape), and many share one: <span data-static="step2.count">46</span> characters are read <span lang="zh-Hant">ㄧㄥˊ</span> (yíng). The key notes which one was meant.</p>
         <div class="fig fig-2" aria-hidden="true">
           <span class="f-in sound" lang="zh-Hant" data-static="step2.reading">ㄧㄥˊ</span>
           <span class="arrow">→</span>
@@ -296,7 +298,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
       <table class="credits">
         <thead><tr><th scope="col">Source</th><th scope="col">Used for</th><th scope="col">License</th></tr></thead>
         <tbody>
-          <tr><td><a href="https://github.com/chewing/libchewing-data" rel="noopener">libchewing-data</a></td><td>Chinese readings, candidate order and phrases; the Pinyin syllable list</td><td><a href="LICENSES/LGPL-2.1.txt">LGPL-2.1-or-later</a></td></tr>
+          <tr><td><a href="https://github.com/chewing/libchewing-data" rel="noopener">libchewing-data</a></td><td>Chinese readings, candidate order and phrases (also the order of the Cangjie and Quick lists); the Pinyin syllable list</td><td><a href="LICENSES/LGPL-2.1.txt">LGPL-2.1-or-later</a></td></tr>
           <tr><td><a href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict" rel="noopener">CC-CEDICT (MDBG)</a></td><td>Chinese ↔ English dictionary hops</td><td>CC BY-SA 4.0</td></tr>
           <tr><td><a href="https://www.edrdg.org/" rel="noopener">JMdict (EDRDG)</a>, via <a href="https://github.com/scriptin/jmdict-simplified" rel="noopener">jmdict-simplified</a></td><td>English → Japanese dictionary hops</td><td>CC BY-SA 4.0</td></tr>
           <tr><td><a href="https://github.com/skk-dev/dict" rel="noopener">SKK-JISYO.L</a></td><td>Japanese readings and candidates</td><td><a href="LICENSES/GPL-2.0.txt">GPL-2.0-or-later</a></td></tr>
@@ -305,6 +307,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <tr><td><a href="https://download.freedict.org/dictionaries/rus-eng/" rel="noopener">FreeDict rus-eng (WikDict, from Wiktionary via DBnary)</a></td><td>Russian ↔ English dictionary hops</td><td>CC BY-SA 3.0</td></tr>
           <tr><td><a href="https://github.com/freedict/fd-dictionaries" rel="noopener">FreeDict spa-eng</a></td><td>Spanish ↔ English dictionary hops</td><td><a href="LICENSES/GPL-2.0.txt">GPL-2.0-or-later</a></td></tr>
           <tr><td><a href="https://github.com/rspeer/wordfreq" rel="noopener">wordfreq data</a></td><td>The English word list and dictionary ordering</td><td>CC BY-SA 4.0</td></tr>
+          <tr><td><a href="https://www.unicode.org/reports/tr38/" rel="noopener">Unihan database (Unicode 18.0.0)</a></td><td>Cangjie codes, and the Quick codes made from them</td><td><a href="LICENSES/Unicode-3.0.txt">Unicode License V3</a></td></tr>
           <tr><td><a href="https://www.unicode.org/ucd/" rel="noopener">Unicode Character Database</a></td><td>Which characters Unicode 14 assigns</td><td><a href="LICENSES/Unicode.txt">Unicode License</a></td></tr>
           <tr><td><a href="https://github.com/notofonts/noto-cjk" rel="noopener">Noto Sans CJK</a></td><td>Fallback glyphs</td><td><a href="fonts/OFL.txt">SIL OFL 1.1</a></td></tr>
         </tbody>

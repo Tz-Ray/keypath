@@ -47,6 +47,8 @@ from keypath.keyspec import (  # noqa: E402
     KEY_SCHEMA, KEY_VERSION, KEY_VERSIONS, V1_LANGUAGES, V1_LAYOUTS, compute_leakage, dumps_key, loads_key,
 )
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
+from keypath.layouts import zh_cangjie as cangjie_layout  # noqa: E402
+from keypath.layouts import zh_quick as quick_layout  # noqa: E402
 from keypath.layouts import ko_dubeolsik as ko_layout  # noqa: E402
 from keypath.layouts import zh_daqian as daqian_layout  # noqa: E402
 from keypath.layouts import zh_pinyin as pinyin_layout  # noqa: E402
@@ -56,7 +58,7 @@ from keypath.surfaces import zh_ko_hanja  # noqa: E402
 from keypath.surfaces.base import SPACED  # noqa: E402
 from keypath.tables import (  # noqa: E402
     es_accent, es_en, ja_romaji, ko_dubeolsik, ko_hanja, ko_hanja_readings, ru_en, ru_jcuken,
-    tables_sha256, zh_chars, zh_daqian, zh_phrases, zh_pinyin,
+    tables_sha256, zh_cangjie, zh_chars, zh_daqian, zh_phrases, zh_pinyin, zh_quick,
 )
 from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
@@ -70,12 +72,15 @@ EDITION = "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732"
 VOCAB_SIZE = 10_000
 SEED = 20260924
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
+SHAPE_LETTERS = "abcdefghijklmnopqrstuvwxy"   # Cangjie and Quick keys (z is unused)
 B36 = "0123456789abcdefghijklmnopqrstuvwxyz"
 
 # The site's surfaces, in chip order: id -> (language, layout).
 SURFACES: dict[str, tuple[str, str]] = {
     "zh_daqian": ("zh", "zh_daqian"),
     "zh_pinyin": ("zh", "zh_pinyin"),
+    "zh_cangjie": ("zh", "zh_cangjie"),
+    "zh_quick": ("zh", "zh_quick"),
     "zh_hanja": ("zh", "ko_dubeolsik"),
     "ja_romaji": ("ja", "ja_romaji"),
     "ko_dubeolsik": ("ko", "ko_dubeolsik"),
@@ -86,6 +91,8 @@ SURFACES: dict[str, tuple[str, str]] = {
 SURFACE_LABELS = {
     "zh_daqian": ("ㄅ", "Bopomofo (Taiwan)", "a Bopomofo (Dàqiān) keyboard"),
     "zh_pinyin": ("pīn", "Pinyin", "a Pinyin keyboard with tone numbers"),
+    "zh_cangjie": ("倉", "Cangjie", "a Cangjie keyboard"),
+    "zh_quick": ("速", "Quick", "a Quick (simplified Cangjie) keyboard"),
     "zh_hanja": ("漢", "Chinese on a Korean keyboard", "a Korean keyboard, as hanja"),
     "ja_romaji": ("か", "Japanese romaji", "a Japanese romaji keyboard"),
     "ko_dubeolsik": ("한", "Korean", "a Korean (Dubeolsik) keyboard"),
@@ -95,9 +102,13 @@ SURFACE_LABELS = {
 }
 SITE_ID = {pair: sid for sid, pair in SURFACES.items()}
 EN_X = [sid for sid in SURFACES if sid != "en_identity"]
+# Surfaces whose English rows the page derives from another surface's rows
+# instead of loading files (docs/10 §9.7): Quick rows are the Cangjie rows
+# with each unit recoded to its Quick code and re-indexed in the Quick list.
+DERIVED_ROWS = {"zh_quick": "zh_cangjie"}
 ALLOWED = {
     "en": list(SURFACES),
-    "zh": ["zh_daqian", "zh_pinyin", "zh_hanja"],
+    "zh": ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja"],
     "ko": ["ko_dubeolsik"],
     "ru": ["ru_jcuken"],
     "es": ["es_accent"],
@@ -115,6 +126,7 @@ CHIPS = [
 ]
 HERO_ALL = {
     "zh_daqian": "cj0u/6ru8", "zh_pinyin": "huan1ying2jia1", "zh_hanja": "ghksdudrk",
+    "zh_cangjie": "tgnoyhvljmso", "zh_quick": "toyljo",
     "ko_dubeolsik": "ghksduddkstlrcj", "ru_jcuken": "ghbdtncndjdfnmljvf",
     "ja_romaji": "kanngeikokunai", "es_accent": "bienvenida", "en_identity": "welcomehome",
 }
@@ -124,6 +136,16 @@ STRIP = {
                  {"length": 9, "route": "en"}, {"length": 13, "route": "zh"}],
     "ciphertext": "sono3gatsu1andthesun2k7s84g4",
 }
+
+# Keys with several segments, one per Chinese keyboard: the page cannot make
+# them, but walks them back ("Walk one back"); their traces are fixtures.
+MIXED = [
+    ("我愛你中國森林", "zh", [{"length": 3, "route": "zh", "layout": "zh_daqian"},
+                        {"length": 2, "route": "zh", "layout": "zh_cangjie"},
+                        {"length": 2, "route": "zh", "layout": "zh_quick"}]),
+    ("welcome home, thank you", "en", [{"length": 13, "route": "zh", "layout": "zh_cangjie"},
+                                       {"length": 10, "route": "zh", "layout": "zh_quick"}]),
+]
 
 CHALLENGE_COPY = {
     1: ("Warm-up", "Type it like a local", "Two characters of very common courtesy. 🇹🇼⌨️", None),
@@ -269,12 +291,19 @@ def registry_data() -> dict[str, Any]:
         },
         "hops": [hop.name for hop in registry.HOPS.values()],
         "hopTables": {hop.name: list(hop.tables) for hop in registry.HOPS.values()},
+        # kp1's ordinal lists (docs/10 §2.2): languages and [language, layout]
+        # surfaces in registration order; surfaces from strictSelectorOrdinal
+        # on accept only their own selector modes (docs/10 §2.1)
+        "kp1Languages": list(registry.LANGUAGES),
+        "kp1Surfaces": [list(pair) for pair in registry.SURFACES],
+        "strictSelectorOrdinal": registry.STRICT_SELECTOR_ORDINAL,
         "siteSurfaces": [
             {"id": sid, "language": lang, "layout": layout, "glyph": SURFACE_LABELS[sid][0],
              "label": SURFACE_LABELS[sid][1], "longName": SURFACE_LABELS[sid][2]}
             for sid, (lang, layout) in SURFACES.items()
         ],
         "allowed": ALLOWED,
+        "derivedRows": DERIVED_ROWS,
     }
 
 
@@ -294,6 +323,8 @@ def layouts_data() -> dict[str, Any]:
         "es_accent": {"rows": [list(r) for r in es_accent().rows]},
         "ja_romaji": {"pairs": [[k, r] for k, r in ja_romaji().kana_to_romaji.items()]},
         "en_identity": {},
+        "zh_cangjie": {"radicals": dict(cangjie_layout.RADICALS), "maxLetters": cangjie_layout.MAX_LETTERS},
+        "zh_quick": {"maxLetters": quick_layout.MAX_LETTERS},
     }
 
 
@@ -386,6 +417,43 @@ def hanja_data(out: Out) -> None:
     print(f"[hanja] {len(lists)} syllables, {len(primary)} hanja, {len(exceptions)} primary exceptions")
 
 
+# ============================================================ Cangjie, Quick
+
+def quick_of(code: str) -> str:
+    """docs/10 §4.2 (the page applies the same rule): a Cangjie code's Quick
+    code is the code if it has at most 2 letters, else its first and last."""
+    return code if len(code) <= 2 else code[0] + code[-1]
+
+
+def shape_data(out: Out) -> dict[str, dict[str, str]]:
+    """data/cangjie/{a..y}.json: the Cangjie lists {code: characters}, sharded
+    by the code's first letter; data/quick.json: the Quick lists.  Both keep
+    the table's candidate order.  -> {"cangjie": lists, "quick": lists}."""
+    cj = zh_cangjie()
+    shards: dict[str, dict[str, str]] = {c: {} for c in SHAPE_LETTERS}
+    for code, chars in cj.candidates_by_code.items():
+        assert re.fullmatch("[a-y]{1,5}", code), code
+        shards[code[0]][code] = "".join(chars)
+    for letter in SHAPE_LETTERS:
+        assert shards[letter], letter
+        out.json(f"data/cangjie/{letter}.json", {c: shards[letter][c] for c in sorted(shards[letter])})
+    # Quick has no table: its lists are the stable group-by of the Cangjie
+    # rows (table order) by quick_of(code); the package's lists must agree
+    derived: dict[str, list[str]] = {}
+    for char, code in cj.code_by_char.items():
+        derived.setdefault(quick_of(code), []).append(char)
+    quick = {q: "".join(cs) for q, cs in zh_quick().candidates_by_code.items()}
+    assert {q: "".join(cs) for q, cs in derived.items()} == quick
+    assert list(derived) == list(quick)
+    out.json("data/quick.json", quick)
+    # a character's Quick code starts with its Cangjie code's letter, so the
+    # page finds a character's Cangjie shard through data/quick.json
+    assert all(zh_quick().code_by_char[c][0] == code[0] for c, code in cj.code_by_char.items())
+    print(f"[shape] {len(cj.candidates_by_code)} Cangjie codes in {len(SHAPE_LETTERS)} shards, "
+          f"{len(quick)} Quick codes, {len(cj.code_by_char)} characters")
+    return {"cangjie": {c: "".join(v) for c, v in cj.candidates_by_code.items()}, "quick": quick}
+
+
 # ================================================================ English
 
 def vocabulary() -> list[str]:
@@ -428,7 +496,26 @@ def entry_from_row(row: list[Any], homophone: bool) -> dict[str, Any]:
     return {"units": units, "translation": {"tier": 1, "index": row[1]}}
 
 
-def english_data(out: Out, vocab: list[str]) -> dict[str, dict[str, tuple]]:
+def derive_row(sid: str, row: list[Any] | None, shape: dict[str, dict[str, str]]) -> list[Any] | None:
+    """A derived surface's row from its base surface's row (DERIVED_ROWS), as
+    the page derives it: each unit's Cangjie code recoded to its Quick code,
+    the index the character's place in that Quick list."""
+    assert sid == "zh_quick", sid
+    if row is None:
+        return None
+    target, hop_index, hop_count, keys, lens, _idx = row
+    chars = list(target)
+    assert len(chars) == len(lens), row
+    codes, pos = [], 0
+    for n in lens:
+        codes.append(keys[pos:pos + n])
+        pos += n
+    quick = [quick_of(code) for code in codes]
+    return [target, hop_index, hop_count, "".join(quick), [len(q) for q in quick],
+            [list(shape["quick"][q]).index(ch) for q, ch in zip(quick, chars)]]
+
+
+def english_data(out: Out, vocab: list[str], shape: dict[str, dict[str, str]]) -> dict[str, dict[str, tuple]]:
     by_letter: dict[str, list[str]] = {c: [] for c in LETTERS}
     for w in vocab:
         by_letter[w[0]].append(w)
@@ -443,9 +530,18 @@ def english_data(out: Out, vocab: list[str]) -> dict[str, dict[str, tuple]]:
             results[sid][w] = (row, entry, cipher)
             if row is not None:
                 rows[w[0]][w] = row
+        n = sum(len(r) for r in rows.values())
+        if sid in DERIVED_ROWS:
+            # no files: the page derives these rows; they must be exactly
+            # the rows Python's own encode yields, for the same words
+            base = DERIVED_ROWS[sid]
+            for w in vocab:
+                assert derive_row(sid, results[base][w][0], shape) == results[sid][w][0], (sid, w)
+            print(f"[en] {sid}: {n} of {len(vocab)} words have a row, all derived from {base}")
+            continue
         for c in LETTERS:
             out.json(f"data/en/{sid}/{c}.json", {w: rows[c][w] for w in sorted(rows[c])})
-        print(f"[en] {sid}: {sum(len(r) for r in rows.values())} of {len(vocab)} words have a row")
+        print(f"[en] {sid}: {n} of {len(vocab)} words have a row")
     return results
 
 
@@ -569,7 +665,7 @@ def load_corpora() -> dict[str, list[str]]:
     for name in ("CURATED", "OOV_CASES", "CORPUS", "ES_CORPUS", "JA_CORPUS"):
         assert name in found, name
     golden = {}
-    for name in ("vectors_zh", "vectors_zh_pinyin", "vectors_ko_hanja", "vectors_ko", "vectors_ru"):
+    for name in ("vectors_zh", "vectors_zh_pinyin", "vectors_ko_hanja", "vectors_zh_cangjie", "vectors_ko", "vectors_ru"):
         data = json.loads((PROJECT / "tests" / "golden" / f"{name}.json").read_text(encoding="utf-8"))
         golden[name] = [v["plaintext"] for v in data["vectors"]]
     found.update(golden)
@@ -793,13 +889,18 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for sid, cipher in HERO_ALL.items():
         vec.add("site", HERO[0], "en", sid)
         assert vec.records[-1]["expect"]["ciphertext"] == cipher, (sid, vec.records[-1]["expect"])
+    for golden in json.loads((PROJECT / "tests" / "golden" / "vectors_zh_cangjie.json").read_text(encoding="utf-8"))["vectors"]:
+        for sid in ("zh_cangjie", "zh_quick"):
+            vec.add("golden-shape", golden["plaintext"], "zh", sid)
+            rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (golden["plaintext"], "zh", sid))
+            assert rec["expect"]["ciphertext"] == golden[sid]["ciphertext"], (golden, rec["expect"])
     for text, source, sid, cipher in CHIPS:
         vec.add("site", text, source, sid)
         rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (text, source, sid))
         assert rec["expect"]["ciphertext"] == cipher, (text, rec["expect"])
     # corpora
     zh_texts = corpora["CURATED"] + corpora["OOV_CASES"] + corpora["vectors_zh"] \
-        + corpora["vectors_zh_pinyin"] + corpora["vectors_ko_hanja"]
+        + corpora["vectors_zh_pinyin"] + corpora["vectors_ko_hanja"] + corpora["vectors_zh_cangjie"]
     for t in zh_texts:
         for sid in ALLOWED["zh"]:
             vec.add("corpus-zh", t, "zh", sid)
@@ -856,6 +957,12 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for c in shipped:
         traces.append({"id": f"challenge-{c['n']:02d}", "ciphertext": c["ciphertext"], "keyText": c["keyText"],
                        "trace": site_trace(c["ciphertext"], json.loads(c["keyText"]))})
+    for i, (text, source, segments) in enumerate(MIXED):
+        result = encode(text, source, segments=segments)
+        assert decode(result.ciphertext, result.key) == normalize(text, source)
+        assert len(result.key["segments"]) == len(segments)
+        traces.append({"id": f"mixed-{i}", "ciphertext": result.ciphertext, "keyText": key_text(result.key),
+                       "trace": site_trace(result.ciphertext, result.key)})
     pool = [r for r in vec.valid if r["class"] != "site"]
     by_group: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for r in pool:
@@ -914,6 +1021,8 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
     hop_keys = pick(lambda r: r["source"] == "en" and r["surface"] != "en_identity"
                     and '"translation"' in r["expect"]["keyText"], 40)
     lit_keys = pick(lambda r: '"literal"' in r["expect"]["keyText"] and r["expect"]["ciphertext"], 10)
+    shape_keys = pick(lambda r: r["surface"] in ("zh_cangjie", "zh_quick") and r["source"] == "zh"
+                      and has_units(r, True), 40)
     all_keys = zh_keys[:10] + bij_keys[:10] + hop_keys[:10]
 
     muts: list[tuple[str, str, dict[str, Any]]] = []
@@ -1026,6 +1135,45 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
         k2 = copy.deepcopy(k)
         first_unit(k2, True)["len"] = 0
         add("len-zero", c, k2)
+    # Cangjie and Quick: keyed only (docs/10 §2.1), a chunk must be a code of
+    # the table, and the v2.0 edition does not list zh_cangjie.tsv
+    shape_tables = {"zh_cangjie": set(zh_cangjie().candidates_by_code), "zh_quick": set(zh_quick().candidates_by_code)}
+
+    def non_code(layout: str, n: int) -> str:
+        """The first a-y string of length n (in order) that is no code on `layout`."""
+        import itertools
+        for letters in itertools.product(SHAPE_LETTERS[::-1], repeat=n):
+            if "".join(letters) not in shape_tables[layout]:
+                return "".join(letters)
+        raise AssertionError((layout, n))
+
+    for i, (c, k) in enumerate(shape_keys[:40]):
+        k2 = copy.deepcopy(k)
+        seg = k2["segments"][0]
+        choice = i % 5
+        if choice == 0:
+            seg["selector_mode"] = "inline"
+            add("shape-inline", c, k2)
+        elif choice == 1:
+            first_unit(k2, True)["homophone_index"] = unit_count(k, c)
+            add("shape-index-range", c, k2)
+        elif choice == 2:
+            del first_unit(k2, True)["homophone_index"]
+            add("shape-index-missing", c, k2)
+        elif choice == 3:
+            k2["tables_sha256"] = "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2"
+            add("shape-old-edition", c, k2)
+        else:
+            # the first unit's chunk (literals take no keys, so it starts the
+            # ciphertext) replaced by a well-shaped non-code
+            n = first_unit(k2, True)["len"]
+            add("shape-not-a-code", non_code(seg["layout"], n) + c[n:], k2)
+    for layout, chunk in (("zh_quick", "abc"), ("zh_cangjie", "abcdef"), ("zh_cangjie", "az")):
+        tail = list(registry.surface("zh", layout).route_tail)
+        add(f"shape-malformed-{layout}", chunk, {
+            "keypath": "1.1", "tables_sha256": EDITION, "source_language": "zh",
+            "segments": [{"language": "zh", "layout": layout, "route": tail, "selector_mode": "keyed",
+                          "words": [{"units": [{"len": len(chunk), "homophone_index": 0}]}]}]})
     ch = {c["n"]: c for c in shipped}
     for n in (2, 4, 5, 6):
         k = json.loads(ch[n]["keyText"])
@@ -1077,6 +1225,28 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
         shards[ord(w[0]) & 0xFF].append("\t".join([w, d[0], d[1], p[0], p[1], d[2], h[0], h[1], h[2]]) + "\n")
     result: dict[str, Any] = {"zh": {f"{i:02x}": sha("".join(shards[i])) for i in range(256)}}
     result["zhCount"] = len(words)
+    # the same words on Cangjie and Quick (a word with a character that has
+    # no code is "-": a tier-3 literal)
+    cj, qk = surface_of("zh_cangjie"), surface_of("zh_quick")
+    shape_shards: dict[int, list[str]] = {i: [] for i in range(256)}
+    for w in words:
+        c = fmt(cj.encode_word(w, "keyed"))
+        q = fmt(qk.encode_word(w, "keyed"))
+        assert (c[0] == "-") == (q[0] == "-"), w
+        shape_shards[ord(w[0]) & 0xFF].append("\t".join([w, *c, *q]) + "\n")
+    result["zhShape"] = {f"{i:02x}": sha("".join(shape_shards[i])) for i in range(256)}
+    # every character's (code, index) on both (docs/10 §9.7: `cangjie`
+    # char<TAB>code<TAB>idx and `quick` char<TAB>quick<TAB>idx, lines sorted
+    # by code point), through the surfaces' own encoders
+    table = zh_cangjie()
+    for name, surface, codes in (("cangjie", cj, table.code_by_char), ("quick", qk, zh_quick().code_by_char)):
+        lines = []
+        for char, code in codes.items():
+            units, keys = surface.encode_word(char, "keyed")
+            assert keys == code and len(units) == 1, (name, char)
+            lines.append(f"{char}\t{keys}\t{units[0]['homophone_index']}\n")
+        result[name] = sha("".join(sorted(lines)))
+        result[f"{name}Count"] = len(lines)
     result["readings"] = sha("".join(
         f"{r}\t{daqian_layout.keys_for_reading(r)}\t{pinyin_layout.keys_for_reading(r)}\n"
         for r in sorted(chars.candidates_by_reading)))
@@ -1160,38 +1330,133 @@ def static_fixture(out: Out, hero: dict[str, Any], vec_rows: dict[str, dict[str,
 
 # ================================================================== main
 
-# GPL-2.0 §2(a) / LGPL §2(b): the files derived from the copyleft sources
-# carry a notice that they were changed, and when.  Directory -> sources.
-SKK = ("SKK-JISYO.L", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", "2026-07-10 and 2026-09-24")
-SPA = ("FreeDict spa-eng 0.3.1", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", "2026-07-10 and 2026-09-24")
-CHEWING = ("libchewing-data", "LGPL-2.1-or-later", "LICENSES/LGPL-2.1.txt", "2026-07-10, 2026-09-23 and 2026-09-24")
-KENG = ("kengdic", "LGPL-2.0-or-later", "LICENSES/LGPL-2.0.txt", "2026-09-23 and 2026-09-24")
-NOTICES: dict[str, tuple[str, tuple[tuple[str, str, str, str], ...]]] = {
-    "data": ("hero.json and layouts.json", (CHEWING,)),
-    "data/zh": ("the files in this directory", (CHEWING,)),
-    "data/en/zh_daqian": ("the files in this directory", (CHEWING,)),
-    "data/en/zh_pinyin": ("the files in this directory", (CHEWING,)),
-    "data/en/zh_hanja": ("the files in this directory", (CHEWING,)),
-    "data/en/ja_romaji": ("the files in this directory", (SKK,)),
-    "data/en/ko_dubeolsik": ("the files in this directory", (KENG,)),
-    "data/en/es_accent": ("the files in this directory", (SPA,)),
-    "data/challenges": ("the files in this directory", (CHEWING, SPA)),
-    "tests/fixtures": ("the files in this directory", (SKK, SPA, CHEWING, KENG)),
+# Where every generated file comes from (docs/10 §9.2).  SOURCE_INFO names
+# each source; SOURCES maps a path glob (first match wins) to the directory
+# whose NOTICE covers it and to its sources, each copyleft one with the
+# dates its data was changed.  The NOTICE files are written from this map,
+# and tests/fixtures/sources.json carries it to the page's coverage test.
+SOURCE_INFO: dict[str, tuple[str, str, str | None, bool]] = {
+    # id: (name, license, license text, copyleft)
+    "chewing": ("libchewing-data", "LGPL-2.1-or-later", "LICENSES/LGPL-2.1.txt", True),
+    "skk": ("SKK-JISYO.L", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", True),
+    "spa": ("FreeDict spa-eng 0.3.1", "GPL-2.0-or-later", "LICENSES/GPL-2.0.txt", True),
+    "keng": ("kengdic", "LGPL-2.0-or-later", "LICENSES/LGPL-2.0.txt", True),
+    "cedict": ("CC-CEDICT", "CC BY-SA 4.0", None, False),
+    "jmdict": ("JMdict", "CC BY-SA 4.0", None, False),
+    "hanja": ("libhangul hanja.txt", "BSD-3-Clause", None, False),
+    "rus": ("FreeDict rus-eng", "CC BY-SA 3.0", None, False),
+    "wordfreq": ("wordfreq data", "CC BY-SA 4.0", None, False),
+    "unihan": ("Unihan", "Unicode-3.0", "LICENSES/Unicode-3.0.txt", False),
+    "ucd": ("Unicode Character Database", "Unicode License", "LICENSES/Unicode.txt", False),
+    "keypath": ("KeyPath", "MIT", "LICENSE", False),
 }
+_CHEWING = {"chewing": ("2026-07-10", "2026-09-23", "2026-09-24")}
+_CHEWING_SHAPE = {"chewing": ("2026-07-10", "2026-09-28")}   # the Cangjie table's character set and order
+_SKK = {"skk": ("2026-07-10", "2026-09-24")}
+_SPA = {"spa": ("2026-07-10", "2026-09-24")}
+_KENG = {"keng": ("2026-09-23", "2026-09-24")}
+_ = ()
+SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
+    ("data/registry.json", None, {"keypath": _}),
+    ("data/manifest.json", None, {"keypath": _}),
+    ("data/unicode14.json", None, {"ucd": _}),
+    ("data/hero.json", "data", {"cedict": _, **_CHEWING}),
+    ("data/layouts.json", "data", {"keypath": _, **_CHEWING}),
+    ("data/quick.json", "data", {"unihan": _, **_CHEWING_SHAPE}),
+    ("data/zh/core.json", "data/zh", {**_CHEWING}),
+    ("data/zh/p/*.txt", "data/zh", {**_CHEWING, "hanja": _}),
+    ("data/hanja/core.json", None, {"hanja": _}),
+    ("data/cangjie/*.json", "data/cangjie", {"unihan": _, **_CHEWING_SHAPE}),
+    ("data/en/vocab/*.json", None, {"wordfreq": _}),
+    ("data/en/zh_daqian/*.json", "data/en/zh_daqian", {"cedict": _, **_CHEWING, "wordfreq": _}),
+    ("data/en/zh_pinyin/*.json", "data/en/zh_pinyin", {"cedict": _, **_CHEWING, "wordfreq": _}),
+    ("data/en/zh_cangjie/*.json", "data/en/zh_cangjie", {"cedict": _, "unihan": _, **_CHEWING_SHAPE, "wordfreq": _}),
+    ("data/en/zh_hanja/*.json", "data/en/zh_hanja", {"cedict": _, **_CHEWING, "hanja": _, "wordfreq": _}),
+    ("data/en/ja_romaji/*.json", "data/en/ja_romaji", {"jmdict": _, **_SKK, "wordfreq": _}),
+    ("data/en/ko_dubeolsik/*.json", "data/en/ko_dubeolsik", {**_KENG, "wordfreq": _}),
+    ("data/en/ru_jcuken/*.json", None, {"rus": _, "wordfreq": _}),
+    ("data/en/es_accent/*.json", "data/en/es_accent", {**_SPA, "wordfreq": _}),
+    ("data/challenges/02.json", "data/challenges", {"keypath": _, "cedict": _, **_SPA, **_CHEWING, "wordfreq": _}),
+    ("data/challenges/*.json", "data/challenges",
+     {"keypath": _, "cedict": _, "rus": _, **_CHEWING, "hanja": _, "wordfreq": _}),
+    ("tests/fixtures/*", "tests/fixtures",
+     {"keypath": _, "cedict": _, "jmdict": _, **_SKK, **_KENG, "hanja": _, "rus": _, **_SPA,
+      "chewing": _CHEWING["chewing"] + ("2026-09-28",), "unihan": _, "wordfreq": _, "ucd": _}),
+]
+
+
+def glob_match(glob: str, path: str) -> bool:
+    """A path glob: `*` matches any run of characters other than `/`."""
+    return re.fullmatch("[^/]*".join(re.escape(part) for part in glob.split("*")), path) is not None
+
+
+def source_of(path: str) -> tuple[str, str | None, dict[str, tuple[str, ...]]]:
+    for entry in SOURCES:
+        if glob_match(entry[0], path):
+            return entry
+    raise AssertionError(f"{path}: no SOURCES entry")
+
+
+def and_list(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
 
 
 def notices(out: Out) -> None:
-    for folder, (which, sources) in NOTICES.items():
+    """GPL-2.0 §2(a) / LGPL §2(b): the files derived from the copyleft sources
+    carry a notice that they were changed, and when: one NOTICE per
+    directory named in SOURCES, over the files it covers."""
+    covered: dict[str, dict[str, Any]] = {}
+    for rel in sorted(out.files):
+        if not (rel.startswith("data/") or rel.startswith("tests/fixtures/")) or rel.endswith("/NOTICE"):
+            continue
+        _glob, folder, sources = source_of(rel)
+        copyleft = {sid: dates for sid, dates in sources.items() if SOURCE_INFO[sid][3]}
+        assert bool(folder) == bool(copyleft), rel
+        if not folder:
+            continue
+        assert rel.startswith(folder + "/"), (rel, folder)
+        entry = covered.setdefault(folder, {"files": [], "sources": {}})
+        entry["files"].append(rel[len(folder) + 1:])
+        for sid, dates in copyleft.items():
+            entry["sources"].setdefault(sid, set()).update(dates)
+    for folder, entry in covered.items():
+        direct = [f for f in entry["files"] if "/" not in f]
+        subdirs = sorted({f.rsplit("/", 1)[0] for f in entry["files"] if "/" in f})
+        siblings = [p.rsplit("/", 1)[1] for p in out.files if p.rsplit("/", 1)[0] == folder and not p.endswith("/NOTICE")]
+        which = []
+        if direct:
+            which.append("the files in this directory" if sorted(direct) == sorted(siblings) else and_list(sorted(direct)))
+        which += [f"{'in' if which else 'the files in'} {d}/" for d in subdirs]
         up = "../" * folder.count("/") + "../"
-        lines = [f"Parts of {which} are modified versions of:", ""]
-        for name, lic, text, dates in sources:
-            lines.append(f"- {name} ({lic}, {up}{text}), changed by the KeyPath project on {dates}")
+        lines = [f"Parts of {and_list(which)} are modified versions of:", ""]
+        for sid in SOURCE_INFO:
+            if sid in entry["sources"]:
+                name, lic, text, _copyleft = SOURCE_INFO[sid]
+                lines.append(f"- {name} ({lic}, {up}{text}), changed by the KeyPath project on "
+                             f"{and_list(sorted(entry['sources'][sid]))}")
         lines += ["", "They are not the original works; do not report errors in them upstream.",
                   f"What was changed, the copyright notices and the upstream versions: {up}DATA-LICENSES.md",
                   "(\"Changes to the GPL and LGPL sources\"); later changes: this repository's history.",
                   "They are distributed WITHOUT ANY WARRANTY; without even the implied warranty of",
                   "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license texts above.", ""]
         out.write(f"{folder}/NOTICE", "\n".join(lines))
+    out.json("tests/fixtures/sources.json", {
+        "sources": {sid: {"name": n, "license": lic, "text": text, "copyleft": c}
+                    for sid, (n, lic, text, c) in SOURCE_INFO.items()},
+        "files": [{"glob": g, "notice": folder, "sources": {sid: list(d) for sid, d in srcs.items()}}
+                  for g, folder, srcs in SOURCES],
+    })
+
+
+def kp1_ordinals(out: Out) -> None:
+    """kp1's ordinal lists (docs/10 §2.2) in the golden's own format; the
+    cipher project's tests/golden/kp1-ordinals.jsonl must be the same bytes."""
+    lines = [{"list": "languages", "ordinal": i, "id": lang} for i, lang in enumerate(registry.LANGUAGES)]
+    lines += [{"list": "surfaces", "ordinal": i, "id": list(pair)} for i, pair in enumerate(registry.SURFACES)]
+    text = "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines)
+    golden = (PROJECT / "tests" / "golden" / "kp1-ordinals.jsonl").read_text(encoding="utf-8")
+    assert text == golden, "the registry's ordinals differ from kp1-ordinals.jsonl"
+    out.write("tests/fixtures/kp1-ordinals.jsonl", text)
 
 
 def guards() -> None:
@@ -1208,10 +1473,11 @@ def build(root: Path) -> Out:
     out.json("data/unicode14.json", unicode14_ranges())
     zh_data(out)
     hanja_data(out)
+    shape = shape_data(out)
     vocab = vocabulary()
     example_words = set(re.findall("[a-z]+", " ".join([HERO[0]] + [c[0] for c in CHIPS if c[1] == "en"])))
     assert example_words <= set(vocab), example_words - set(vocab)
-    rows = english_data(out, vocab)
+    rows = english_data(out, vocab, shape)
     shipped = challenges_data(out)
     hero = hero_data(out)
     corpora = load_corpora()
@@ -1219,6 +1485,7 @@ def build(root: Path) -> Out:
     digests(out, vocab, rows)
     unicode_fixture(out)
     static_fixture(out, hero, rows)
+    kp1_ordinals(out)
     notices(out)
     files = {rel: {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
              for rel, data in sorted(out.files.items()) if rel.startswith("data/")}

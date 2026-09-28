@@ -4,7 +4,10 @@
 import { renderWalk, renderTable } from "./walk.js";
 import { openCandidates, openSense, whatIfBanner } from "./popover.js";
 
-const EDGE = seg => (seg.language === "zh" ? (seg.layout === "ko_dubeolsik" ? "homophone:ko_hanja" : "homophone:zh") : "homophone:ja");
+const SHAPE_EDGES = { zh_cangjie: "shape:zh_cangjie", zh_quick: "shape:zh_quick" };
+const EDGE = seg => (seg.language !== "zh" ? "homophone:ja"
+  : seg.layout === "ko_dubeolsik" ? "homophone:ko_hanja"
+  : Object.prototype.hasOwnProperty.call(SHAPE_EDGES, seg.layout) ? SHAPE_EDGES[seg.layout] : "homophone:zh");
 
 /**
  * mountFigure(host, trace, {engine, legends, animate, prevKeys, message, surfaceName,

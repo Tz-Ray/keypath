@@ -195,6 +195,11 @@ export function checkKey(key, R) {
     const [hops, tail] = splitRoute(seg.route);
     if (JSON.stringify(tail) !== JSON.stringify(surface.routeTail))
       fail(`segment ${si}: route tail ${show(tail)} is not the tail registered for (${seg.language}, ${seg.layout})`);
+    // docs/10 §2.1: a surface first registered in v2.1 or later accepts only
+    // its own selector modes (the v2.0 surfaces keep ignoring the mode)
+    const ordinal = R.kp1Surfaces.findIndex(([l, y]) => l === seg.language && y === seg.layout);
+    if (!surface.selectorModes.includes(seg.selector_mode) && ordinal >= R.strictSelectorOrdinal)
+      fail(`segment ${si}: ${show(seg.selector_mode)} is not a selector mode of (${seg.language}, ${seg.layout}) (its modes: ${show(surface.selectorModes)})`);
     let from = key.source_language;
     for (const hop of hops) {
       if (!R.hops.includes(hop)) fail(`segment ${si}: unknown hop ${hop}`);

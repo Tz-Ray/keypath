@@ -129,6 +129,56 @@ await attempt("example chips", async () => {
   }
 });
 
+await attempt("shape keyboards", async () => {
+  // "welcome home" on Cangjie and Quick (docs/10 §4.2: 歡迎家), from the chips
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    for (const [surface, want] of [["zh_cangjie", "tgnoyhvljmso"], ["zh_quick", "toyljo"]]) {
+      await b.evaluate(`${q(`input[name=kbd][value=${surface}]`)}.click()`);
+      await b.waitFor(cipherIs(want));
+      await settle();
+      check(`${surface} at ${w}px: "welcome home" shows ${want}`, await b.evaluate(cipherIs(want)));
+      const key = await b.evaluate(`window.__keypath.engine.encode({ text: "welcome home", source: "en", surface: ${js(surface)} }).then(r => r.keyText)`);
+      check(`${surface} at ${w}px: the key panel is the exact key file`, await b.evaluate(keyIs(key)));
+      check(`${surface} at ${w}px: no horizontal scroll`, await noHScroll(w), await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+    }
+  }
+  await open(1280, 800);
+  await b.evaluate(`${q("input[name=kbd][value=zh_cangjie]")}.click()`);
+  await b.waitFor(cipherIs("tgnoyhvljmso"));
+  await settle();
+  // the walk: a Shape band with each code's radicals (the code beneath), labelled Shape
+  const shapes = await b.evaluate(`[...document.querySelectorAll("#walk .unit .b-shape")].map(b => [b.querySelector(".radicals").textContent, b.querySelector(".py").textContent])`);
+  check("Cangjie: the Shape band shows radicals over each code", js(shapes) === js([["廿土弓人", "tgno"], ["卜竹女中", "yhvl"], ["十一尸人", "jmso"]]), js(shapes));
+  check("Cangjie: the band is labelled Shape, and there is no Sound band",
+    await b.evaluate(`[...document.querySelectorAll("#walk .walk-gutter span")].some(s => s.textContent === "Shape") && !document.querySelector("#walk .b-sound")`));
+  const legends = await b.evaluate(`[...document.querySelectorAll("#walk .unit")][0].querySelectorAll("kbd .leg").length`);
+  check("Cangjie: every keycap carries its radical", legends === 4, legends);
+  // the keyboard picture: radical legends read from the table, x is 難, z unused
+  await b.evaluate(`${q("#kbd-panel")}.open = true`);
+  const pic = await b.evaluate(`Object.fromEntries([...document.querySelectorAll("#kbd-pic .kb-key")].map(k => [k.querySelector(".us").textContent, k.querySelector(".sym") ? k.querySelector(".sym").textContent : ""]))`);
+  const radicals = await b.evaluate("window.__keypath.engine.layouts.radicals");
+  check("Cangjie keyboard: a-y carry their radicals, z is unused",
+    [..."abcdefghijklmnopqrstuvwxy"].every(k => pic[k] === radicals[k]) && pic.x === "難" && pic.a === "日" && pic.z === "", js(pic));
+  // the candidate popover names the code and its radicals
+  await b.evaluate(`document.querySelector('#walk .stack').click()`);
+  await b.waitFor(`document.querySelector('.popover') && !document.querySelector('.popover').hidden`);
+  const title = await b.evaluate(`document.querySelector('.popover .pop-title').textContent`);
+  check("Cangjie: the popover lists the code's characters", title === "tgno · 廿土弓人: 3 characters share this code", title);
+  await b.evaluate("document.querySelector('.popover .pop-close').click()");
+  // Quick: the note says how its codes are made
+  await b.evaluate(`${q("input[name=kbd][value=zh_quick]")}.click()`);
+  await b.waitFor(cipherIs("toyljo"));
+  await settle();
+  check("Quick: the keyboard picture explains the first and last letters",
+    await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note")].some(n => n.textContent.startsWith("Quick types only the first and last letters"))`));
+  // Chinese typed on both, and a message mixing the three Chinese keyboards walked back
+  const guo = await typeAndWait("中國", "zh", "zh_cangjie");
+  check("Cangjie: 中國 typed as lwirm", guo === "lwirm", guo);
+  const guoQ = await typeAndWait("中國", "zh", "zh_quick");
+  check("Quick: 中國 typed as lwm", guoQ === "lwm", guoQ);
+});
+
 await attempt("typing", async () => {
   // every live keyboard: the site vectors, the corpora and fuzz strings
   const bySurface = new Map();
@@ -143,7 +193,7 @@ await attempt("typing", async () => {
   }
   const picked = [...bySurface.values()].flat();
   const surfaces = new Set(picked.map(v => v.surface));
-  check("typing: vectors cover all 8 keyboards", surfaces.size === 8, [...surfaces]);
+  check("typing: vectors cover all 10 keyboards", surfaces.size === 10, [...surfaces]);
   for (const v of picked) {
     await typeMessage(v.text, v.source, v.surface);
     try {
@@ -569,6 +619,12 @@ if (SHOTS) {
           await b.waitFor(`${q("#challenge-1 .revealed .plain")}`);
           await sleep(1500);
           await shotOf(`challenges-${tag}`, "#challenges");
+          // Cangjie: the Shape band and the radical keyboard picture
+          await b.evaluate(`${q("input[name=kbd][value=zh_cangjie]")}.click()`);
+          await b.waitFor(cipherIs("tgnoyhvljmso"));
+          await b.evaluate(`${q("#kbd-panel")}.open = true`);
+          await sleep(1500);
+          await shotOf(`cangjie-${tag}`, ".enc-out");
         }
       }
     }

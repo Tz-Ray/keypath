@@ -34,7 +34,7 @@ The data under `data/` is derived from the tables of keypath 2.2.0 (its tag
 | `puzzles/` | the six challenges: ciphertext and, as spoilers, key, plaintext and solve path |
 | `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256; a byte-for-byte copy, so the scripts it names are KeyPath's unpublished ones) |
 | `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
-| `tests/` | `node --test` suites; `tests/fixtures/` is generated |
+| `tests/` | `node --test` suites; `tests/fixtures/` is generated (`sources.json` says which sources every generated file derives from; the NOTICE files follow from it) |
 
 ## Rebuilding the data
 
@@ -75,11 +75,15 @@ node tools/check_links.mjs         # needs the network: every external link reso
 ```
 
 The engine suites compare the JavaScript engine with fixtures the Python
-implementation generated: about 7,400 encode/decode vectors over every live
+implementation generated: about 10,400 encode/decode vectors over every live
 route (KeyPath's test corpora and golden vectors, seeded fuzz strings,
-edge cases), 419 walk traces, 149 tampered keys, and exhaustive digests of
-every Chinese phrase and character on all three Chinese keyboards, every
-reading, every Korean syllable, every hanja reading and every English row.
+edge cases), 421 walk traces, 193 tampered keys, and exhaustive digests of
+every Chinese phrase and character on all five Chinese keyboards, every
+reading, every Cangjie and Quick code, every Korean syllable, every hanja
+reading and every English row (the Quick rows, which the page derives from
+the Cangjie rows, included). The build itself asserts that each derived
+Quick row equals the row KeyPath's own encoder gives, for every word of the
+English list.
 
 The page suites check the copy (no leftover development text, honest
 wording, only relative or credited links), that every figure hard-coded in
@@ -92,7 +96,8 @@ compares the rendered ciphertext and key with the fixtures, clicks the
 examples, reveals every challenge, walks tampered keys, checks keyboard
 navigation, IME composition, share links, reduced motion, offline reload,
 horizontal overflow from 360 px up (long literals, long words and error
-paths included), touch-target sizes, focus after popovers and reveals,
+paths included), the Cangjie radicals on the keyboard picture and the walk,
+touch-target sizes, focus after popovers and reveals,
 share links with a hand-picked language, puzzles through a dictionary,
 and that the page makes no request outside its own origin and logs no
 errors.

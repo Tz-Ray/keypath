@@ -1,8 +1,9 @@
 // Exhaustive parity on the engine's internal encoders, compared through
 // sha256 digests of line dumps that tools/build_data.py writes from Python:
-// every zh phrase and character on all three zh surfaces, every reading's
-// keys, every Dubeolsik unit, every hanja's primary reading and every
-// English row of every translated surface.
+// every zh phrase and character on all five zh surfaces, every reading's
+// keys, every Cangjie and Quick code with its index, every Dubeolsik unit,
+// every hanja's primary reading and every English row of every translated
+// surface (Quick's derived from Cangjie's).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -34,6 +35,42 @@ test("zh: every phrase and character on zh_daqian, zh_pinyin and zh_hanja", asyn
     const id = i.toString(16).padStart(2, "0");
     assert.equal(sha(lines.join("")), digests.zh[id], mismatch(`zh shard ${id}`, lines));
   });
+});
+
+test("zh: every phrase and character on zh_cangjie and zh_quick", async () => {
+  const e = await freshEngine();
+  const { native } = e._internal;
+  await Promise.all([native.loadZhCore(), native.loadAllShards(), native.loadAllShapes()]);
+  const words = [...new Set([...native.phrases.keys(), ...native.zhState().readings.keys()])].sort(cpCompare);
+  const fmt = r => (r === null ? ["-", "-", "-"]
+    : [r[1], r[0].map(u => u.len).join(","), r[0].map(u => u.homophone_index).join(",")]);
+  const shards = Array.from({ length: 256 }, () => []);
+  for (const w of words) {
+    const c = fmt(native.encodeZhWord(w, "zh_cangjie"));
+    const q = fmt(native.encodeZhWord(w, "zh_quick"));
+    shards[w.codePointAt(0) & 0xff].push([w, ...c, ...q].join("\t") + "\n");
+  }
+  shards.forEach((lines, i) => {
+    const id = i.toString(16).padStart(2, "0");
+    assert.equal(sha(lines.join("")), digests.zhShape[id], mismatch(`zhShape shard ${id}`, lines));
+  });
+});
+
+test("every Cangjie and Quick code: char, code, index (docs/10 §9.7)", async () => {
+  const e = await freshEngine();
+  const { native } = e._internal;
+  await native.loadAllShapes();
+  for (const [name, table] of [["cangjie", native.cangjieState()], ["quick", native.quickState()]]) {
+    const lines = [];
+    for (const [code, chars] of table.lists) chars.forEach((ch, i) => lines.push(`${ch}\t${code}\t${i}\n`));
+    lines.sort(cpCompare);
+    assert.equal(lines.length, digests[`${name}Count`], name);
+    assert.equal(sha(lines.join("")), digests[name], mismatch(name, lines));
+  }
+  // the two cover the same characters, and each one's Quick code is the rule's
+  const cj = native.cangjieState(), q = native.quickState();
+  assert.equal(cj.codeOf.size, q.codeOf.size);
+  for (const [ch, code] of cj.codeOf) assert.equal(q.codeOf.get(ch), e.layouts.quickOf(code), ch);
 });
 
 test("every reading's Dàqiān and Pinyin keys", async () => {

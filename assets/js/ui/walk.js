@@ -10,6 +10,8 @@ import { T, LANG_TAGS, SURFACE_BADGE } from "./text.js";
 const US_PUNCT = /[^a-zA-Z]/;
 const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
 const UNIT_LIMIT = 60;
+/** Layouts whose units are shape codes: their band under the characters shows radicals. */
+export const SHAPE_LAYOUTS = new Set(["zh_cangjie", "zh_quick"]);
 const FAN_MAX = 10;
 
 // ------------------------------------------------------------ legends
@@ -24,6 +26,8 @@ export function makeLegends(layouts) {
   for (const [jamo, keys] of Object.entries(L.ko_dubeolsik.keysByJamo)) if (keys.length === 1) ko.set(keys, jamo);
   const ru = new Map(Object.entries(L.ru_jcuken.keysByLetter).map(([l, k]) => [k, l]));
   const es = new Map(L.es_accent.rows.map(([b, d, v]) => [b + d, v]));
+  // Cangjie and Quick keys: each letter's radical (X 難 is the difficult-character key)
+  const shape = new Map(Object.entries(L.zh_cangjie.radicals));
 
   /** keys (string) on a layout -> [{key, legend, mis, shift}] */
   function legends(layout, keys) {
@@ -35,10 +39,11 @@ export function makeLegends(layouts) {
       else if (layout === "ko_dubeolsik") { legend = ko.get(key) || ""; shift = key >= "A" && key <= "Z"; }
       else if (layout === "ru_jcuken") { legend = ru.get(key) || ""; mis = US_PUNCT.test(key); }
       else if (layout === "es_accent" && key >= "0" && key <= "9" && i > 0) legend = es.get(ks[i - 1] + key) || "";
+      else if (SHAPE_LAYOUTS.has(layout)) legend = shape.get(key) || "";
       return { key, legend, mis, shift };
     });
   }
-  return { legends, dq, ko, ru, es, layouts };
+  return { legends, dq, ko, ru, es, shape, layouts };
 }
 
 // ------------------------------------------------------------ model
@@ -49,7 +54,7 @@ export function modelOf(trace, registry) {
   let nHops = 0, hasHomophone = false, hasLetters = false, hasEnglish = false;
   trace.segments.forEach((seg, si) => {
     const surf = registry.surfaces[seg.language][seg.layout];
-    const info = { nHops: 0, hasHomophone: false, hasLetters: false, hasUnits: false };
+    const info = { nHops: 0, hasHomophone: false, hasShape: SHAPE_LAYOUTS.has(seg.layout), hasLetters: false, hasUnits: false };
     segs.push(info);
     seg.words.forEach((word, wi) => {
       const w = { si, wi, seg, word, surfaceId: seg.surface, literal: Object.prototype.hasOwnProperty.call(word, "literal"), units: [] };
@@ -85,7 +90,7 @@ function bandsOf(m) {
   for (let i = 0; i < m.nHops; i++) b.push(`hop${i}`, `dict${i}`);
   if (m.hasUnits) {
     b.push("bracket");
-    if (m.hasHomophone) b.push("char", "choice", "sound");
+    if (m.hasHomophone) b.push("char", "choice", m.hasShape ? "shape" : "sound");
     else if (m.hasLetters) b.push("letters");
     if (m.hasHomophone || m.hasLetters) b.push("keyedge");
     b.push("keys");
@@ -101,6 +106,7 @@ export function bandLabel(b, m) {
   if (c === "dict") return T.bands.dict;
   if (c === "char") return T.bands.char;
   if (c === "sound") return T.bands.sound;
+  if (c === "shape") return T.bands.shape;
   if (c === "letters") return T.bands.letters;
   if (c === "keys") return T.bands.keys;
   return "";
@@ -183,7 +189,7 @@ export function renderWalk(host, trace, ctx) {
   // legend (narrow) and gutter (wide) share the band labels
   const labelled = segInfo.flatMap(s => s.bands).filter(b => bandLabel(b, m));
   const legendRow = h("ul.walk-legend", { "aria-hidden": "true" },
-    ["msg", "dict", "char", "sound", "letters", "keys"].filter(c => labelled.some(x => bandClass(x) === c)).map(c => h(`li.lg-${c}`, h("span.dot"), bandLabel(c === "dict" ? "dict0" : c, m))));
+    ["msg", "dict", "char", "sound", "shape", "letters", "keys"].filter(c => labelled.some(x => bandClass(x) === c)).map(c => h(`li.lg-${c}`, h("span.dot"), bandLabel(c === "dict" ? "dict0" : c, m))));
   // the gutter labels the bands of a single-segment walk (multi: legend only)
   const gutter = m.multi ? null : h("div.walk-gutter", { "aria-hidden": "true",
     class: `walk-gutter${segInfo[0].hasHomophone ? " has-homophone" : ""}${segInfo[0].hasLetters ? " has-letters" : ""}` },
@@ -277,13 +283,17 @@ export function renderWalk(host, trace, ctx) {
     const keysText = cps(unit.keys).join(" ");
     let stop;
     if (u.kind === "homophone") {
-      const pinyin = seg.language === "zh" && seg.layout !== "ko_dubeolsik" ? ctx.layouts.numberedPinyin(unit.reading) : null;
+      const shape = segInfo[u.si].hasShape;
+      const pinyin = seg.language === "zh" && seg.layout !== "ko_dubeolsik" && !shape ? ctx.layouts.numberedPinyin(unit.reading) : null;
       const ghosts = unit.head.filter(c => c !== unit.out).slice(0, 3);
       const rank = rankText(u);
       const soundTag = seg.layout === "ko_dubeolsik" ? "ko" : seg.language === "ja" ? "ja" : "zh-Hant";
+      // a shape code reads as its radicals, with the code beneath
+      const radicals = shape ? ctx.layouts.radicalsOf(unit.reading) : null;
+      const reads = shape ? `shape ${radicals} ${unit.reading}` : `sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}`;
       const label = unit.count > 1 && unit.index !== null
-        ? `${unit.out}, candidate ${unit.index + 1} of ${unit.count}, sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}, keys ${keysText}`
-        : `${unit.out}, ${rank}, sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}, keys ${keysText}`;
+        ? `${unit.out}, candidate ${unit.index + 1} of ${unit.count}, ${reads}, keys ${keysText}`
+        : `${unit.out}, ${rank}, ${reads}, keys ${keysText}`;
       li.setAttribute("aria-label", label);
       const wide = cps(unit.out).length > 1;
       const stack = h("button.stack", { type: "button", tabindex: "-1", "aria-haspopup": "dialog", "aria-label": label, class: `stack${wide ? " wide" : ""}${unit.count <= 1 ? " single" : ""}` },
@@ -295,7 +305,9 @@ export function renderWalk(host, trace, ctx) {
       li.append(
         band("char", bandIndex.get("char"), stack, h("span.rank", { "aria-hidden": "true" }, rank)),
         band("choice", bandIndex.get("choice"), edgeSvg("choice", svgLine("50%", "0", "50%", "100%", "edge ch"))),
-        band("sound", bandIndex.get("sound"), h("span.sound", { lang: soundTag }, unit.reading), pinyin ? h("span.py", { lang: "en" }, pinyin) : null),
+        shape
+          ? band("shape", bandIndex.get("shape"), h("span.sound.radicals", { lang: "zh-Hant" }, radicals), h("span.py", { lang: "en", translate: "no" }, unit.reading))
+          : band("sound", bandIndex.get("sound"), h("span.sound", { lang: soundTag }, unit.reading), pinyin ? h("span.py", { lang: "en" }, pinyin) : null),
         band("keyedge", bandIndex.get("keyedge"), fan(legend.length)),
         band("keys", bandIndex.get("keys"), keycaps(legend, layout)));
     } else if (u.kind === "syllable") {
@@ -470,10 +482,12 @@ export function renderWalk(host, trace, ctx) {
 export function renderTable(host, trace, ctx) {
   const m = modelOf(trace, ctx.registry);
   const srcTag = LANG_TAGS[trace.source] || "en";
+  const shapes = m.segs.filter(s => s.hasShape && s.hasHomophone).length, sounds = m.segs.filter(s => !s.hasShape && s.hasHomophone).length;
+  const head = T.tableHead.map((t, i) => (i === 4 && shapes ? (sounds ? T.tableSoundShape : T.tableShape) : t));
   const table = h("table.walk-table",
     h("caption.vh", T.figCaption(ctx.message ?? trace.text, trace.ciphertext, ctx.surfaceName ?? "",
       m.words.filter(w => !w.literal).length, m.units.length, cps(trace.ciphertext).length)),
-    h("thead", h("tr", T.tableHead.map(t => h("th", { scope: "col" }, t)))));
+    h("thead", h("tr", head.map(t => h("th", { scope: "col" }, t)))));
   const tbody = h("tbody");
   let n = 0;
   for (const w of m.words) {
@@ -494,10 +508,12 @@ export function renderTable(host, trace, ctx) {
             : "—"));
       }
       const tag = LANG_TAGS[u.seg.language];
-      const pinyin = u.kind === "homophone" && u.seg.language === "zh" && u.seg.layout !== "ko_dubeolsik" ? ctx.layouts.numberedPinyin(u.unit.reading) : null;
+      const shape = u.kind === "homophone" && SHAPE_LAYOUTS.has(u.seg.layout);
+      const pinyin = u.kind === "homophone" && !shape && u.seg.language === "zh" && u.seg.layout !== "ko_dubeolsik" ? ctx.layouts.numberedPinyin(u.unit.reading) : null;
       tr.append(
         h("td", u.kind === "homophone" ? [h("span", { lang: tag }, u.unit.out), " ", rankText(u)] : h("span", { lang: tag }, u.unit.out)),
-        h("td", u.kind === "homophone" ? [h("span", { lang: u.seg.layout === "ko_dubeolsik" ? "ko" : tag }, u.unit.reading), pinyin ? ` ${pinyin}` : ""] : "—"),
+        h("td", shape ? [h("span", { lang: "zh-Hant" }, ctx.layouts.radicalsOf(u.unit.reading)), " ", h("span", { lang: "en", translate: "no" }, u.unit.reading)]
+          : u.kind === "homophone" ? [h("span", { lang: u.seg.layout === "ko_dubeolsik" ? "ko" : tag }, u.unit.reading), pinyin ? ` ${pinyin}` : ""] : "—"),
         h("td.mono", { lang: "en", translate: "no" }, u.unit.keys));
       tbody.append(tr);
     });

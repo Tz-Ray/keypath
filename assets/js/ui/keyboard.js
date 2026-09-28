@@ -11,6 +11,7 @@ const ROWS = [
 const INDENT = [0, 0.5, 0.75, 1.25];
 const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
 const DAQIAN_TONES = new Set(["6", "3", "4", "7"]);
+const SHAPE = new Set(["zh_cangjie", "zh_quick"]);
 
 /**
  * Render the picture for `layout` into `host` (a <details> body).  Returns
@@ -43,6 +44,7 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
     if (layout === "ko_dubeolsik") return legends.ko.get(shift && /[qwertop]/.test(key) ? key.toUpperCase() : key) || "";
     if (layout === "ru_jcuken") return legends.ru.get(key) || "";
     if (layout === "zh_pinyin") return PINYIN_TONE[key] || (/[a-z]/.test(key) ? key : "");
+    if (SHAPE.has(layout)) return legends.shape.get(key) || "";
     return "";
   };
   const legendLang = layout === "ru_jcuken" ? "ru" : layout === "ko_dubeolsik" ? "ko" : layout === "zh_pinyin" ? "en" : "zh-Hant";
@@ -77,6 +79,12 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
   }
   if (layout === "zh_pinyin") parts.push(h("p.kb-note", "Tone digits: 1 ˉ · 2 ˊ · 3 ˇ · 4 ˋ · 5 neutral"));
   if (layout === "zh_daqian") parts.push(h("p.kb-note", "Tone keys: 6 ˊ · 3 ˇ · 4 ˋ · 7 ˙; the first tone types nothing."));
+  if (SHAPE.has(layout)) {
+    parts.push(h("p.kb-note", "Each letter stands for a shape, its radical; a character's code spells its parts (codes from Unihan). ",
+      h("kbd", { lang: "en" }, "x"), " ", h("span", { lang: "zh-Hant" }, legends.shape.get("x")),
+      " is the key for hard-to-split characters; ", h("kbd", { lang: "en" }, "z"), " is unused."));
+    if (layout === "zh_quick") parts.push(h("p.kb-note", "Quick types only the first and last letters of a character's Cangjie code; a code of one or two letters stays whole."));
+  }
   host.append(...parts);
   return {
     highlight(keys) {

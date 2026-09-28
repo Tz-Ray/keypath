@@ -1,0 +1,16 @@
+{"list": "languages", "ordinal": 0, "id": "zh"}
+{"list": "languages", "ordinal": 1, "id": "ja"}
+{"list": "languages", "ordinal": 2, "id": "es"}
+{"list": "languages", "ordinal": 3, "id": "en"}
+{"list": "languages", "ordinal": 4, "id": "ko"}
+{"list": "languages", "ordinal": 5, "id": "ru"}
+{"list": "surfaces", "ordinal": 0, "id": ["zh", "zh_daqian"]}
+{"list": "surfaces", "ordinal": 1, "id": ["zh", "zh_pinyin"]}
+{"list": "surfaces", "ordinal": 2, "id": ["ja", "ja_romaji"]}
+{"list": "surfaces", "ordinal": 3, "id": ["es", "es_accent"]}
+{"list": "surfaces", "ordinal": 4, "id": ["en", "en_identity"]}
+{"list": "surfaces", "ordinal": 5, "id": ["ko", "ko_dubeolsik"]}
+{"list": "surfaces", "ordinal": 6, "id": ["zh", "ko_dubeolsik"]}
+{"list": "surfaces", "ordinal": 7, "id": ["ru", "ru_jcuken"]}
+{"list": "surfaces", "ordinal": 8, "id": ["zh", "zh_cangjie"]}
+{"list": "surfaces", "ordinal": 9, "id": ["zh", "zh_quick"]}

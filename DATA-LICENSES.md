@@ -12,8 +12,9 @@ KeyPath 2.2.0 (tag
 
 The full texts of the licenses that ask for a copy to travel with the data
 are in [`LICENSES/`](LICENSES): [GPL-2.0](LICENSES/GPL-2.0.txt),
-[LGPL-2.0](LICENSES/LGPL-2.0.txt), [LGPL-2.1](LICENSES/LGPL-2.1.txt) and
-the [Unicode](LICENSES/Unicode.txt) permission notice; the SIL OFL 1.1 is
+[LGPL-2.0](LICENSES/LGPL-2.0.txt), [LGPL-2.1](LICENSES/LGPL-2.1.txt), the
+[Unicode License V3](LICENSES/Unicode-3.0.txt) and the older
+[Unicode](LICENSES/Unicode.txt) permission notice; the SIL OFL 1.1 is
 [`fonts/OFL.txt`](fonts/OFL.txt). The Creative Commons licenses are given
 by their URIs below.
 
@@ -24,15 +25,18 @@ by their URIs below.
 | `data/zh/core.json` (readings, candidate order) | libchewing-data | LGPL-2.1-or-later |
 | `data/zh/p/*.txt` (phrase list, reading choices) | libchewing-data; the hangul readings from libhangul `hanja.txt` | LGPL-2.1-or-later; BSD-3-Clause |
 | `data/hanja/core.json` | libhangul `hanja.txt` | BSD-3-Clause |
+| `data/cangjie/*.json` (the Cangjie lists, by first letter) | Unihan `kCangjie` (Unicode 18.0.0: the codes); libchewing-data (which characters, and their order) | [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later |
+| `data/quick.json` (the Quick lists) | Unihan `kCangjie` (each code's first and last letters); libchewing-data (which characters, and their order) | [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later |
 | `data/en/vocab/*.json` (the 10,000-word English list) | wordfreq 3.1.1 data | CC BY-SA 4.0 |
 | `data/en/zh_daqian/`, `data/en/zh_pinyin/`, `data/en/zh_hanja/` | CC-CEDICT; libchewing-data; libhangul `hanja.txt` (zh_hanja); wordfreq data | CC BY-SA 4.0; LGPL-2.1-or-later; BSD-3-Clause; CC BY-SA 4.0 |
+| `data/en/zh_cangjie/` (the page derives the Quick rows from these) | CC-CEDICT; Unihan `kCangjie`; libchewing-data; wordfreq data | CC BY-SA 4.0; [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later; CC BY-SA 4.0 |
 | `data/en/ja_romaji/` | JMdict (via jmdict-simplified); SKK-JISYO.L; wordfreq data | CC BY-SA 4.0; GPL-2.0-or-later; CC BY-SA 4.0 |
 | `data/en/ko_dubeolsik/` | kengdic; wordfreq data | LGPL-2.0-or-later; CC BY-SA 4.0 |
 | `data/en/ru_jcuken/` | FreeDict rus-eng (WikDict); wordfreq data | CC BY-SA 3.0; CC BY-SA 4.0 |
 | `data/en/es_accent/` | FreeDict spa-eng; wordfreq data | GPL-2.0-or-later; CC BY-SA 4.0 |
 | `data/challenges/*.json` | the KeyPath puzzles (MIT) and the dictionary entries their keys read: CC-CEDICT, FreeDict spa-eng, FreeDict rus-eng, libchewing-data, libhangul `hanja.txt`; the order of the Spanish and Russian entries from wordfreq data | MIT; CC BY-SA 4.0; GPL-2.0-or-later; CC BY-SA 3.0; LGPL-2.1-or-later; BSD-3-Clause; CC BY-SA 4.0 |
 | `data/hero.json` | CC-CEDICT; libchewing-data | CC BY-SA 4.0; LGPL-2.1-or-later |
-| `data/layouts.json` | the KeyPath keyboard layouts (authored, MIT); the Pinyin spellings of libchewing-data's syllables | MIT; LGPL-2.1-or-later |
+| `data/layouts.json` | the KeyPath keyboard layouts and the Cangjie radical legend (authored, MIT); the Pinyin spellings of libchewing-data's syllables | MIT; LGPL-2.1-or-later |
 | `data/registry.json`, `data/manifest.json` | KeyPath (MIT) | MIT |
 | `data/unicode14.json` | the Unicode Character Database 14.0.0 (assigned code point ranges; a modified Data File) | Unicode License (`LICENSES/Unicode.txt`) |
 | `fonts/glyphs-tc.woff2`, `fonts/glyphs-kr.woff2` | Noto Sans CJK TC 2.004 (subsets, renamed "KeyPath Glyphs") | SIL OFL 1.1 (`fonts/OFL.txt`) |
@@ -198,10 +202,74 @@ POSSIBILITY OF SUCH DAMAGE.
   [`LICENSES/Unicode.txt`](LICENSES/Unicode.txt). The file is a modified
   Data File: it keeps only the ranges of assigned code points.
 
+### Unihan
+
+- license: Unicode License V3 (SPDX `Unicode-3.0`), which grants its
+  permissions only if its copyright and permission notice travels with the
+  data or its documentation; the Unihan archive carries no license file of
+  its own, so here is the notice, as fetched from
+  https://www.unicode.org/license.txt on 2026-09-27 (39 lines, sha256
+  `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`),
+  also in [`LICENSES/Unicode-3.0.txt`](LICENSES/Unicode-3.0.txt):
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+```
+
+- used for: the Cangjie codes (the `kCangjie` field, lowercased) in
+  `data/cangjie/` and `data/en/zh_cangjie/`, and the Quick codes of
+  `data/quick.json` (each Cangjie code's first and last letters). Which
+  characters have a code, and their order, come from libchewing-data.
+- upstream: the Unicode Han Database (Unihan, UAX #38,
+  https://www.unicode.org/reports/tr38/), release 18.0.0,
+  https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip (sha256
+  `4c93ea9c1f636451729a840978f1667a53886af37ba854fdcce109721c63d43e`); its
+  29,189 `kCangjie` lines of `Unihan_DictionaryLikeData.txt` hash to
+  `fccf1261026d081605dd32c3d5b3fb92d46e76b46952dde822824875a02e0b9a`.
+
 ### KeyPath
 
 The keyboard layouts (Dàqiān, Dubeolsik, ЙЦУКЕН, romaji, the Spanish
-accent selectors), the key format, the puzzles and all code are authored
+accent selectors, the Cangjie radical legend and the Quick rule), the key
+format, the puzzles and all code are authored
 in KeyPath and MIT-licensed. The puzzles are copied into
 [`puzzles/`](puzzles).
 
@@ -238,6 +306,7 @@ repository's history records any later change).
 - **libchewing-data** (`word.csv`, `tsi.csv`) → `data/zh/`,
   `data/en/zh_daqian/`, `data/en/zh_pinyin/`, `data/en/zh_hanja/`,
   `data/hero.json`, `data/layouts.json`, `data/challenges/`,
+  `data/cangjie/`, `data/quick.json`, `data/en/zh_cangjie/`,
   `tests/fixtures/`. Changed 2026-07-10: header and tone-mark rows removed;
   converted to tab-separated; each character's frequency replaced by one
   derived from its own rows and every phrase containing it. Changed
@@ -246,7 +315,11 @@ repository's history records any later change).
   derived-frequency order; readings replaced by indices, Korean readings
   (libhangul) added, phrases split into 256 files by character code; for
   English words, the Chinese word and its reading stored as keystrokes and
-  candidate positions.
+  candidate positions. Changed 2026-09-28: the characters that have a
+  Unihan Cangjie code kept, each with that code in place of its readings,
+  grouped by code and by Quick code in derived-frequency order (one JSON
+  file per first letter, and one for Quick); for English words, the Chinese
+  word stored as Cangjie keystrokes and candidate positions.
 - **kengdic** → `data/en/ko_dubeolsik/`, `tests/fixtures/`. Changed
   2026-09-23: the id, hanja, level, created and source columns removed;
   rows kept only if the word is all Hangul syllables with a gloss; rows
