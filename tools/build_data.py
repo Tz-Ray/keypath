@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Generate the site's data/ and tests/fixtures/ from keypath 2.0.0.
+"""Generate the site's data/ and tests/fixtures/ from keypath 2.2.0.
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v2.0); the cipher project
+site's own venv (from the cipher project at tag v2.2); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
-docs/09) and never imported from, executed or written to.
+docs/09) and never imported from, executed or written to.  The walks the
+page draws come from keypath.trace (trace/1), mapped to the site's surface
+ids.
 
     .venv/bin/python tools/build_data.py            # (re)write data/ + fixtures
     .venv/bin/python tools/build_data.py --check    # rebuild to a temp dir, byte-compare
@@ -56,12 +58,15 @@ from keypath.tables import (  # noqa: E402
     es_accent, es_en, ja_romaji, ko_dubeolsik, ko_hanja, ko_hanja_readings, ru_en, ru_jcuken,
     tables_sha256, zh_chars, zh_daqian, zh_phrases, zh_pinyin,
 )
+from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
 # a checkout of the cipher project at tag v2.0; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-EDITION = "67a40391169bcb9b891b52c84e126fb386e5b9b6e1153665ea55aba214c161f2"
+VERSION = "2.2.0"
+TAG = "v2.2"
+EDITION = "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732"
 VOCAB_SIZE = 10_000
 SEED = 20260924
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
@@ -205,49 +210,35 @@ def leak_count(key: dict[str, Any]) -> int:
 
 # ================================================================== trace
 
-def py_trace(ciphertext: str, key: dict[str, Any]) -> dict[str, Any]:
-    """The Trace (SPEC §7.4) of one key, walked the way decode walks it."""
-    text = decode(ciphertext, key)
-    pos = 0
+# trace/1 (keypath.trace) minus what the page does not draw: the format tag,
+# residualBytes, each segment's span and hint, a tier-2 word's patch record
+# and each unit's choice; each segment gains the site's surface id first.
+TRACE_DROPPED = {"top": ("format", "residualBytes"), "segment": ("span", "hint"),
+                 "word": ("tier2",), "unit": ("choice",)}
+
+
+def site_trace(ciphertext: str, key: dict[str, Any]) -> dict[str, Any]:
+    """The page's Trace (site SPEC §7.4) of one key: keypath.trace.trace, mapped."""
+    obj = trace1(ciphertext, key)
+    drop = TRACE_DROPPED
+
+    def word(w: dict[str, Any]) -> dict[str, Any]:
+        if "literal" in w:
+            return dict(w)
+        out = {k: v for k, v in w.items() if k not in drop["word"]}
+        out["units"] = [{k: v for k, v in u.items() if k not in drop["unit"]} for u in w["units"]]
+        return out
+
     segments = []
-    for segment in key["segments"]:
-        lang, layout, mode = segment["language"], segment["layout"], segment["selector_mode"]
-        surface = registry.surface(lang, layout)
-        hops, _tail = registry.split_route(segment["route"])
-        words: list[dict[str, Any]] = []
-        for word in segment["words"]:
-            if "literal" in word:
-                words.append({"literal": word["literal"]["text"]})
-                continue
-            units = []
-            outs = []
-            for unit in word["units"]:
-                chunk = ciphertext[pos : pos + unit["len"]]
-                parsed = surface.unit_candidates(chunk, mode)
-                out = surface.decode_unit(chunk, unit, mode)
-                units.append({
-                    "keys": chunk, "at": pos, "reading": parsed.reading,
-                    "count": len(parsed.candidates), "head": list(parsed.candidates[:4]),
-                    "index": unit.get("homophone_index"), "selected": parsed.selected, "out": out,
-                })
-                outs.append(out)
-                pos += unit["len"]
-            current = "".join(outs)
-            records = (word["translations"] if "translations" in word
-                       else [word["translation"]] if "translation" in word else [])
-            chain: list[dict[str, Any]] = []
-            for step, record in zip(reversed(hops), reversed(records)):
-                a, b = step.removeprefix(registry.HOP_PREFIX).split(">")
-                back = registry.HOPS[(a, b)].edge.backward(current)
-                chain.insert(0, {"lang": b, "word": current, "index": record["index"], "count": len(back)})
-                current = back[record["index"]]
-            words.append({"source": current, "chain": chain, "units": units})
-        segments.append({
-            "surface": SITE_ID[(lang, layout)], "language": lang, "layout": layout, "selector": mode,
-            "hops": [h.removeprefix(registry.HOP_PREFIX) for h in hops], "words": words,
-        })
-    return {"source": key["source_language"], "text": text, "ciphertext": ciphertext,
-            "leak": [leak_count(key), len(text)], "segments": segments}
+    for seg in obj["segments"]:
+        mapped: dict[str, Any] = {"surface": SITE_ID[(seg["language"], seg["layout"])]}
+        for k, v in seg.items():
+            if k not in drop["segment"]:
+                mapped[k] = [word(w) for w in v] if k == "words" else v
+        segments.append(mapped)
+    top = {k: v for k, v in obj.items() if k not in drop["top"] and k != "segments"}
+    top["segments"] = segments
+    return top
 
 
 # ============================================================= registry
@@ -550,7 +541,7 @@ def hero_data(out: Out) -> dict[str, Any]:
     text, source, sid, cipher = HERO
     result = py_encode(text, source, sid)
     assert result.ciphertext == cipher, result.ciphertext
-    trace = py_trace(result.ciphertext, result.key)
+    trace = site_trace(result.ciphertext, result.key)
     chars = zh_chars()
     lists = {}
     for word in trace["segments"][0]["words"]:
@@ -861,10 +852,10 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
         if rec["class"] == "site":
             traces.append({"id": rec["id"], "ciphertext": rec["expect"]["ciphertext"],
                            "keyText": rec["expect"]["keyText"],
-                           "trace": py_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
+                           "trace": site_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
     for c in shipped:
         traces.append({"id": f"challenge-{c['n']:02d}", "ciphertext": c["ciphertext"], "keyText": c["keyText"],
-                       "trace": py_trace(c["ciphertext"], json.loads(c["keyText"]))})
+                       "trace": site_trace(c["ciphertext"], json.loads(c["keyText"]))})
     pool = [r for r in vec.valid if r["class"] != "site"]
     by_group: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for r in pool:
@@ -878,7 +869,7 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for rec in sample:
         traces.append({"id": rec["id"], "ciphertext": rec["expect"]["ciphertext"],
                        "keyText": rec["expect"]["keyText"],
-                       "trace": py_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
+                       "trace": site_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
     out.jsonl_gz("tests/fixtures/traces.jsonl.gz", traces)
 
     out.jsonl_gz("tests/fixtures/decode-errors.jsonl.gz", tampered(rng, vec.valid, shipped))
@@ -1204,7 +1195,7 @@ def notices(out: Out) -> None:
 
 
 def guards() -> None:
-    assert keypath.__version__ == "2.0.0", keypath.__version__
+    assert keypath.__version__ == VERSION, keypath.__version__
     assert tables_sha256() == EDITION, tables_sha256()
     assert (PROJECT / "puzzles").is_dir(), PROJECT
 
@@ -1231,7 +1222,7 @@ def build(root: Path) -> Out:
     notices(out)
     files = {rel: {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
              for rel, data in sorted(out.files.items()) if rel.startswith("data/")}
-    out.json("data/manifest.json", {"keypath": keypath.__version__, "tag": "v2.0", "edition": EDITION,
+    out.json("data/manifest.json", {"keypath": keypath.__version__, "tag": TAG, "edition": EDITION,
                                     "vocab": VOCAB_SIZE, "files": files})
     return out
 

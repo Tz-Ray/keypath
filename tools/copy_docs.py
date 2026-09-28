@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Copy the puzzles, the analysis and the table provenance from keypath v2.0.
+"""Copy the puzzles, the analysis and the table provenance from KeyPath.
 
 The cipher project's repository is not public, so the page links to these
 copies in this repository instead.  Files are read from the project's git
-tag `v2.0` (never its working tree).  A solve path keeps its title and its
+tags, never its working tree: the six puzzles from `v2.0`, where they were
+set (their solve paths describe that release's keyboards), and the
+analysis and the table provenance from `v2.1`, whose tables edition the
+data under data/ is built from (KeyPath 2.2 keeps it).  A solve path keeps its title and its
 solving steps (the setter's notes after them, which cite unpublished
 documents and tools, are left out) and gets a short preface; the analysis
 gets a preface too; everything else is copied byte for byte.
@@ -23,7 +26,8 @@ from pathlib import Path
 
 SITE = Path(__file__).resolve().parent.parent
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-TAG = "v2.0"
+PUZZLES_TAG = "v2.0"
+DOCS_TAG = "v2.1"
 PAGE = "https://tz-ray.github.io/keypath/"
 RULES = "All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals."
 
@@ -52,7 +56,7 @@ SOLVE_PREFACE = """\
 """
 
 ANALYSIS_PREFACE = """\
-> From KeyPath 2.0 (tag `v2.0`). The scripts, tests and design documents
+> From KeyPath 2.1 (tag `v2.1`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -62,9 +66,13 @@ ANALYSIS_PREFACE = """\
 """
 
 
-def show(path: str) -> str:
-    return subprocess.run(["git", "-C", str(PROJECT), "show", f"{TAG}:{path}"],
-                          check=True, capture_output=True).stdout.decode("utf-8")
+def show_bytes(path: str, tag: str = PUZZLES_TAG) -> bytes:
+    return subprocess.run(["git", "-C", str(PROJECT), "show", f"{tag}:{path}"],
+                          check=True, capture_output=True).stdout
+
+
+def show(path: str, tag: str = PUZZLES_TAG) -> str:
+    return show_bytes(path, tag).decode("utf-8")
 
 
 def with_preface(text: str, preface: str) -> bytes:
@@ -109,10 +117,9 @@ def build() -> dict[str, bytes]:
             files[f"{src}/{name}"] = show(f"{src}/{name}").encode("utf-8")
         files[f"{src}/solve-path.md"] = solve_path(f"{src}/solve-path.md")
     files["puzzles/README.md"] = puzzles_index().encode("utf-8")
-    files["docs/analysis.md"] = with_preface(show("docs/09-analysis.md"), ANALYSIS_PREFACE)
+    files["docs/analysis.md"] = with_preface(show("docs/09-analysis.md", DOCS_TAG), ANALYSIS_PREFACE)
     # verbatim: its sha256 is the tables edition
-    files["docs/VERSIONS.md"] = subprocess.run(["git", "-C", str(PROJECT), "show", f"{TAG}:tables/VERSIONS.md"],
-                                               check=True, capture_output=True).stdout
+    files["docs/VERSIONS.md"] = show_bytes("tables/VERSIONS.md", DOCS_TAG)
     return files
 
 

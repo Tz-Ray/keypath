@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.0 (tag `v2.0`). The scripts, tests and design documents
+> From KeyPath 2.1 (tag `v2.1`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -97,6 +97,8 @@ rewrites the blocks. With no flag the script prints them.
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_daqian) | 86 | 177 |
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_pinyin) | 86 | 177 |
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, ko_dubeolsik) | 86 | 177 |
+| zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_cangjie) | 86 | 177 |
+| zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_quick) | 86 | 177 |
 | ja round-trip | `test_walk_roundtrip_ja_es: JA_CORPUS` | ja on (ja, ja_romaji) | 11 | 49 |
 | es round-trip | `test_walk_roundtrip_ja_es: ES_CORPUS` | es on (es, es_accent) | 9 | 111 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en on (en, en_identity) | 25 | 483 |
@@ -129,9 +131,11 @@ encoded by the surface and parsed back to exactly one candidate:
 | (ru, ru_jcuken) | ru_jcuken.tsv letters | 33 | 33 | 1 |
 <!-- END GENERATED: bijective -->
 
-The other surfaces are homophone layers. For each one, every
-reading its table lists is typed on its layout and parsed back by the
-surface, and the size of the candidate set is recorded. The Japanese
+The other surfaces are homophone layers, or shape layers: Cangjie and
+Quick list the characters that share a code the way a homophone layer
+lists those that share a reading. For each one, every reading or code
+its table lists is typed on its layout and parsed back by the surface,
+and the size of the candidate set is recorded. The Japanese
 row counts SKK candidates; a keyed Japanese unit's key chooses from one
 more, the kana itself (see Definitions):
 
@@ -142,6 +146,8 @@ more, the kana itself (see Definitions):
 | (zh, zh_pinyin) | zh_chars.tsv readings | 1,412 | 11.1% | 1 | 11 | 18.48 | 45 | 106 | 215 |
 | (ja, ja_romaji) | ja_skk.tsv readings | 130,697 | 84.3% | 1 | 1 | 1.38 | 2 | 7 | 239 |
 | (zh, ko_dubeolsik) | ko_hanja.tsv syllables | 555 | 10.3% | 1 | 33 | 51.30 | 123 | 282 | 352 |
+| (zh, zh_cangjie) | zh_cangjie.tsv codes | 17,758 | 95.3% | 1 | 1 | 1.05 | 1 | 2 | 6 |
+| (zh, zh_quick) | Quick codes of zh_cangjie.tsv | 646 | 3.9% | 1 | 26 | 28.93 | 55 | 81 | 105 |
 <!-- END GENERATED: candidate-sets -->
 
 <!-- BEGIN GENERATED: candidate-histogram -->
@@ -151,6 +157,8 @@ more, the kana itself (see Definitions):
 | (zh, zh_pinyin) | 157 | 231 | 257 | 517 | 233 | 17 |
 | (ja, ja_romaji) | 110,208 | 17,685 | 2,116 | 604 | 74 | 10 |
 | (zh, ko_dubeolsik) | 57 | 34 | 49 | 130 | 194 | 91 |
+| (zh, zh_cangjie) | 16,919 | 837 | 2 | 0 | 0 | 0 |
+| (zh, zh_quick) | 25 | 24 | 48 | 290 | 258 | 1 |
 <!-- END GENERATED: candidate-histogram -->
 
 What the tables say:
@@ -163,6 +171,10 @@ What the tables say:
   distinct syllables than Chinese has tonal readings, so each syllable
   collects many more characters. Typing Chinese on a Korean keyboard
   therefore spends more bits per character than typing it in Bopomofo.
+- **Cangjie almost never needs its index; Quick almost always does.**
+  A Cangjie code spells a character's shape, so nearly every code names
+  a single character. Quick keeps only a code's first and last letters,
+  which gathers characters into sets as large as the Bopomofo ones.
 - **Japanese is lopsided.** Most SKK readings are long compound
   readings that name a single word. The short readings carry the long
   candidate lists, as the table by reading length shows, and short
@@ -253,6 +265,8 @@ and the tables show how far each one does:
 | zh round-trip | zh on (zh, zh_daqian) | (zh, zh_daqian) | 154 | 154 | 73.4% | 73.4% | 0.64 | 11 |
 | zh round-trip | zh on (zh, zh_pinyin) | (zh, zh_pinyin) | 154 | 154 | 73.4% | 73.4% | 0.64 | 11 |
 | zh round-trip | zh on (zh, ko_dubeolsik) | (zh, ko_dubeolsik) | 154 | 154 | 41.6% | 41.6% | 4.44 | 94 |
+| zh round-trip | zh on (zh, zh_cangjie) | (zh, zh_cangjie) | 154 | 19 | 100.0% | 100.0% | 0.00 | 0 |
+| zh round-trip | zh on (zh, zh_quick) | (zh, zh_quick) | 154 | 147 | 74.7% | 73.5% | 0.55 | 11 |
 | ja round-trip | ja on (ja, ja_romaji) | (ja, ja_romaji) | 15 | 15 | 40.0% | 40.0% | 11.00 | 118 |
 | es round-trip | es on (es, es_accent) | (es, es_accent) | 0 | 0 | — | — | — | — |
 | en round-trip | en on (en, en_identity) | (en, en_identity) | 0 | 0 | — | — | — | — |
@@ -346,6 +360,8 @@ apart from the key size, the unit-boundary bits per character:
 | zh round-trip | zh on (zh, zh_daqian) | 85 | 11.27 | 9.04 | 87 | 5.41 | 24.2% | 0.83 |
 | zh round-trip | zh on (zh, zh_pinyin) | 85 | 11.27 | 9.04 | 87 | 5.41 | 24.2% | 0.00 |
 | zh round-trip | zh on (zh, ko_dubeolsik) | 85 | 14.57 | 12.87 | 93.04 | 7.00 | 18.7% | 0.00 |
+| zh round-trip | zh on (zh, zh_cangjie) | 85 | 2.98 | 0 | 80 | 1.43 | 91.6% | 1.83 |
+| zh round-trip | zh on (zh, zh_quick) | 85 | 11.74 | 9.71 | 91.68 | 5.64 | 23.3% | 0.96 |
 | ja round-trip | ja on (ja, ja_romaji) | 10 | 13.66 | 1.95 | 96 | 2.79 | 76.2% | 0.96 |
 | es round-trip | es on (es, es_accent) | 8 | 11.00 | 0 | 88 | 0.79 | 100.0% | 0.73 |
 | en round-trip | en on (en, en_identity) | 24 | 6.67 | 0 | 72 | 0.33 | 100.0% | 0.79 |
@@ -381,8 +397,11 @@ Reading the table:
   with the spaces taken out.
 - **Homophone layers are where the key's bits live.** A Chinese
   character costs the logarithm of its reading's candidate count,
-  whatever its rank, so the Chinese rows are the heaviest native rows,
-  and hanja conversion is heavier than Bopomofo.
+  whatever its rank, so the Chinese rows on Bopomofo, Pinyin, hanja
+  conversion and Quick are the heaviest native rows, and hanja
+  conversion is heavier than Bopomofo. Cangjie is the exception: nearly
+  every code names one character, so its keys are light, and its
+  difficulty moves into the unit boundaries.
 - **Residual text is expensive.** Each literal byte costs eight bits,
   far more than a typical index. The leakage rule (docs/06 §6) caps it
   in shipped challenges to a small share of their characters, but it
@@ -393,7 +412,9 @@ Reading the table:
 - **Unit boundaries are the solver's work, not the key's.** Pinyin's
   column carries no information because every unit ends in its tone
   digit, so the split is forced. Dàqiān's does, because the first tone
-  types no key and a bare phonetic letter is a unit of its own. On
+  types no key and a bare phonetic letter is a unit of its own.
+  Cangjie's column is the largest: its codes run from one letter to
+  five with nothing to mark where one ends. On
   word-per-unit layouts the boundaries are the missing spaces. A Korean
   challenge can carry no key bits at all and still be a puzzle, because
   all of its difficulty is recognising the keyboard and splitting the

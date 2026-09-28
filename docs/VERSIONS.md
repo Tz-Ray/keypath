@@ -76,6 +76,16 @@ each processed table, which pins the raw sources.  Regenerate with
 - raw sha256 (rus-eng.tei): 294932498ca0e75420565731c8cdfc0737b49c7714e8108f0db61ccdca318d37
 - ordering: wordfreq==3.1.1 zipf_frequency, en for the ru→en order and ru for the en→ru order, Zipf baked at build
 
+## Source: Unihan (Cangjie codes, Cantonese readings)
+
+- url: https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip
+- release: 18.0.0
+- license: Unicode License V3 (notice text https://www.unicode.org/license.txt, sha256 e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96)
+- zip sha256 (Unihan.zip, 8,340,649 bytes): 4c93ea9c1f636451729a840978f1667a53886af37ba854fdcce109721c63d43e
+- fallback accepted: https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip, sha256 f7a48b2b545acfaa77b2d607ae28747404ce02baefee16396c5d2d7a8ef34b5e (byte-identical field lines)
+- raw sha256 (unihan-kCangjie.txt, the 29,189 kCangjie data lines of Unihan_DictionaryLikeData.txt): fccf1261026d081605dd32c3d5b3fb92d46e76b46952dde822824875a02e0b9a
+- raw sha256 (unihan-kCantonese.txt, the 29,936 kCantonese data lines of Unihan_Readings.txt): 87513d07ef4cc8c92513937caa8e0b449e03e76f6d40aaa6ce75a8a881a5dfe6
+
 ## Processed tables
 
 - zh_chars.tsv: b9de5dd9a051e35d3cc57647de66af3458f3620a6fb541cbc5dbe3f8d3e72095
@@ -104,3 +114,5 @@ each processed table, which pins the raw sources.  Regenerate with
   (layout pinned by docs/07-extensions-spec.md §7 (Windows Russian KLID 00000419), not derived from raw data)
 - ru_en_freedict.tsv: 2573032a287765a5673cd597e16ce540f44f907dd7ad4db0d7252d3a8f8de8c1
   (Zipf(ru) millis and the ru→en order baked with wordfreq==3.1.1; the en→ru order is derived at load)
+- zh_cangjie.tsv: ac78acbb07f87d69cff72fc4660805b496df9b6acf18671aaab961f7fd831ed8
+  (Unihan 18.0.0 kCangjie, lowercased, for each zh_chars.tsv character that has one; docs/10 §4.1 order: derived_freq desc, then code point)

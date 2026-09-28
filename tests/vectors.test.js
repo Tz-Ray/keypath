@@ -1,4 +1,4 @@
-// Encode/decode parity with keypath 2.0.0 on the generated corpus
+// Encode/decode parity with keypath 2.2.0 on the generated corpus
 // (tests/fixtures/vectors.jsonl.gz, written by tools/build_data.py): the
 // site's examples, the cipher project's round-trip corpora and golden
 // vectors, seeded fuzz strings per live surface, and edge cases.

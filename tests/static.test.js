@@ -15,7 +15,8 @@ const registry = readJson("data/registry.json");
 const nf = new Intl.NumberFormat("en");
 const ordinal = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th"}`;
 
-const get = path => path.split(".").reduce((o, k) => o[k], { ...S, edition8: registry.currentEdition.slice(0, 8) });
+const get = path => path.split(".").reduce((o, k) => o[k], { ...S, edition8: registry.currentEdition.slice(0, 8),
+  version2: registry.keypathVersion.split(".").slice(0, 2).join(".") });
 
 test("every data-static value matches the build's static.json", () => {
   const els = elements(doc).filter(e => e.attrs["data-static"] !== undefined);
