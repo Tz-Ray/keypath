@@ -84,6 +84,22 @@ test("JS kp1 equals Python kp1 for every fixture key, and unpacks each back to i
   assert.ok(packed > 9000 && none > 50, `${packed} packed, ${none} without a kp1 form`);
 });
 
+test("no kp1 form: a literal tier written as a float validates and decodes, and both packers refuse it", async () => {
+  assert.deepEqual(F.noForm.map(g => g.why), ["a literal whose tier is the float 3.0", "a literal whose tier is the float 3e0"]);
+  const e = await engine();
+  for (const g of F.noForm) {
+    const key = parseKeyJson(g.keyText);
+    validateKey(key, R);
+    checkKey(key, R);
+    const r = await e.decode({ ciphertext: g.ciphertext, keyText: g.keyText });
+    assert.deepEqual([r.ok, r.text], [true, g.decoded], g.why);
+    assert.throws(() => kp1.pack(key, R), err => err instanceof KeyError && err.message.startsWith("no kp1 form"), g.why);
+    const packed = e.kp1Pack(g.keyText);
+    assert.equal(packed.ok, false, g.why);
+    assert.match(packed.message, /^no kp1 form/, g.why);
+  }
+});
+
 test("the engine decodes a kp1 key exactly as its JSON (the challenges on fresh engines)", async () => {
   for (const g of F.accepted.filter(a => a.source.startsWith("puzzles/"))) {
     const n = g.source.match(/challenge-(\d+)/)[1];

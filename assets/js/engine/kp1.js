@@ -10,7 +10,8 @@
 // validateKey).  None calls pack or unpack, and none calls another raw one.
 //   unpack(s) = parse(s), then require text(payload(parse(s))) === s
 //   pack(key) = validateKey(key); s = text(payload(key)); then require
-//               dumpsKey(parse(s)) === dumpsKey(key)
+//               dumpsKey(parse(s)) === dumpsKey(key) and no float in key
+//               (the reference's dumps writes 3.0, which dumpsKey cannot)
 // Every failure is a KeyError.  kp1 accepts exactly what validateKey
 // accepts: decode's own checks (hop registration, the chain's start at the
 // source language, the edition's table list) are not kp1's, so an unpacked
@@ -18,7 +19,7 @@
 //
 // Integers: every varint and the unit word 2·len + has_index (up to 2^32-1)
 // are read and written with arithmetic, never with 32-bit bit operators.
-import { KeyError, has, splitRoute, HOP_PREFIX, validateKey } from "./keycheck.js";
+import { KeyError, PyFloat, has, splitRoute, HOP_PREFIX, validateKey } from "./keycheck.js";
 import { dumpsKey } from "./dumps.js";
 import { sha256 } from "./sha256.js";
 
@@ -380,11 +381,23 @@ export function unpack(s, R, accepted = R.editionHashes) {
   return key;
 }
 
+/** Whether a parsed key holds a float anywhere (parseKeyJson's PyFloat). */
+function holdsFloat(v) {
+  if (v instanceof PyFloat) return true;
+  if (v === null || typeof v !== "object") return false;
+  return (Array.isArray(v) ? v : Object.values(v)).some(holdsFloat);
+}
+
 /** pack(K): the kp1 string of a key, defined only for keys that survive the round trip. */
 export function pack(key, R, accepted = R.editionHashes) {
   validateKey(key, R);
   const s = text(payload(key, R));
-  if (dumpsKey(parse(s, R, accepted)) !== dumpsKey(key))
-    fail("no kp1 form: the key does not survive the round trip (an extra field, another field order, an uppercase digest, …)");
+  // dumpsKey writes a float the way JSON.stringify does (3.0 as 3), where
+  // the reference writes 3.0; parse(s) never holds a float (kp1 carries
+  // integers only), so a key that holds one never survives the round trip.
+  // validateKey lets one through where the schema says const (a literal's
+  // "tier": 3.0 equals 3).
+  if (dumpsKey(parse(s, R, accepted)) !== dumpsKey(key) || holdsFloat(key))
+    fail("no kp1 form: the key does not survive the round trip (an extra field, another field order, an uppercase digest, a float, …)");
   return s;
 }

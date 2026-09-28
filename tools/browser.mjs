@@ -2,7 +2,7 @@
 // headless Chromium, opens one page and exposes send/evaluate/screenshot.
 // No dependencies: Node's built-in WebSocket and fetch.
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
 
@@ -37,28 +37,90 @@ export function fontConfig(fontDir, outDir) {
   return path;
 }
 
+// Every browser this process launched and has not closed, and every
+// profile directory not yet removed.  The browsers go down with the process
+// however it ends: normally, on an uncaught error, or on SIGTERM / SIGINT /
+// SIGHUP (a test runner's timeout, ^C), so no headless browser outlives its
+// driver.
+const live = new Set();
+const profiles = new Set();
+
+function removeProfile(profile) {
+  try {
+    rmSync(profile, { recursive: true, force: true });
+    profiles.delete(profile);
+  } catch { /* still in use */ }
+}
+
+let hooked = false;
+function hookExit() {
+  if (hooked) return;
+  hooked = true;
+  process.on("exit", () => {
+    for (const proc of live) { try { proc.kill(); } catch { /* gone */ } }
+    for (const profile of [...profiles]) removeProfile(profile);
+  });
+  for (const [signal, number] of [["SIGTERM", 15], ["SIGINT", 2], ["SIGHUP", 1]])
+    process.once(signal, () => process.exit(128 + number));
+}
+
+/**
+ * The DevTools port a browser listens on and its browser endpoint's path,
+ * from the DevToolsActivePort file it writes into its own profile once it
+ * has bound the port (--remote-debugging-port=0 lets the system pick a free
+ * one), or null while it has not.
+ */
+function activePort(profile) {
+  let text;
+  try { text = readFileSync(join(profile, "DevToolsActivePort"), "utf8"); } catch { return null; }
+  const [port, path = ""] = text.split("\n");
+  return /^[0-9]+$/.test(port) && /^\/devtools\/browser\/\S+$/.test(path) ? { port: Number(port), path } : null;
+}
+
 export async function launch({ chrome = findChrome(), fontsConf = null } = {}) {
   if (!chrome) throw new Error("no Chromium binary found");
   const profile = mkdtempSync(join(tmpdir(), "kp-chrome-"));
-  const port = 9300 + Math.floor(Math.random() * 600);
   const env = { ...process.env };
   if (fontsConf) env.FONTCONFIG_FILE = fontsConf;
+  hookExit();
+  profiles.add(profile);
   const proc = spawn(chrome, [
     "--headless", "--no-sandbox", "--disable-gpu", "--hide-scrollbars", "--mute-audio",
     "--no-first-run", "--no-default-browser-check", "--disable-extensions",
     "--disable-background-networking", "--disable-component-update", "--disable-sync",
     "--disable-features=Translate,OptimizationHints,MediaRouter",
-    `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "about:blank",
+    "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank",
   ], { stdio: "ignore", env });
-  let target;
+  live.add(proc);
+  const running = () => proc.exitCode === null && proc.signalCode === null;
+  const stop = () => {
+    live.delete(proc);
+    if (running()) {
+      proc.once("exit", () => removeProfile(profile));
+      try { proc.kill(); } catch { /* gone */ }
+    } else removeProfile(profile);
+  };
+  const abort = message => { stop(); throw new Error(message); };
+  // this browser's own port and endpoint, never a guess another browser may hold
+  let active = null;
+  for (let i = 0; i < 150 && !active && running(); i++) {
+    active = activePort(profile);
+    if (!active) await sleep(100);
+  }
+  if (!active) abort("Chromium did not report its DevTools port");
+  const { port } = active;
+  let target, endpoint;
   for (let i = 0; i < 150 && !target; i++) {
     try {
+      endpoint ??= String((await (await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl);
+      if (!endpoint.endsWith(active.path)) break;
       const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
       target = list.find(t => t.type === "page");
     } catch { /* not up yet */ }
     if (!target) await sleep(100);
   }
-  if (!target) { proc.kill(); throw new Error("no CDP page target"); }
+  if (endpoint !== undefined && !endpoint.endsWith(active.path)) abort(`port ${port} answers for another browser`);
+  if (!target) abort("no CDP page target");
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => {
     ws.addEventListener("open", resolve, { once: true });
@@ -119,12 +181,11 @@ export async function launch({ chrome = findChrome(), fontsConf = null } = {}) {
   };
   const close = () => {
     try { ws.close(); } catch { /* closed */ }
-    proc.kill();
-    setTimeout(() => { try { rmSync(profile, { recursive: true, force: true }); } catch { /* busy */ } }, 300);
+    stop();
   };
   await send("Page.enable");
   await send("Runtime.enable");
   await send("Network.enable");
   await send("Log.enable");
-  return { send, evaluate, waitFor, viewport, media, screenshot, navigate, close, events, listeners };
+  return { send, evaluate, waitFor, viewport, media, screenshot, navigate, close, events, listeners, port, pid: proc.pid };
 }

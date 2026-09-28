@@ -48,6 +48,7 @@ from keypath import registry  # noqa: E402
 from keypath.editions import edition_tables, known_editions  # noqa: E402
 from keypath.keyspec import (  # noqa: E402
     KEY_SCHEMA, KEY_VERSION, KEY_VERSIONS, V1_LANGUAGES, V1_LAYOUTS, compute_leakage, dumps_key, loads_key,
+    validate_key,
 )
 from keypath.errors import KeyValidationError, KeypathError  # noqa: E402
 from keypath.keycodec import pack as kp1_pack, unpack as kp1_unpack  # noqa: E402
@@ -1860,6 +1861,38 @@ def py_pack(key_text: str) -> str | None:
         return None
 
 
+# Keys that are valid and decode, yet have no kp1 form (docs/10 §2.2: pack is
+# defined only when dumps_key(unpack(pack(K))) == dumps_key(K)).  A literal's
+# tier is a bare const 3, so the float 3.0 passes validate_key (3.0 == 3), but
+# kp1 carries integers only and the round trip writes 3, not 3.0.
+KP1_NO_FORM = [
+    ("a literal whose tier is the float 3.0", "3.0"),
+    ("a literal whose tier is the float 3e0", "3e0"),
+]
+
+
+def kp1_no_form() -> list[dict[str, str]]:
+    """Challenge-01's key with a literal word "a" in front, its tier written
+    as a float; each validates and decodes, and pack refuses it."""
+    base = (PROJECT / "puzzles" / "challenge-01" / "key.json").read_text(encoding="utf-8")
+    cipher = (PROJECT / "puzzles" / "challenge-01" / "ciphertext.txt").read_text(encoding="utf-8").strip()
+    rows = []
+    for why, tier in KP1_NO_FORM:
+        text = base.replace('"words": [', '"words": [{"literal": {"tier": ' + tier + ', "text": "a"}}, ', 1)
+        key = json.loads(text)
+        assert isinstance(key["segments"][0]["words"][0]["literal"]["tier"], float), why
+        validate_key(key)
+        decoded = decode(cipher, key)
+        try:
+            kp1_pack(key)
+        except KeyValidationError as exc:
+            assert str(exc).startswith("kp1: no kp1 form"), exc
+            rows.append({"why": why, "keyText": text, "ciphertext": cipher, "decoded": decoded})
+            continue
+        raise SystemExit(f"kp1 packed a key with no kp1 form: {why}")
+    return rows
+
+
 def kp1_fixtures(out: Out) -> None:
     """tests/fixtures/kp1.json: the kp1 goldens, reject vectors and
     accepted-but-refused strings (docs/10 §2.2), and a markup walk;
@@ -1902,8 +1935,9 @@ def kp1_fixtures(out: Out) -> None:
     markup = {"ciphertext": hero.ciphertext, "keyText": dumps_key(key), "kp1": kp1_pack(key),
               "decoded": decode(hero.ciphertext, key)}
     assert markup["decoded"].endswith(MARKUP)
+    no_form = kp1_no_form()
     out.json("tests/fixtures/kp1.json", {"accepted": accepted, "rejected": rejected, "refused": refused,
-                                          "markup": markup})
+                                          "markup": markup, "noForm": no_form})
     # every key of the other fixtures, once each
     seen: set[str] = set()
     rows = []
