@@ -8,6 +8,7 @@ import { initTheme } from "./ui/theme.js";
 import { initPlayground } from "./ui/playground.js";
 import { initChallenges } from "./ui/challenges.js";
 import { initShare, parseFragment, showPuzzleBanner } from "./ui/share.js";
+import { initWorkbench } from "./ui/workbench.js";
 
 const idle = fn => ("requestIdleCallback" in window ? requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 1000));
 
@@ -47,6 +48,7 @@ async function main() {
     $("#try").scrollIntoView({ block: "start" });
   }
   initChallenges({ host: $("#challenge-grid"), getEngine, registry: engine.registry, layouts: engine.layouts, legends, surfaces });
+  initWorkbench({ root: $("#workbench"), engine });
   document.documentElement.classList.add("ready");
   registerServiceWorker();
 }

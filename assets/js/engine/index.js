@@ -4,6 +4,8 @@
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })
 //   await engine.decode({ ciphertext, keyText })
+//   await engine.lookup({ layout, chunks, top })   // the workbench (workbench.js)
+//   await engine.type({ layout, text })
 //
 // Every result that could differ from the Python tool is refused with a
 // reason instead (the "exact or refuse" rule); tests/ checks the rest
@@ -19,6 +21,7 @@ import { walkKey, keyNeeds, Tier2Error } from "./decode.js";
 import { KeyError, JsonError, checkKey, parseKeyJson, has } from "./keycheck.js";
 import { dumpsKeyWithSpans } from "./dumps.js";
 import * as kp1 from "./kp1.js";
+import { createWorkbench } from "./workbench.js";
 
 export { normalize } from "./normalize.js";
 export { cpCompare, cpLength, codePoints } from "./unicode.js";
@@ -50,6 +53,8 @@ export async function createEngine({ fetchText } = {}) {
 
   const native = createNative({ data, layouts, lists });
   const english = createEnglish({ data, layouts, lists, surfaceById, derivedRows: registry.derivedRows, native });
+  // the workbench: only ever for one layout the visitor names (docs/10 §8.1)
+  const workbench = createWorkbench({ registry, layouts, native, siteId, firstNewer });
 
   let challengeLists = null;
   function loadChallengeLists() {
@@ -270,6 +275,8 @@ export async function createEngine({ fetchText } = {}) {
     list,
     kp1Pack,
     kp1Unpack,
+    lookup: workbench.lookup,
+    type: workbench.type,
     isCompact,
     whatIf,
     whatIfParts,

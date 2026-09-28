@@ -36,6 +36,9 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 const decodeErrors = readJsonl("tests/fixtures/decode-errors.jsonl.gz");
 const challenges = [1, 2, 3, 4, 5, 6].map(n => readJson(`data/challenges/0${n}.json`));
 const kp1Fixtures = readJson("tests/fixtures/kp1.json");
+const wbLookups = readJsonl("tests/fixtures/workbench-lookup.jsonl.gz");
+const wbTypes = readJsonl("tests/fixtures/workbench-type.jsonl.gz");
+const registryJson = readJson("data/registry.json");
 const b64url = obj => Buffer.from(JSON.stringify(obj)).toString("base64url");
 
 // ------------------------------------------------------------ bookkeeping
@@ -674,6 +677,83 @@ await attempt("walk links", async () => {
   check("walk link: no horizontal scroll at 360px on a walk link", await noHScroll(360));
 });
 
+await attempt("workbench", async () => {
+  await open(1280, 800);
+  const layouts = registryJson.workbench.map(w => w.layout);
+  const radios = await b.evaluate(`[...document.querySelectorAll("#wb-kbd input")].map(r => [r.name, r.value, r.checked])`);
+  check("workbench: a picker with exactly the workbench keyboards, none picked and no 'any'",
+    js(radios.map(r => r[1])) === js(layouts) && radios.every(r => r[0] === "wbkbd" && !r[2]), js(radios));
+  const status = id => q(`#wb-${id}-status`);
+  const out = id => q(`#wb-${id}-out`);
+  /** Submit a tool and wait for its answer (or its message). */
+  const submit = async (id, field, value, top) => {
+    await b.evaluate(`(() => { ${status(id)}.textContent = ""; ${q(field)}.value = ${js(value)};
+      ${top === undefined ? "" : `${q("#wb-top")}.value = ${js(String(top))};`} ${q(`#wb-${id}`)}.requestSubmit(); })()`);
+    await b.waitFor(`${status(id)}.textContent !== ""`);
+    return b.evaluate(`[${status(id)}.textContent, ${out(id)}.hidden, ${out(id)}.textContent]`);
+  };
+  const look = (keys, top = 10) => submit("look", "#wb-keys", keys, top);
+  const type = text => submit("type", "#wb-text", text);
+  const pick = layout => b.evaluate(`${q(`#wb-kbd input[value=${layout}]`)}.click()`);
+
+  const none = await look("tgnoyhvljmso");
+  const noneT = await type("welcome home");
+  check("workbench: without a keyboard it asks for one and answers nothing",
+    none[0] === "Pick a keyboard first. The workbench never guesses it." && none[1] && noneT[0] === none[0] && noneT[1], js([none, noneT]));
+
+  // every keyboard: lookups and typing exactly as the Python CLI printed them
+  for (const layout of layouts) {
+    await pick(layout);
+    const cases = wbLookups.filter(r => r.layout === layout && [10, 50, 500].includes(r.top) && r.chunks.length && r.chunks.every(Boolean));
+    for (const r of new Set([cases[0], cases.find(c => !c.wellFormed), cases.find(c => c.top !== 10 && c.wellFormed)].filter(Boolean))) {
+      const got = await look(r.chunks.join(" "), r.top);
+      check(`workbench lookup on ${layout} (${r.id})`, !got[1] && got[2] === r.output
+        && got[0].startsWith(`${r.chunks.length} unit${r.chunks.length === 1 ? "" : "s"} on `), js(got).slice(0, 400));
+    }
+    const typed = wbTypes.filter(r => r.layout === layout && r.input.trim() && Array.from(r.input).length <= 200 && !r.input.includes("\r"));
+    for (const r of new Set([typed[0], typed.find(t => /\(literal: /.test(t.output) && /\n[^(]/.test(t.output)), typed[typed.length - 1]].filter(Boolean))) {
+      const got = await type(r.input);
+      check(`workbench type on ${layout} (${r.id})`, !got[1] && got[2] === r.output, js(got).slice(0, 400));
+    }
+  }
+  // each surface's part carries its language
+  await pick("ko_dubeolsik");
+  await look("rnr");
+  check("workbench: Korean and hanja parts are tagged ko and zh-Hant",
+    js(await b.evaluate(`[...${out("look")}.children].map(s => s.lang)`)) === js(["ko", "zh-Hant"]));
+  // a new keyboard answers the same keys again
+  await pick("zh_cangjie");
+  await look("tgno");
+  await b.evaluate(`${status("look")}.textContent = ""`);
+  await pick("zh_quick");
+  await b.waitFor(`${status("look")}.textContent !== ""`);
+  const quick = await b.evaluate(`window.__keypath.engine.lookup({ layout: "zh_quick", chunks: ["tgno"] }).then(r => r.text)`);
+  check("workbench: picking another keyboard answers again on it",
+    await b.evaluate(`${out("look")}.textContent === ${js(quick)} && ${status("look")}.textContent.includes("Quick")`), quick);
+  // keys that are not printable ASCII are refused with the page's message
+  await pick("zh_daqian");
+  const bad = await look("su3 é");
+  check("workbench: a key outside printable ASCII is refused, named", bad[1]
+    && bad[0] === "“é” (U+00E9) isn't a key on a US keyboard. Units use its printable keys only (letters, digits and punctuation), split by spaces.", js(bad));
+  const tab = await look("su3\tcl3");
+  check("workbench: an invisible one is named by its code point", tab[1] && tab[0].startsWith("U+0009 isn't a key"), js(tab));
+  // Enter in the keys field looks them up
+  await b.evaluate(`(() => { ${status("look")}.textContent = ""; const i = ${q("#wb-keys")}; i.value = "su3"; i.focus(); })()`);
+  await press("Enter");
+  await b.waitFor(`${status("look")}.textContent !== ""`);
+  check("workbench: Enter in the keys field looks them up",
+    await b.evaluate(`${out("look")}.textContent.startsWith("su3 · (zh, zh_daqian) · well-formed: yes")`));
+
+  // phones: long answers wrap inside their box
+  await open(360, 780);
+  await pick("zh_daqian");
+  const long = await look(`u4 ${"1qaz2wsx3edc".repeat(5)} ${"'\"\\".repeat(20)}`, 500);
+  const longT = await type("歡迎回家".repeat(40) + " welcome home and a very long word: donaudampfschifffahrtsgesellschaftskapitän");
+  const inBox = await b.evaluate(`[${out("look")}, ${out("type")}].every(p => p.scrollWidth <= p.clientWidth + 1)`);
+  check("workbench at 360px: long answers wrap, no horizontal scroll", !long[1] && !longT[1] && inBox && await noHScroll(360),
+    await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+});
+
 // requests and errors, for everything above
 const origin = srv.origin + "/";
 const requests = b.events.filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
@@ -748,6 +828,11 @@ if (SHOTS) {
           await b.evaluate(`${q("#kbd-panel")}.open = true`);
           await sleep(1500);
           await shotOf(`cangjie-${tag}`, ".enc-out");
+          // the workbench, both tools answered on Bopomofo
+          await b.evaluate(`(() => { ${q("#wb-kbd input[value=zh_daqian]")}.click(); ${q("#wb-keys")}.value = "cj0 u/6 ru8 zz'";
+            ${q("#wb-look")}.requestSubmit(); ${q("#wb-text")}.value = "歡迎回家, hello"; ${q("#wb-type")}.requestSubmit(); })()`);
+          await b.waitFor(`!${q("#wb-look-out")}.hidden && !${q("#wb-type-out")}.hidden`);
+          await shotOf(`workbench-${tag}`, "#workbench");
         }
       }
     }

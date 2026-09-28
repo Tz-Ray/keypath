@@ -2,7 +2,11 @@
 // from data/layouts.json.  The keys -> text readers are adapted from
 // cipher-project scripts/build_demo.py (v2.0), MIT.
 //
-// Every function throws LayoutError on a malformed unit, like Python.
+// Every function throws LayoutError on a malformed unit, like Python.  The
+// keys -> text readers throw Python's own messages, values quoted by
+// pyrepr: the workbench prints them as lookup's violated rules
+// (tests/workbench.test.js compares them with the Python fixtures).
+import { pyrepr as R } from "./pyrepr.js";
 
 export class LayoutError extends Error {}
 const fail = msg => { throw new LayoutError(msg); };
@@ -36,13 +40,13 @@ export function makeLayouts(L) {
     for (let i = 0; i < chunk.length; i++) {
       const k = chunk[i];
       if (dqKeyToSymbol.has(k)) {
-        if (i > 0 && dqKeyToTone.has(chunk[i - 1])) fail(`symbol after tone mark in unit ${chunk}`);
+        if (i > 0 && dqKeyToTone.has(chunk[i - 1])) fail(`symbol after tone mark in unit ${R(chunk)}`);
         out += dqKeyToSymbol.get(k);
       } else if (dqKeyToTone.has(k)) {
-        if (i !== chunk.length - 1) fail(`tone key not final in unit ${chunk}`);
-        if (i === 0) fail(`unit ${chunk} is a bare tone key`);
+        if (i !== chunk.length - 1) fail(`tone key not final in unit ${R(chunk)}`);
+        if (i === 0) fail(`unit ${R(chunk)} is a bare tone key`);
         out += dqKeyToTone.get(k);
-      } else fail(`key '${k}' is not on layout zh_daqian`);
+      } else fail(`key ${R(k)} is not on layout zh_daqian`);
     }
     return out;
   }
@@ -73,12 +77,13 @@ export function makeLayouts(L) {
   /** "ni3" -> ㄋㄧˇ: an a-z spelling, then one tone digit 1-5. */
   function pinyinReading(chunk) {
     if (!chunk) fail("empty keystroke unit");
-    const digit = chunk[chunk.length - 1], spelling = chunk.slice(0, -1);
-    if (!markByDigit.has(digit)) fail(`unit ${chunk} does not end in a tone digit 1-5`);
-    if (!spelling) fail(`unit ${chunk} is a bare tone digit`);
+    const cps = Array.from(chunk);
+    const digit = cps[cps.length - 1], spelling = cps.slice(0, -1).join("");
+    if (!markByDigit.has(digit)) fail(`unit ${R(chunk)} does not end in a tone digit 1-5`);
+    if (!spelling) fail(`unit ${R(chunk)} is a bare tone digit`);
     for (const ch of spelling)
-      if (ch < "a" || ch > "z") fail(`key '${ch}' in unit ${chunk}: a spelling is a-z and one tone digit ends the unit`);
-    if (!baseBySpelling.has(spelling)) fail(`${spelling} is not a pinyin spelling on layout zh_pinyin`);
+      if (!(ch >= "a" && ch <= "z")) fail(`key ${R(ch)} in unit ${R(chunk)}: a spelling is a-z and one tone digit ends the unit`);
+    if (!baseBySpelling.has(spelling)) fail(`${R(spelling)} is not a pinyin spelling on layout zh_pinyin`);
     return baseBySpelling.get(spelling) + markByDigit.get(digit);
   }
 
@@ -118,7 +123,7 @@ export function makeLayouts(L) {
   function koUnit(chunk) {
     if (!chunk) fail("empty keystroke unit");
     koEnumeration();
-    if (!koInverse.has(chunk)) fail(`'${chunk}' types no single syllable or jamo on layout ko_dubeolsik`);
+    if (!koInverse.has(chunk)) fail(`${R(chunk)} types no single syllable or jamo on layout ko_dubeolsik`);
     return koInverse.get(chunk);
   }
   /** 가 -> ["ㄱ", "ㅏ", ""] (Unicode §3.12). */
@@ -149,7 +154,7 @@ export function makeLayouts(L) {
     if (!chunk) fail("empty unit for ru_jcuken");
     let out = "";
     for (const ch of chunk) {
-      if (!ruLetters.has(ch)) fail(`key '${ch}' types no letter on layout ru_jcuken`);
+      if (!ruLetters.has(ch)) fail(`key ${R(ch)} types no letter on layout ru_jcuken`);
       out += ruLetters.get(ch);
     }
     return out;
@@ -177,15 +182,16 @@ export function makeLayouts(L) {
     if (!chunk) fail("empty unit for es_accent");
     const out = [];
     let prevDigit = false;
-    for (let i = 0; i < chunk.length; i++) {
-      const ch = chunk[i];
+    const cps = Array.from(chunk);
+    for (let i = 0; i < cps.length; i++) {
+      const ch = cps[i];
       if (isPlain(ch)) { out.push(ch); prevDigit = false; }
       else if (isDigit(ch)) {
-        if (i === 0 || prevDigit) fail(`digit '${ch}' has no base letter in unit ${chunk}`);
-        if (!esVariant.has(chunk[i - 1] + ch)) fail(`no variant '${ch}' for base '${chunk[i - 1]}' in unit ${chunk}`);
-        out[out.length - 1] = esVariant.get(chunk[i - 1] + ch);
+        if (i === 0 || prevDigit) fail(`digit ${R(ch)} has no base letter in unit ${R(chunk)}`);
+        if (!esVariant.has(cps[i - 1] + ch)) fail(`no variant ${R(ch)} for base ${R(cps[i - 1])} in unit ${R(chunk)}`);
+        out[out.length - 1] = esVariant.get(cps[i - 1] + ch);
         prevDigit = true;
-      } else fail(`key '${ch}' is not on layout es_accent`);
+      } else fail(`key ${R(ch)} is not on layout es_accent`);
     }
     return out.join("");
   }
@@ -200,7 +206,7 @@ export function makeLayouts(L) {
     return word;
   }
   function enWord(chunk) {
-    if (!chunk || !EN_WORD.test(chunk)) fail(`unit ${chunk} is not well-formed for en_identity`);
+    if (!chunk || !EN_WORD.test(chunk)) fail(`unit ${R(chunk)} is not well-formed for en_identity`);
     return chunk;
   }
 
@@ -271,9 +277,9 @@ export function makeLayouts(L) {
   function shapeCode(chunk, layout) {
     if (!chunk) fail("empty keystroke unit");
     for (const ch of chunk)
-      if (!has(radicals, ch)) fail(`key '${ch}' in unit ${chunk} is not a shape key on layout ${layout} (a-y; z is unused)`);
-    const max = L[layout].maxLetters;
-    if (chunk.length > max) fail(`unit ${chunk} has ${chunk.length} letters; a code on layout ${layout} has 1-${max}`);
+      if (!has(radicals, ch)) fail(`key ${R(ch)} in unit ${R(chunk)} is not a shape key on layout ${layout} (a-y; z is unused)`);
+    const max = L[layout].maxLetters, n = Array.from(chunk).length;
+    if (n > max) fail(`unit ${R(chunk)} has ${n} letters; a code on layout ${layout} has 1-${max}`);
     return chunk;
   }
   /** A Cangjie code's Quick code: the code itself up to 2 letters, else its first and last. */

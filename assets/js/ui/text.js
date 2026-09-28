@@ -159,6 +159,17 @@ export const T = {
   puzzleExample: "This is one of the page's own examples, so its answer is already on the page. Type your own message first.",
   puzzleEmpty: "This message has nothing to type on the keyboard: all of it rides in the key. Add some words first.",
 
+  // the workbench (docs/10 §9.7)
+  wbPick: "Pick a keyboard first. The workbench never guesses it.",
+  wbNoKeys: "Type the keys to look up, split into units with spaces.",
+  wbNoText: "Type a guess to see the keys it makes.",
+  // `shown` is a character in quotes with its code point, or the code point alone
+  wbBadKey: shown => `${shown} isn't a key on a US keyboard. Units use its printable keys only (letters, digits and punctuation), split by spaces.`,
+  wbLooked: (n, keyboard, all) => (n === 1
+    ? `1 unit on ${keyboard}: ${all ? "it reads on this keyboard." : "it doesn't read on this keyboard, and the rule it breaks is below."}`
+    : `${n} units on ${keyboard}: ${all ? "every one reads on this keyboard." : "not all of them read on this keyboard; each that doesn't names the rule it breaks."}`),
+  wbTyped: keyboard => `Typed on ${keyboard}.`,
+
   // theme
   theme: mode => `Colour theme: ${mode}`,
   themeNames: { auto: "Auto", light: "Light", dark: "Dark" },

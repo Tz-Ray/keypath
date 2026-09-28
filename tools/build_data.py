@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import copy
 import filecmp
 import gzip
@@ -41,6 +42,8 @@ os.environ.setdefault("PYTHONDONTWRITEBYTECODE", "1")
 sys.dont_write_bytecode = True
 
 import keypath  # noqa: E402
+from keypath import cli as keypath_cli  # noqa: E402
+from keypath import lookup as toolkit  # noqa: E402
 from keypath import registry  # noqa: E402
 from keypath.editions import edition_tables, known_editions  # noqa: E402
 from keypath.keyspec import (  # noqa: E402
@@ -115,6 +118,11 @@ ALLOWED = {
     "ru": ["ru_jcuken"],
     "es": ["es_accent"],
 }
+# The workbench's keyboards (docs/10 §9.7, M14): lookup and type answer for
+# the one layout the visitor names, over every surface typed on it (both of
+# ko_dubeolsik's: Korean and hanja).  No Japanese.
+WORKBENCH_LAYOUTS = ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik",
+                     "ru_jcuken", "es_accent", "en_identity"]
 
 # Examples used by the page (§6); every one is re-encoded and asserted.
 HERO = ("welcome home", "en", "zh_daqian", "cj0u/6ru8")
@@ -306,6 +314,12 @@ def registry_data() -> dict[str, Any]:
         ],
         "allowed": ALLOWED,
         "derivedRows": DERIVED_ROWS,
+        # docs/10 §9.7: the keyboards the workbench looks up and types on,
+        # each with the surfaces typed on it, in registration order
+        "workbench": [
+            {"layout": layout, "surfaces": [[s.language, s.layout] for s in registry.surfaces_with_layout(layout)]}
+            for layout in WORKBENCH_LAYOUTS
+        ],
     }
 
 
@@ -1337,6 +1351,359 @@ def static_fixture(out: Out, hero: dict[str, Any], vec_rows: dict[str, dict[str,
     out.json("tests/fixtures/static.json", static)
 
 
+# ============================================================== workbench
+
+# The workbench (docs/10 §9.7): the page's `lookup` must print what
+# `keypath lookup --layout L --top N` prints (no --gloss) and its `type`
+# what `keypath type --layout L` prints (greedy).  The fixtures run the
+# installed CLI itself, in-process, with `--` before the positionals so that
+# every chunk is a chunk (the CLI reads `--gloss` or `-h` there as options).
+WB_SEED = 20260928
+WB_STREAM = "tgnoyhvljmso"          # "welcome home" on Cangjie, unsplit
+WB_TOPS = [10, 0, 1, 3, 5, 20, 50, 500]
+ASCII_KEYS = "".join(chr(cp) for cp in range(0x21, 0x7F))   # the chunk rule: U+0021-U+007E
+
+# Every violated-rule text lookup can print on a workbench surface, as one
+# template each (LIT: a value Python's repr quoted).  A chunk pool (every
+# 0-2 key string, the table's own units and mutations of them, random key
+# runs) must reach exactly the templates listed for each surface, and the
+# fixtures must cover each of them.
+_LIT = r"""('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""
+WB_RULES: dict[str, str] = {
+    "alphabet": r"unit LIT contains LIT, which is outside the [a-z_]+ alphabet",
+    "empty": r"empty keystroke unit",
+    "empty-unit": r"empty unit for (?:ru_jcuken|es_accent)",
+    "tone-not-final": r"tone key not final in unit LIT",
+    "bare-tone": r"unit LIT is a bare tone key",
+    "not-syllable": r"unit LIT maps to LIT, which is not a syllable in the reading table",
+    "no-tone-digit": r"unit LIT does not end in a tone digit 1-5",
+    "bare-digit": r"unit LIT is a bare tone digit",
+    "spelling-key": r"key LIT in unit LIT: a spelling is a-z and one tone digit ends the unit",
+    "not-spelling": r"LIT is not a pinyin spelling on layout zh_pinyin",
+    "too-long": r"unit LIT has \d+ letters; a code on layout zh_(?:cangjie|quick) has 1-\d",
+    "not-code": r"unit LIT is not a code on layout zh_(?:cangjie|quick): no character of zh_cangjie\.tsv has it",
+    "no-unit": r"LIT types no single syllable or jamo on layout ko_dubeolsik",
+    "no-hanja": r"unit LIT: reading LIT has no hanja candidates",
+    "no-base": r"digit LIT has no base letter in unit LIT",
+    "no-variant": r"no variant LIT for base LIT in unit LIT",
+    "not-word": r"unit LIT is not well-formed for en_identity",
+}
+WB_RULE_RE = {name: re.compile("^" + pattern.replace("LIT", _LIT) + "$") for name, pattern in WB_RULES.items()}
+WB_SURFACE_RULES: dict[str, list[str]] = {
+    "(zh, zh_daqian)": ["alphabet", "empty", "tone-not-final", "bare-tone", "not-syllable"],
+    "(zh, zh_pinyin)": ["alphabet", "empty", "no-tone-digit", "bare-digit", "spelling-key", "not-spelling",
+                        "not-syllable"],
+    "(zh, zh_cangjie)": ["alphabet", "empty", "too-long", "not-code"],
+    "(zh, zh_quick)": ["alphabet", "empty", "too-long", "not-code"],
+    "(ko, ko_dubeolsik)": ["alphabet", "empty", "no-unit"],
+    "(zh, ko_dubeolsik)": ["alphabet", "empty", "no-unit", "no-hanja"],
+    "(ru, ru_jcuken)": ["alphabet", "empty-unit"],
+    "(es, es_accent)": ["alphabet", "empty-unit", "no-base", "no-variant"],
+    "(en, en_identity)": ["alphabet", "not-word"],
+}
+# chunks with ', ", both, and \ (docs/10 §9.7), per surface
+QUOTE_CLASSES = {"single": lambda c: "'" in c and '"' not in c, "double": lambda c: '"' in c and "'" not in c,
+                 "both": lambda c: "'" in c and '"' in c, "backslash": lambda c: "\\" in c}
+
+
+def pyrepr(s: str) -> str:
+    """docs/10 §9.7's quoting, the rule the page implements: Python's repr of
+    a string of U+0020-U+007E and printable non-ASCII.  The delimiter is "
+    if s has ' and no ", else '; \\ doubles; a ' delimiter is escaped."""
+    assert all(ch.isprintable() for ch in s), f"pyrepr is defined only for printable text: {s!r}"
+    quote = '"' if "'" in s and '"' not in s else "'"
+    body = s.replace("\\", "\\\\")
+    if quote == "'":
+        body = body.replace("'", "\\'")
+    return quote + body + quote
+
+
+def cli_text(argv: list[str]) -> tuple[int, str]:
+    """Run the installed `keypath` CLI in-process: (exit code, stdout without
+    its final newline)."""
+    buf, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+        code = keypath_cli.main(argv)
+    assert not err.getvalue(), (argv, err.getvalue())
+    text = buf.getvalue()
+    assert text.endswith("\n"), argv
+    return code, text[:-1]
+
+
+def wb_rule(surface: str, message: str) -> tuple[str, list[str]]:
+    """The template a violated-rule text matches (it must be one listed for
+    its surface) and the repr'd values in it."""
+    found = [(name, m) for name in WB_SURFACE_RULES[surface] if (m := WB_RULE_RE[name].match(message))]
+    assert len(found) == 1, (surface, message, [n for n, _ in found])
+    name, m = found[0]
+    return name, [g for g in m.groups() if g is not None]
+
+
+def wb_units(layout: str) -> list[str]:
+    """Well-formed chunks of `layout`, from its tables."""
+    if layout == "zh_daqian":
+        return sorted({daqian_layout.keys_for_reading(r) for r in zh_chars().candidates_by_reading})
+    if layout == "zh_pinyin":
+        return sorted({pinyin_layout.keys_for_reading(r) for r in zh_chars().candidates_by_reading})
+    if layout == "zh_cangjie":
+        return sorted(zh_cangjie().candidates_by_code)
+    if layout == "zh_quick":
+        return sorted(zh_quick().candidates_by_code)
+    if layout == "ko_dubeolsik":
+        return sorted({ko_layout.keys_for_unit(u) for u in ko_layout.units()})
+    lang = {"ru_jcuken": "ru", "es_accent": "es", "en_identity": "en"}[layout]
+    if lang == "ru":
+        words = sorted(ru_en().translations_by_ru)
+    elif lang == "es":
+        words = sorted(es_en().translations_by_es)
+    else:
+        from wordfreq import top_n_list
+        words = top_n_list("en", 3000)
+    surface = registry.surface(lang, layout)
+    out = set()
+    for w in words:
+        encoded = surface.encode_word(w, "keyed")
+        if encoded is not None:
+            out.add(encoded[1])
+    return sorted(out)
+
+
+def wb_pool(layout: str, units: list[str], rng: random.Random) -> list[str]:
+    """Chunks to classify: every string of 0-2 keys, the layout's units and
+    mutations of them, and random runs over its alphabet (quotes and a
+    backslash mixed in)."""
+    pool = {""} | set(ASCII_KEYS) | {a + b for a in ASCII_KEYS for b in ASCII_KEYS}
+    pool |= set(units)
+    alpha = sorted(set().union(*(s.alphabet for s in registry.surfaces_with_layout(layout))))
+    spice = alpha + ["'", '"', "\\"]
+    for _ in range(3000):
+        pool.add("".join(rng.choice(alpha) for _ in range(rng.randint(3, 8))))
+    for u in rng.sample(units, min(3000, len(units))):
+        i = rng.randint(0, len(u))
+        pool.add(u[:i] + rng.choice(spice) + u[i:])
+        pool.add(u[:-1])
+        pool.add(u + rng.choice(units))
+    return sorted(pool)
+
+
+def wb_lookup_fixtures(rng: random.Random) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def add(layout: str, chunks: list[str], top: int) -> None:
+        sig = json.dumps([layout, chunks, top])
+        if sig in seen:
+            return
+        seen.add(sig)
+        code, text = cli_text(["lookup", "--layout", layout, "--top", str(top), "--", *chunks])
+        assert code in (0, 1), (layout, chunks, code)
+        report = toolkit.lookup(chunks, layout, top=top)
+        assert toolkit.render(report) == text and (code == 0) == toolkit.all_well_formed(report), (layout, chunks)
+        records.append({"id": f"lookup-{len(records)}", "layout": layout, "chunks": chunks, "top": top,
+                        "output": text, "wellFormed": code == 0})
+
+    goldens = {
+        "zh_daqian": [["su3"], ["cj0", "u/6", "ru8"], ["-"]],
+        "zh_pinyin": [["ni3"], ["huan1", "ying2", "jia1"], ["su3"]],
+        "zh_cangjie": [["tgno"], ["ykhaf"], ["tgno", "yhvl", "jmso"]],
+        "zh_quick": [["of"], ["to", "yl", "jo"], ["ab", "mk"]],
+        "ko_dubeolsik": [["gks"], ["rnr"], ["z"], ["ghks", "dud", "rk"]],
+        "ru_jcuken": [["ghbdtn"], ["'nj"], ["`;br"], ["[kt,"]],
+        "es_accent": [["man1ana"], ["pingu4ino"], ["an1o"], ["can1cio1n"]],
+        "en_identity": [["welcome", "home"], ["hello"]],
+    }
+    stats: dict[str, Any] = {}
+    for layout in WORKBENCH_LAYOUTS:
+        surfaces = registry.surfaces_with_layout(layout)
+        units = wb_units(layout)
+        by_rule: dict[tuple[str, str], list[str]] = {}
+        well_formed: list[str] = []
+        for chunk in wb_pool(layout, units, rng):
+            ok = False
+            for s in surfaces:
+                entry = toolkit.lookup_unit(s, chunk, top=0)
+                if entry["well_formed"]:
+                    ok = True
+                    continue
+                name, _values = wb_rule(s.name, entry["error"])
+                by_rule.setdefault((s.name, name), []).append(chunk)
+            if ok and chunk:
+                well_formed.append(chunk)
+        for s in surfaces:
+            reached = sorted(name for (sname, name) in by_rule if sname == s.name)
+            assert reached == sorted(WB_SURFACE_RULES[s.name]), (s.name, reached)
+        # the §8.2 goldens and a few more, the stream unsplit and split
+        for chunks in goldens[layout]:
+            add(layout, chunks, 10)
+        add(layout, [WB_STREAM], 10)
+        add(layout, ["tgno", "yhvl", "jmso"], 10)
+        # well-formed chunks, alone and in threes, at every top
+        picks = rng.sample(well_formed, 36)
+        for i, chunk in enumerate(picks[:24]):
+            add(layout, [chunk], WB_TOPS[i % len(WB_TOPS)])
+        for i in range(24, 36, 2):
+            add(layout, picks[i:i + 2] + [rng.choice(well_formed)], WB_TOPS[i % len(WB_TOPS)])
+        # every template of every surface on this layout, and each quote class
+        rule_chunks: list[str] = []
+        for s in surfaces:
+            for name in WB_SURFACE_RULES[s.name]:
+                examples = sorted(set(by_rule[(s.name, name)]))
+                chosen = rng.sample(examples, min(4, len(examples)))
+                for cls, has_cls in QUOTE_CLASSES.items():
+                    with_cls = [c for c in examples if has_cls(c)]
+                    if with_cls:
+                        chosen.append(rng.choice(with_cls))
+                for chunk in chosen:
+                    add(layout, [chunk], rng.choice(WB_TOPS))
+                rule_chunks += chosen
+        # random key runs, and mixes of good and bad chunks
+        for _ in range(12):
+            add(layout, ["".join(rng.choice(ASCII_KEYS) for _ in range(rng.randint(1, 7)))], 10)
+        for _ in range(10):
+            mix = [rng.choice(well_formed) for _ in range(rng.randint(1, 3))] + \
+                  [rng.choice(rule_chunks) for _ in range(rng.randint(1, 2))]
+            rng.shuffle(mix)
+            add(layout, mix, rng.choice(WB_TOPS))
+        stats[layout] = {"pool": sum(len(v) for v in by_rule.values()), "wellFormed": len(well_formed)}
+    return records, stats
+
+
+def wb_blocks(output: str) -> list[tuple[str, str, str | None]]:
+    """(chunk, surface, violated rule or None) per block of lookup's text."""
+    out = []
+    for block in output.split("\n\n"):
+        lines = block.split("\n")
+        m = re.fullmatch(r"([\x21-\x7e]*) · (\([a-z]+, [a-z_]+\)) · well-formed: (yes|no)", lines[0])
+        assert m, lines[0]
+        rule = None
+        if m.group(3) == "no":
+            assert len(lines) == 2 and lines[1].startswith("  violated rule: "), block
+            rule = lines[1][len("  violated rule: "):]
+        out.append((m.group(1), m.group(2), rule))
+    return out
+
+
+def wb_type_texts(rng: random.Random, corpora: dict[str, list[str]]) -> dict[str, list[str]]:
+    common = [
+        "", " ", "   ", "\t", "a\nb", "hello world", "Hello, World!", "don't stop", "123 abc",
+        "你好世界", "歡迎家", "明天", "國家", "鍵盤", "中文 English", "豈更", "𠀀𠀁", "한국어 공부", "ㅋㅋㅋ",
+        "привет мир", "ЁЛКА", "ÑANDÚ año", "mañana", "pingüino", "canción", "ΣΑΣ ΟΔΟΣ", "İstanbul",
+        "Straße", "é", "😀 hi", "a\u0001b", 'quote " and \\ backslash', "it's", "tab\there",
+        "line sep", "mixed 你好 hello 안녕 привет ñ", "ｶﾞ", "welcome home",
+    ]
+    zh = corpora["CURATED"] + corpora["OOV_CASES"] + corpora["vectors_zh"] + corpora["vectors_zh_cangjie"]
+    phrases = sorted(zh_phrases().readings_by_word)
+    long_zh = "".join(rng.choice(phrases) for _ in range(120))[:200]
+    texts: dict[str, list[str]] = {}
+
+    def some(items: list[str], n: int) -> list[str]:
+        pool = sorted(set(items))
+        return rng.sample(pool, min(n, len(pool)))
+
+    for layout in WORKBENCH_LAYOUTS:
+        own = list(common)
+        if layout.startswith("zh_") or layout == "ko_dubeolsik":
+            own += some(zh, 10) + [long_zh]
+            own += ["".join(rng.choice(phrases) for _ in range(rng.randint(2, 5))) for _ in range(3)]
+        if layout == "ko_dubeolsik":
+            own += some(corpora["vectors_ko"], 8) + some(corpora["vectors_ko_hanja"], 4)
+        if layout == "ru_jcuken":
+            own += some(corpora["vectors_ru"], 10)
+        if layout == "es_accent":
+            own += some(corpora["ES_CORPUS"], 10)
+        if layout == "en_identity":
+            own += some(corpora["CORPUS"], 10)
+        texts[layout] = own
+    return texts
+
+
+def wb_type_fixtures(rng: random.Random, corpora: dict[str, list[str]]) -> list[dict[str, Any]]:
+    records = []
+    for layout, texts in wb_type_texts(rng, corpora).items():
+        for text in texts:
+            # the page refuses code points Unicode 14 does not assign (and lone
+            # surrogates) before typing, so fixtures have none
+            assert all(unicodedata.category(ch) not in ("Cn", "Cs") for ch in text), text
+            code, out = cli_text(["type", "--layout", layout, "--", text])
+            assert code == 0 and out == toolkit.render_typed(toolkit.type_text(text, layout)), (layout, text)
+            records.append({"id": f"type-{len(records)}", "layout": layout, "input": text, "output": out})
+    return records
+
+
+def workbench_fixtures(out: Out, corpora: dict[str, list[str]]) -> None:
+    """tests/fixtures/workbench-lookup.jsonl.gz and workbench-type.jsonl.gz
+    (parity: the CLI's text for each input), workbench-rules.json (the
+    violated-rule templates per surface) and pyrepr.json (repr of every value
+    those texts quote, and more)."""
+    for layout in WORKBENCH_LAYOUTS:
+        surfaces = registry.surfaces_with_layout(layout)
+        assert surfaces and all((s.language, s.layout) in SITE_ID and s.language != "ja" for s in surfaces), layout
+        assert [[s.language, s.layout] for s in surfaces] == [list(p) for p in registry.SURFACES if p[1] == layout]
+        assert all(s.selector_modes == ("keyed",) for s in surfaces), layout
+    # the page reads a reading's (and syllable's) candidates from these lists:
+    # a reading is a syllable of the table iff it has candidates
+    chars = zh_chars()
+    assert chars.valid_readings == frozenset(chars.candidates_by_reading)
+    assert all(chars.candidates_by_reading.values()) and all(ko_hanja().candidates_by_syllable.values())
+    rng = random.Random(WB_SEED)
+    lookups, stats = wb_lookup_fixtures(rng)
+    types = wb_type_fixtures(rng, corpora)
+    assert len(lookups) >= 500 and len(types) >= 200, (len(lookups), len(types))
+
+    # the §8.2-§8.3 goldens
+    def one(layout: str, chunks: list[str]) -> str:
+        return next(r["output"] for r in lookups if r["layout"] == layout and r["chunks"] == chunks and r["top"] == 10)
+    assert "  candidates: 3\n  0:歡 1:莰 2:羑" in one("zh_cangjie", ["tgno"])
+    assert "  candidates: 6\n" in one("zh_cangjie", ["ykhaf"])
+    assert "  candidates: 62\n  0:你 " in one("zh_quick", ["of"])
+    typed = {(r["layout"], r["input"]): r["output"] for r in types}
+    assert typed[("zh_cangjie", "明天")] == "(zh, zh_cangjie)\n明 ab 0/1\n天 mk 0/1"
+    assert typed[("zh_quick", "明天")] == "(zh, zh_quick)\n明 ab 0/14\n天 mk 1/60"
+    assert typed[("zh_cangjie", "歡迎家")].split("\n")[1] == "歡 tgno 0/3"
+
+    # coverage: every template of every surface, and each quote class, in a
+    # violated rule; every quoted value is repr == pyrepr
+    covered: dict[str, set[str]] = {s: set() for s in WB_SURFACE_RULES}
+    quoted: dict[str, set[str]] = {s: set() for s in WB_SURFACE_RULES}
+    values: set[str] = set()
+    for r in lookups:
+        for chunk, surface, rule in wb_blocks(r["output"]):
+            if rule is None:
+                continue
+            name, tokens = wb_rule(surface, rule)
+            covered[surface].add(name)
+            quoted[surface] |= {cls for cls, has_cls in QUOTE_CLASSES.items() if has_cls(chunk)}
+            for token in tokens:
+                value = ast.literal_eval(token)
+                assert isinstance(value, str) and repr(value) == token and pyrepr(value) == token, token
+                values.add(value)
+    for surface, names in WB_SURFACE_RULES.items():
+        assert covered[surface] == set(names), (surface, set(names) - covered[surface])
+        assert quoted[surface] == set(QUOTE_CLASSES), (surface, quoted[surface])
+    out.jsonl_gz("tests/fixtures/workbench-lookup.jsonl.gz", lookups)
+    out.jsonl_gz("tests/fixtures/workbench-type.jsonl.gz", types)
+    out.json("tests/fixtures/workbench-rules.json", {
+        "layouts": WORKBENCH_LAYOUTS, "stream": WB_STREAM, "lit": _LIT,
+        "rules": WB_RULES, "surfaces": WB_SURFACE_RULES,
+    })
+    # pyrepr: every quoted value, each printable ASCII key alone and next to
+    # quotes and backslashes, and printable non-ASCII readings and radicals
+    extra = set(" " + ASCII_KEYS)
+    for a in "'\"\\ a":
+        for b in "'\"\\ a":
+            extra.add(a + b)
+            for c in "'\"\\a":
+                extra.add(a + b + c)
+    extra |= {"ㄋㄧˇ", "廿土弓人", "한", "ㅋ", "ёжик", "ñ", "歡", "\U00020000", "a'ㄦ\"", "'ㄦ", "\\ˊ", "ü\"",
+              "tgno yhvl jmso", "don't", 'say "hi"', "it's \"x\"", "a\\'b"}
+    pairs = [[s, repr(s)] for s in sorted(values | extra)]
+    assert all(pyrepr(s) == r for s, r in pairs)
+    out.json("tests/fixtures/pyrepr.json", pairs)
+    print(f"[workbench] {len(lookups)} lookup fixtures ({sum(not r['wellFormed'] for r in lookups)} not well-formed), "
+          f"{len(types)} type fixtures, {len(values)} quoted values; pools: "
+          + ", ".join(f"{k} {v['pool']}/{v['wellFormed']}" for k, v in stats.items()))
+
+
 # ================================================================== main
 
 # Where every generated file comes from (docs/10 §9.2).  SOURCE_INFO names
@@ -1576,6 +1943,7 @@ def build(root: Path) -> Out:
     hero = hero_data(out)
     corpora = load_corpora()
     build_fixtures(out, vocab, rows, corpora, shipped)
+    workbench_fixtures(out, corpora)
     digests(out, vocab, rows)
     unicode_fixture(out)
     static_fixture(out, hero, rows)

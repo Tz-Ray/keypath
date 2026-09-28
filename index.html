@@ -24,6 +24,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <link rel="modulepreload" href="assets/js/ui/playground.js">
 <link rel="modulepreload" href="assets/js/ui/challenges.js">
 <link rel="modulepreload" href="assets/js/ui/share.js">
+<link rel="modulepreload" href="assets/js/ui/workbench.js">
 <link rel="modulepreload" href="assets/js/engine/index.js">
 <link rel="modulepreload" href="assets/js/engine/data.js">
 <link rel="modulepreload" href="assets/js/engine/unicode.js">
@@ -36,6 +37,8 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <link rel="modulepreload" href="assets/js/engine/decode.js">
 <link rel="modulepreload" href="assets/js/engine/keycheck.js">
 <link rel="modulepreload" href="assets/js/engine/kp1.js">
+<link rel="modulepreload" href="assets/js/engine/workbench.js">
+<link rel="modulepreload" href="assets/js/engine/pyrepr.js">
 <link rel="modulepreload" href="assets/js/engine/sha256.js">
 <link rel="modulepreload" href="assets/js/engine/dumps.js">
 <link rel="modulepreload" href="assets/js/engine/hash.js">
@@ -292,11 +295,69 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <section id="challenges" class="band-section" aria-labelledby="chal-h">
   <div class="wrap">
     <h2 id="chal-h">Six puzzles to crack</h2>
-    <p class="section-lead">No key this time. Work out the keyboard, read the keys, and pick the words that make sense. They start easy.</p>
+    <p class="section-lead">No key this time. Work out the keyboard, read the keys, and pick the words that make sense. They start easy. The <a href="#workbench">workbench</a> below reads keys on the keyboard you name.</p>
     <div id="challenge-grid" class="chal-grid">
       <noscript><p>The puzzles are also on <a href="https://github.com/Tz-Ray/keypath/tree/main/puzzles" rel="noopener">GitHub</a>.</p></noscript>
     </div>
     <p class="small muted chal-foot">All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals. Each puzzle, with a write-up of how to solve it, is also in the project's <a href="https://github.com/Tz-Ray/keypath/tree/main/puzzles" rel="noopener">puzzles folder</a>.</p>
+  </div>
+</section>
+
+<section id="workbench" class="band-section" aria-labelledby="wb-h">
+  <div class="wrap">
+    <h2 id="wb-h">Workbench</h2>
+    <p class="section-lead">For solving by hand. Name the keyboard you think the keys were typed on, then look up the keys one unit at a time, or type a guess to see the keys it makes. The workbench never guesses the keyboard or where the units split: that part of the puzzle is yours.</p>
+    <div class="card wb">
+      <fieldset class="chips" id="wb-kbd">
+        <legend>Keyboard</legend>
+        <div class="chip-row">
+          <label class="chip"><input type="radio" name="wbkbd" value="zh_daqian"><span class="g" lang="zh-Hant" aria-hidden="true">ㄅ</span><span class="t">Bopomofo (Taiwan)</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="zh_pinyin"><span class="g" aria-hidden="true">pīn</span><span class="t">Pinyin</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="zh_cangjie"><span class="g" lang="zh-Hant" aria-hidden="true">倉</span><span class="t">Cangjie</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="zh_quick"><span class="g" lang="zh-Hant" aria-hidden="true">速</span><span class="t">Quick</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="ko_dubeolsik"><span class="g" lang="ko" aria-hidden="true">한</span><span class="t">Korean and hanja</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="ru_jcuken"><span class="g" lang="ru" aria-hidden="true">Й</span><span class="t">Russian <span lang="ru">ЙЦУКЕН</span></span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="es_accent"><span class="g" lang="es" aria-hidden="true">ñ</span><span class="t">Spanish accents</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="en_identity"><span class="g" aria-hidden="true">a</span><span class="t">Plain English</span></label>
+        </div>
+      </fieldset>
+      <div class="wb-tools">
+        <form id="wb-look" class="wb-tool" novalidate>
+          <h3>Look up keys</h3>
+          <div class="field">
+            <label for="wb-keys">Keys, split into units with spaces</label>
+            <input id="wb-keys" class="mono" type="text" maxlength="600" spellcheck="false" autocomplete="off" autocapitalize="off" lang="en" aria-describedby="wb-keys-hint">
+          </div>
+          <p id="wb-keys-hint" class="small muted">A unit is the keys of one character (of one syllable in Korean, of one word in Russian, Spanish and English), for example <code>cj0 u/6 ru8</code> on Bopomofo. For each unit you get its reading and its candidates, numbered from 0 as a key numbers them, or the rule it breaks.</p>
+          <div class="wb-row">
+            <div class="field">
+              <label for="wb-top">Candidates to list</label>
+              <select id="wb-top">
+                <option value="10" selected>10</option>
+                <option value="50">50</option>
+                <option value="500">500</option>
+              </select>
+            </div>
+            <button type="submit" class="btn primary">Look up</button>
+          </div>
+          <p id="wb-look-status" class="wb-status small" role="status"></p>
+          <pre id="wb-look-out" class="wb-out" tabindex="0" role="region" aria-label="What the keys read as" hidden></pre>
+        </form>
+        <form id="wb-type" class="wb-tool" novalidate>
+          <h3>Type a guess</h3>
+          <div class="field">
+            <label for="wb-text">Text to type</label>
+            <textarea id="wb-text" rows="2" maxlength="200" spellcheck="false" autocomplete="off" aria-describedby="wb-text-hint"></textarea>
+          </div>
+          <p id="wb-text-hint" class="small muted">Each line is a unit, its keys and which candidate it is, counting from 0: <code>3/62</code> is the fourth of 62. Text this keyboard can't type is shown as a literal.</p>
+          <div class="wb-row">
+            <button type="submit" class="btn primary">Show the keys</button>
+          </div>
+          <p id="wb-type-status" class="wb-status small" role="status"></p>
+          <pre id="wb-type-out" class="wb-out" tabindex="0" role="region" aria-label="The keys for the text" hidden></pre>
+        </form>
+      </div>
+    </div>
   </div>
 </section>
 

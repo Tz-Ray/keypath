@@ -7,7 +7,10 @@ accent-digit scheme), with a small key that records every choice on the way. The
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
 KeyPath's Python reference implementation (keypath 2.2.0, not published)
-produces; the parity tests check this.
+produces; the parity tests check this. Its workbench, for solving by hand,
+looks up keys and types text on a keyboard the visitor names, never
+guessing one, and prints exactly what KeyPath's own `lookup` and `type`
+tools print.
 KeyPath is a puzzle, not encryption.
 
 The data under `data/` is derived from the tables of keypath 2.2.0 (its tag
@@ -20,8 +23,8 @@ The data under `data/` is derived from the tables of keypath 2.2.0 (its tag
 | path | what |
 |------|------|
 | `index.html`, `assets/css/site.css` | the page (no build step; served as is) |
-| `assets/js/app.js`, `assets/js/ui/` | the page scripts: playground, walk figure, popovers, challenges, share links |
-| `assets/js/engine/` | the engine: plain ES modules, `createEngine()` in `index.js` |
+| `assets/js/app.js`, `assets/js/ui/` | the page scripts: playground, walk figure, popovers, challenges, share links, workbench |
+| `assets/js/engine/` | the engine: plain ES modules, `createEngine()` in `index.js`, the workbench in `workbench.js` |
 | `sw.js` | network-first service worker, so the page works offline once loaded |
 | `data/` | generated tables the engine loads on demand (never edit by hand) |
 | `fonts/` | fallback glyphs, used only when the system has no CJK font |
@@ -90,6 +93,17 @@ packs every key in the fixtures to the same string as the Python reference
 (about 10,000 keys), unpacks the reference's golden kp1 strings to their
 keys, and refuses every one of its reject vectors.
 
+The workbench has its own fixtures, printed by KeyPath's `lookup` and
+`type` commands themselves: about 600 lookups (half of them keys that do
+not read, reaching every rule a unit can break on every workbench
+keyboard, with keys holding quotes and backslashes) and about 400 typed
+texts, all of which the page must print byte for byte; Python's `repr`,
+which those messages quote with, is checked against Python on every value
+they quote. `tests/no-solver.test.js` holds the engine to the public
+surface listed in `tests/engine-allowlist.js`, and calls every function in
+it with an unsplit stream of keys and no keyboard: none may answer with
+ways to split it, and the workbench answers nothing without a keyboard.
+
 The page suites check the copy (no leftover development text, honest
 wording, only relative or credited links), that every figure hard-coded in
 `index.html` matches the build's output, that nothing shown before a reveal
@@ -102,7 +116,9 @@ examples, reveals every challenge, walks tampered keys, checks keyboard
 navigation, IME composition, share links, reduced motion, offline reload,
 horizontal overflow from 360 px up (long literals, long words and error
 paths included), the Cangjie radicals on the keyboard picture and the walk,
-touch-target sizes, focus after popovers and reveals,
+touch-target sizes, focus after popovers and reveals, the workbench (no
+keyboard picked for the visitor, lookups and typing on every keyboard
+against the fixtures, refused keys, long answers at 360 px),
 share links with a hand-picked language, puzzles through a dictionary,
 walk links (`#walk=`, opened in a fresh browser, refused keys, markup that
 must stay text), and that the page makes no request outside its own origin
