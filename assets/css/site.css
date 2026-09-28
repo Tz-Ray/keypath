@@ -517,11 +517,10 @@ select {
 
 .walk, .seg-words, .units { list-style: none; margin: 0; padding: 0; }
 .walk { flex: 0 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: center; }
-.seg { max-width: 100%; min-width: 0; }
+.seg { max-width: 100%; min-width: 0; --seg: var(--seg-en_identity); }
 .seg-words { display: flex; flex-wrap: wrap; gap: 20px 14px; align-items: flex-start; justify-content: center; }
 @container (max-width: 479.98px) { .seg-words { gap: 16px 10px; } }
 .walk-host.multi .seg {
-  --seg: var(--seg-en_identity);
   padding: 6px; border-radius: 10px;
   background: color-mix(in srgb, var(--seg) 8%, transparent);
 }
