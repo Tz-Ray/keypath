@@ -32,9 +32,14 @@ test("every data file is at most 120 KB gzipped", () => {
   for (const f of served.filter(f => f.startsWith("data/"))) assert.ok(gz(f) <= 120 * 1024, `${f}: ${gz(f)} bytes gz`);
 });
 
-test("the served total is at most 5 MB", () => {
+// docs/10 §9.7: the served total (all but tests, tools, .git, .venv,
+// node_modules and *.md) at most 6.5 MiB from M14 (5 MiB through v2.0)
+const SERVED_CAP = 6.5 * 1024 * 1024;
+
+test("the served total is at most 6.5 MiB", () => {
+  assert.equal(SERVED_CAP, 6_815_744);
   const total = served.reduce((s, f) => s + statSync(join(ROOT, f)).size, 0);
-  assert.ok(total <= 5 * 1024 * 1024, `served ${total} bytes`);
+  assert.ok(total <= SERVED_CAP, `served ${total} bytes`);
 });
 
 test("fonts stay small", () => {

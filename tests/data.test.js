@@ -27,7 +27,10 @@ test("data/manifest.json lists every data file with its size and sha256", () => 
   }
 });
 
-test("budget: every data file is at most 120 KB gzipped, data/ at most 4.5 MB raw", () => {
+// docs/10 §9.7: data/ at most 6 MiB raw from M14 (4.5 MiB through v2.0)
+const DATA_CAP = 6 * 1024 * 1024;
+
+test("budget: every data file is at most 120 KB gzipped, data/ at most 6 MiB raw", () => {
   let total = 0;
   for (const path of dataFiles) {
     const buf = readFileSync(join(ROOT, path));
@@ -35,7 +38,8 @@ test("budget: every data file is at most 120 KB gzipped, data/ at most 4.5 MB ra
     const gz = gzipSync(buf, { level: 9 }).length;
     assert.ok(gz <= 120 * 1024, `${path}: ${gz} bytes gzipped`);
   }
-  assert.ok(total <= 4.5 * 1024 * 1024, `data/ is ${total} bytes`);
+  assert.equal(DATA_CAP, 6_291_456);
+  assert.ok(total <= DATA_CAP, `data/ is ${total} bytes`);
 });
 
 test("first-view data (registry, layouts, unicode14, hero) stays small", () => {
