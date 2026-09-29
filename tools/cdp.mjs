@@ -41,6 +41,7 @@ const kp1Fixtures = readJson("tests/fixtures/kp1.json");
 const wbLookups = readJsonl("tests/fixtures/workbench-lookup.jsonl.gz");
 const wbTypes = readJsonl("tests/fixtures/workbench-type.jsonl.gz");
 const registryJson = readJson("data/registry.json");
+const legendsJson = readJson("tests/fixtures/legends.json");
 const b64url = obj => Buffer.from(JSON.stringify(obj)).toString("base64url");
 
 // ------------------------------------------------------------ bookkeeping
@@ -278,6 +279,141 @@ await attempt("vietnamese", async () => {
   await b.evaluate(`${q("#tab-enc")}.click()`);
 });
 
+await attempt("ETen, Jyutping and kana", async () => {
+  // docs/10 §4.3-§4.4: every golden typed on the ETen and Jyutping chips shows Python's ciphertext and key
+  const goldens = vectors.filter(v => v.class === "golden-m16" && (v.surface === "zh_eten" || v.surface === "zh_jyutping"));
+  const hello = sid => goldens.find(v => v.surface === sid && v.text === "你好");
+  check("M16 goldens: 你好 is ne3hz3 on ETen and nei5hou2 on Jyutping, all goldens on both chips",
+    hello("zh_eten").expect.ciphertext === "ne3hz3" && hello("zh_jyutping").expect.ciphertext === "nei5hou2"
+    && goldens.filter(v => v.surface === "zh_eten").length === 6 && goldens.filter(v => v.surface === "zh_jyutping").length === 8, goldens.length);
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    for (const v of w === 1280 ? goldens : goldens.filter(g => g.text === "你好")) {
+      await typeMessage(v.text, "zh", v.surface);
+      try {
+        await b.waitFor(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)}`, 15000);
+        await settle();
+        check(`${v.surface} at ${w}px: "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`, await b.evaluate(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)}`));
+      } catch {
+        const got = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#enc-refusal")}.textContent]`);
+        check(`${v.surface} at ${w}px: "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`, false, js(got));
+      }
+    }
+    check(`ETen and Jyutping at ${w}px: no horizontal scroll`, await noHScroll(w), await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+  }
+  // the walk on ETen: bopomofo legends on the keys, the misdirection dot on digits and punctuation
+  await typeMessage("你好", "zh", "zh_eten");
+  await b.waitFor(cipherIs("ne3hz3"));
+  await settle();
+  const etCaps = await b.evaluate(`[...document.querySelectorAll("#walk .unit")].map(u => [u.querySelector(".b-sound .sound").textContent,
+    [...u.querySelectorAll("kbd")].map(k => k.querySelector(".main").textContent + k.querySelector(".leg").textContent + (k.classList.contains("mis") ? "*" : ""))])`);
+  check("ETen walk: 你好, each key under its bopomofo", js(etCaps) === js([["ㄋㄧˇ", ["nㄋ", "eㄧ", "3ˇ*"]], ["ㄏㄠˇ", ["hㄏ", "zㄠ", "3ˇ*"]]]), js(etCaps));
+  // the Jyutping popover lists the syllable's characters: 好 is 0 of 2 (on Pinyin, hou2 is 侯's)
+  await typeMessage("你好", "zh", "zh_jyutping");
+  await b.waitFor(cipherIs("nei5hou2"));
+  await settle();
+  await b.evaluate(`document.querySelectorAll('#walk .stack')[1].click()`);
+  await b.waitFor(`document.querySelector('.popover') && !document.querySelector('.popover').hidden`);
+  const jyTitle = await b.evaluate(`[document.querySelector('.popover .pop-title').textContent, [...document.querySelectorAll('.popover .cand .cg')].map(c => c.textContent)]`);
+  check("Jyutping: the popover lists hou2's two characters", jyTitle[0] === "hou2: 2 characters share this sound" && js(jyTitle[1].slice(0, 1)) === js(["好"]), js(jyTitle));
+  await b.evaluate("document.querySelector('.popover .pop-close').click()");
+
+  // docs/10 §5: ありがとう typed as Japanese is refused (the page carries no Japanese dictionary) ...
+  await open(1280, 800);
+  const kanaGolden = vectors.find(v => v.class === "golden-m16" && v.surface === "ja_kana" && v.text === "ありがとう");
+  check("kana golden: ありがとう is 3lt[s4 (Python)", kanaGolden.expect.ciphertext === "3lt[s4" && js(kanaGolden.jsRefusal) === js(["jaSource"]));
+  await b.evaluate(`${q("input[name=kbd][value=ja_kana]")}.click()`);
+  await b.waitFor(cipherIs(S.heroAll.ja_kana));
+  await b.evaluate(`(() => { const t = ${q("#msg")}; t.value = ""; t.dispatchEvent(new Event("input")); t.focus(); })()`);
+  await b.send("Input.insertText", { text: "ありがとう" });
+  await b.waitFor(`!${q("#enc-refusal")}.hidden`);
+  check("kana: a Japanese message is refused with its reason, keeping the kana keyboard",
+    await b.evaluate(`${q("#enc-refusal")}.textContent.startsWith("Japanese messages need the full Japanese dictionary") && ${q("input[name=kbd][value=ja_kana]")}.checked`),
+    await b.evaluate(`${q("#enc-refusal")}.textContent`));
+  // ... and its key, from Python, walks back to ありがとう on the page, each kana over its keys
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(kanaGolden.expect.ciphertext)}; ${q("#dec-key")}.value = ${js(kanaGolden.expect.keyText)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`);
+  const kanaWalk = await b.evaluate(`[${q("#dec-text")}.textContent, [...document.querySelectorAll("#dec-walk kbd")].map(k => k.querySelector(".main").textContent + (k.querySelector(".leg") ? k.querySelector(".leg").textContent : "")),
+    [...document.querySelectorAll("#dec-walk .rank")].map(r => r.textContent), [...document.querySelectorAll("#dec-walk .seg-badge")].map(x => x.textContent)]`);
+  check("kana: ありがとう's key walks back, kana over its keys, as typed", kanaWalk[0] === "ありがとう"
+    && js(kanaWalk[1]) === js(["3あ", "lり", "tか", "[゛", "sと", "4う"]) && js(kanaWalk[2]) === js(["kana as typed"]), js(kanaWalk));
+  await b.evaluate(`${q("#tab-enc")}.click()`);
+
+  // a #walk link on a new keyboard (the kana golden, its key as kp1) decodes and animates
+  const kp1 = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(kanaGolden.expect.keyText)})`);
+  check("kana: the golden key has a kp1 form", kp1.ok && kp1.text.startsWith("kp1."), js(kp1));
+  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+    new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
+      .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
+  for (const [name, body] of [["kana", { c: kanaGolden.expect.ciphertext, k: kp1.text }],
+    ["Jyutping", { c: hello("zh_jyutping").expect.ciphertext, j: JSON.stringify(JSON.parse(hello("zh_jyutping").expect.keyText)) }]]) {
+    await b.navigate("about:blank");
+    await b.navigate(`${srv.url}#walk=${b64url(body)}`);
+    await b.waitFor("document.documentElement.classList.contains('ready')");
+    await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
+    // every unit, then its word, lit
+    await b.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && [...document.querySelectorAll("#dec-walk .unit, #dec-walk .wg")].every(e => e.classList.contains("lit"))`);
+    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__lit.length ? window.__lit[window.__lit.length - 1] - window.__lit[0] : 0]`);
+    const want = name === "kana" ? "ありがとう" : "你好";
+    // unit by unit, then the word: each lights up 140 ms after the one before
+    check(`walk link on ${name}: decodes and animates`, got[0] === want && got[1] && got[2] >= 2 && got[3] >= (got[2] - 1) * 120, js(got));
+  }
+  await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: watch.identifier });
+
+  // the keyboard pictures: legends from the tables, the kana shift layer, no overflow
+  const pictureOf = () => b.evaluate(`Object.fromEntries([...document.querySelectorAll("#kbd-pic .kb-key")].map(k =>
+    [k.dataset.key, [k.querySelector(".us").textContent, k.querySelector(".sym") ? k.querySelector(".sym").textContent : "", k.classList.contains("tone")]]))`);
+  const matches = (pic, layout, shift) => Object.entries(pic).every(([key, [us, sym]]) => {
+    const typed = shift ? shiftedOf(key) : key;
+    return sym === (legendsJson.layouts[layout][typed] ?? "") && us === (typed === key ? key : `⇧${typed}`);
+  });
+  const shiftedOf = key => legendsJson.usShiftedRows.join("")[legendsJson.usRows.join("").indexOf(key)];
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    for (const sid of ["zh_eten", "zh_jyutping", "ja_kana"]) {
+      await b.evaluate(`${q(`input[name=kbd][value=${sid}]`)}.click()`);
+      await b.waitFor(cipherIs(S.heroAll[sid]));
+      await settle();
+      await b.evaluate(`${q("#kbd-panel")}.open = true`);
+      await sleep(120);
+      const pic = await pictureOf();
+      check(`${sid} keyboard at ${w}px: 47 keys, = and \\ among them, legends as KeyPath's`,
+        Object.keys(pic).length === 47 && "=" in pic && "\\" in pic && matches(pic, sid, false), js(pic).slice(0, 500));
+      if (sid === "zh_eten") check(`ETen keyboard at ${w}px: 7 is ㄑ, the tone keys 2 3 4 1`, pic["7"][1] === "ㄑ"
+        && Object.entries(pic).filter(([, v]) => v[2]).map(([k]) => k).sort().join("") === "1234", js(pic["7"]));
+      if (sid === "zh_jyutping") check(`Jyutping keyboard at ${w}px: the six tone digits and their names`,
+        Object.entries(pic).filter(([, v]) => v[2]).map(([k]) => k).sort().join("") === "123456"
+        && await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note")].some(n => n.textContent.endsWith("5 low rising · 6 low level."))`));
+      if (sid === "ja_kana") {
+        check(`kana keyboard at ${w}px: \\ is む, [ and ] voice`, pic["\\"][1] === "む" && pic["["][1] === "゛" && pic["]"][1] === "゜", js([pic["\\"], pic["["]]));
+        await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
+        await sleep(80);
+        const shifted = await pictureOf();
+        check(`kana keyboard at ${w}px with Shift: 0 is を, v is ゐ, z is っ, all as KeyPath's`,
+          shifted["0"][1] === "を" && shifted.v[1] === "ゐ" && shifted.z[1] === "っ" && shifted["0"][0] === "⇧)" && matches(shifted, sid, true),
+          js([shifted["0"], shifted.v, shifted.z]));
+        const notes = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note, #kbd-pic li")].map(n => n.textContent)`);
+        check(`kana keyboard at ${w}px: the voicing and shift notes`, notes.includes("Each key types one kana. [ after a kana adds ゛ (か t, が t[); ] after a kana adds ゜ (は f, ぱ f]).")
+          && notes.includes(") を (Shift+0)") && notes.includes("V ゐ (Shift+v)"), js(notes));
+      }
+      const fits = await b.evaluate(`(() => { const p = ${q("#kbd-pic .kb-pic")}; const box = ${q("#kbd-pic")}.getBoundingClientRect();
+        return [...p.querySelectorAll(".kb-key")].every(k => k.getBoundingClientRect().right <= box.right + 0.5) && p.scrollWidth <= p.clientWidth + 1; })()`);
+      check(`${sid} keyboard at ${w}px: every key inside the picture, no horizontal scroll`, fits && await noHScroll(w),
+        await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+    }
+  }
+  // Dubeolsik reads its shifted jamo through the same shift map
+  await open(1280, 800);
+  await b.evaluate(`${q("input[name=kbd][value=ko_dubeolsik]")}.click()`);
+  await b.waitFor(cipherIs(S.heroAll.ko_dubeolsik));
+  await b.evaluate(`${q("#kbd-panel")}.open = true`);
+  await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
+  const ko = await pictureOf();
+  check("Dubeolsik keyboard with Shift: Q W E R T O P show their doubled jamo, as KeyPath's", matches(ko, "ko_dubeolsik", true)
+    && "qwertop".split("").map(k => ko[k][1]).join("") === "ㅃㅉㄸㄲㅆㅒㅖ", js(ko.q));
+});
+
 await attempt("typing", async () => {
   // every keyboard chip on the page: the site vectors, the corpora and fuzz strings
   const chips = await b.evaluate(`[...document.querySelectorAll("input[name=kbd]")].map(i => i.value)`);
@@ -373,8 +509,8 @@ await attempt("keyboard", async () => {
     if (a === "kbd:zh_daqian") {
       await press("ArrowRight");
       const moved = await active();
-      check("keyboard: arrow keys move between keyboard chips", moved === "kbd:zh_pinyin" && await b.evaluate(`${q("input[value=zh_pinyin]")}.checked`), moved);
-      await b.waitFor(cipherIs(S.heroAll.zh_pinyin));
+      check("keyboard: arrow keys move between keyboard chips", moved === "kbd:zh_eten" && await b.evaluate(`${q("input[value=zh_eten]")}.checked`), moved);
+      await b.waitFor(cipherIs(S.heroAll.zh_eten));
       await press("ArrowLeft");
       await b.waitFor(cipherIs(hero.ciphertext));
     }
@@ -911,6 +1047,25 @@ if (SHOTS) {
         await sleep(2200);
         await shot(`hero-${tag}`);
         if (w === 1440 || w === 390) await shot(`page-${tag}`, { fullPage: true });
+        if (w === 1440 || w === 360) {
+          // ETen, Jyutping and JIS kana: the walk and the keyboard picture (kana also with Shift)
+          for (const [sid, text, lang] of [["zh_eten", "你好", "zh"], ["zh_jyutping", "廣東話", "zh"], ["ja_kana", "welcome home", "en"]]) {
+            await typeAndWait(text, lang, sid);
+            await b.evaluate(`${q("#kbd-panel")}.open = true`);
+            await sleep(1500);
+            await shotOf(`${sid}-${tag}`, ".enc-out");
+            await shotOf(`${sid}-keyboard-${tag}`, "#kbd-panel");
+          }
+          await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
+          await sleep(200);
+          await shotOf(`ja_kana-keyboard-shift-${tag}`, "#kbd-panel");
+          await b.evaluate(`(() => { ${q("#wb-kbd input[value=zh_jyutping]")}.click(); ${q("#wb-keys")}.value = "nei5 hou2 nei7 si1";
+            ${q("#wb-look")}.requestSubmit(); ${q("#wb-text")}.value = "廣東話, hello"; ${q("#wb-type")}.requestSubmit(); })()`);
+          await b.waitFor(`!${q("#wb-look-out")}.hidden && !${q("#wb-type-out")}.hidden`);
+          await shotOf(`workbench-jyutping-${tag}`, "#workbench");
+          await open(w, h, { dark });
+          await sleep(1200);
+        }
         if (w === 1280 || w === 360) {
           await shotOf(`how-${tag}`, "#how");
           await b.evaluate(`(() => { const s = document.querySelectorAll('#walk .stack')[1]; s.scrollIntoView({ block: "center" }); s.click(); })()`);

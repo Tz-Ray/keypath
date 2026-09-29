@@ -102,10 +102,11 @@ keys, and refuses every one of its reject vectors and every key that asks
 for inline selectors on a keyboard that has none.
 
 The workbench has its own fixtures, printed by KeyPath's `lookup` and
-`type` commands themselves: about 750 lookups (half of them keys that do
-not read, reaching every rule a unit can break on every workbench
-keyboard, with keys holding quotes and backslashes) and about 500 typed
-texts, all of which the page must print byte for byte; Python's `repr`,
+`type` commands themselves: about 930 lookups (more than half of them keys
+that do not read, reaching every rule a unit can break on every workbench
+keyboard, ETen and Jyutping included, with keys holding quotes and
+backslashes) and about 650 typed texts, all of which the page must print
+byte for byte; Python's `repr`,
 which those messages quote with, is checked against Python on every value
 they quote. `tests/no-solver.test.js` holds the engine to the public
 surface listed in `tests/engine-allowlist.js`, and calls every function in
@@ -116,6 +117,12 @@ The page suites check the copy (no leftover development text, honest
 wording, only relative or credited links), that every figure hard-coded in
 `index.html` matches the build's output, that nothing shown before a reveal
 spoils a challenge, the payload budget, and colour contrast in both themes.
+`tests/keyboard.test.js` holds the keyboard pictures to KeyPath's own
+legends (`tests/fixtures/legends.json`, from its tables): the US rows with
+`=` and `\`, one US shift map, and on every keyboard drawn as keys exactly
+the legend KeyPath gives each key, the shift layers of the Korean and JIS
+kana keyboards included (ETen's `7` is ㄑ, kana's `\` is む, Shift+`0`
+is を).
 `tests/e2e.test.js` runs `tools/cdp.mjs` when a Chromium binary is found
 (Playwright's cache, or `KEYPATH_CHROME`) and is skipped otherwise: it
 serves the site under `/keypath/`, types messages on every keyboard and
@@ -125,7 +132,11 @@ navigation, IME composition, share links, reduced motion, offline reload,
 horizontal overflow from 360 px up (long literals, long words and error
 paths included), the Cangjie radicals on the keyboard picture and the walk,
 the Vietnamese goldens typed on the Telex and VNI keyboards, detection of
-Vietnamese, the Telex and VNI legends and each letter over its keys,
+Vietnamese, the Telex and VNI legends and each letter over its keys, the
+ETen and Jyutping goldens typed on their keyboards, a Japanese message
+refused and the JIS kana golden's key walked back, walk links on the new
+keyboards, the ETen, Jyutping and kana pictures (the kana shift layer
+included) inside 360 px,
 touch-target sizes, focus after popovers and reveals, the workbench (no
 keyboard picked for the visitor, lookups and typing on every keyboard
 against the fixtures, refused keys, long answers at 360 px),

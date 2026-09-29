@@ -56,7 +56,7 @@ export const T = {
   // refusals, errors and toasts (§2.3)
   empty: "Type a message to see its keystrokes.",
   unknownWords: words => `Not in this page's 10,000-word English list: ${words.join(", ")}. Try a more common word, or type it on Plain English.`,
-  jaSource: "Japanese messages need the full Japanese dictionary, which this page doesn't carry. Try an English message on the Japanese keyboard.",
+  jaSource: "Japanese messages need the full Japanese dictionary, which this page doesn't carry. Try an English message on a Japanese keyboard (romaji or kana).",
   routeOff: (lang, keyboards) => `From ${lang}, this page types on ${listAnd(keyboards)} only.`,
   newerUnicode: cp => `${cp} is newer than the Unicode version KeyPath uses. Remove it to continue.`,
   loadFailed: "Couldn't load part of the dictionary. Check your connection and try again.",
@@ -131,6 +131,7 @@ export const T = {
   jaMore: n => `+${n} more in the full dictionary`,
   zhCaption: "Ordered by how common each character is (libchewing), ties by code point.",
   shapeCaption: "Codes from Unihan. Ordered by how common each character is (libchewing), ties by code point.",
+  jyutpingCaption: "Readings from Unihan. Ordered by how common each character is (libchewing), ties by code point.",
   hanjaCaption: "In hanja.txt order.",
   jaCaption: "In SKK dictionary order.",
   countNote: "Numbered from 1 here; the key counts from 0.",

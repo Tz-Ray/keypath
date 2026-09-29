@@ -37,9 +37,10 @@ function blocks(text) {
 
 test("the workbench keyboards are docs/10 §9.7's, each with its surfaces in registry order", () => {
   assert.deepEqual(registry.workbench.map(w => w.layout), rules.layouts);
-  // M14's keyboards, then Vietnamese Telex and VNI (M15)
-  assert.deepEqual(rules.layouts, ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity",
-    "vi_telex", "vi_vni"]);
+  // M14's keyboards, Vietnamese Telex and VNI (M15), and ETen and Jyutping
+  // (M16), each after its twin as on the page's chips; no Japanese
+  assert.deepEqual(rules.layouts, ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "ko_dubeolsik",
+    "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni"]);
   for (const { layout, surfaces } of registry.workbench) {
     assert.deepEqual(surfaces, registry.kp1Surfaces.filter(([, l]) => l === layout), layout);
     assert.ok(surfaces.every(([language]) => language !== "ja"), layout);
@@ -115,6 +116,18 @@ test("docs/10 §8.2-§8.3 goldens", async () => {
   const typed = async (layout, text) => (await e.type({ layout, text })).text;
   assert.equal(await typed("zh_cangjie", "明天"), "(zh, zh_cangjie)\n明 ab 0/1\n天 mk 0/1");
   assert.equal(await typed("zh_quick", "明天"), "(zh, zh_quick)\n明 ab 0/14\n天 mk 1/60");
+  // docs/10 §4.3-§4.4: ETen reads as Dàqiān does (7 is ㄑ), Jyutping as the syllable, with its pun
+  assert.match(await look("zh_eten", "ne3"), /^ne3 · \(zh, zh_eten\) · well-formed: yes\n {2}reading: ㄋㄧˇ \/ ni3\n {2}candidates: 32\n {2}0:你 /);
+  assert.match(await look("zh_eten", "7"), /^7 · \(zh, zh_eten\) · well-formed: yes\n {2}reading: ㄑ \/ /);
+  assert.match(await look("zh_eten", "3"), /\n {2}violated rule: unit '3' is a bare tone key$/);
+  assert.match(await look("zh_jyutping", "nei5"), /^nei5 · \(zh, zh_jyutping\) · well-formed: yes\n {2}reading: nei5\n {2}candidates: 14\n {2}0:你 /);
+  assert.match(await look("zh_jyutping", "hou2"), /\n {2}candidates: 2\n {2}0:好 1:/);
+  assert.match(await look("zh_pinyin", "hou2"), /\n {2}candidates: 21\n {2}0:侯 /);
+  assert.match(await look("zh_jyutping", "si1"), /\n {2}candidates: 68\n {2}0:司 .* 7:詩 /);
+  assert.match(await look("zh_pinyin", "nei5"), /well-formed: no\n/);
+  assert.match(await look("zh_jyutping", "nei"), /\n {2}violated rule: unit 'nei' does not end in a tone digit 1-6$/);
+  assert.equal(await typed("zh_eten", "你好"), "(zh, zh_eten)\n你 ne3 0/32\n好 hz3 0/4");
+  assert.equal(await typed("zh_jyutping", "你好"), "(zh, zh_jyutping)\n你 nei5 0/14\n好 hou2 0/2");
 });
 
 test("a chunk is printable ASCII other than space; anything else is refused, naming the code point", async () => {

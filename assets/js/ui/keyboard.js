@@ -2,16 +2,71 @@
 // keys the ciphertext uses, and (on hover/focus) the focused unit's keys.
 import { h, cps } from "./dom.js";
 
-const ROWS = [
-  ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"],
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
+/** The US keys the picture draws, row by row (docs/10 §8.4's order). */
+export const ROWS = [
+  ["`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="],
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]", "\\"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'"],
   ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
 ];
 const INDENT = [0, 0.5, 0.75, 1.25];
-const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
-const DAQIAN_TONES = new Set(["6", "3", "4", "7"]);
+const SHIFTED_PUNCT = {
+  "`": "~", 1: "!", 2: "@", 3: "#", 4: "$", 5: "%", 6: "^", 7: "&", 8: "*", 9: "(", 0: ")", "-": "_", "=": "+",
+  "[": "{", "]": "}", "\\": "|", ";": ":", "'": '"', ",": "<", ".": ">", "/": "?",
+};
+/**
+ * The one US shift map (docs/10 §9.7): what each key types with Shift (a
+ * letter: its capital).  Every layout with a shift layer (Dubeolsik, JIS
+ * kana) reads its shifted legends through it.
+ */
+export const US_SHIFT = Object.freeze(Object.fromEntries(ROWS.flat().map(key => [key, SHIFTED_PUNCT[key] ?? key.toUpperCase()])));
+/** Layouts drawn as a key grid (the others get a list or no picture). */
+export const GRID_LAYOUTS = new Set(["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick",
+  "ko_dubeolsik", "ru_jcuken", "ja_kana"]);
 const SHAPE = new Set(["zh_cangjie", "zh_quick"]);
+const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", zh_pinyin: "en", zh_jyutping: "en", ja_kana: "ja" };
+
+/**
+ * The grid for `layout`: rows of {key, typed, legend, tone}, where `typed` is
+ * what the key types (with `shift`, through US_SHIFT) and `legend` what that
+ * means on the layout ("" for a key the layout does not use).
+ */
+export function keyboardModel(legends, layout, shift = false) {
+  return ROWS.map(row => row.map(key => {
+    const typed = shift ? US_SHIFT[key] : key;
+    return { key, typed, legend: legends.keyLegend(layout, typed), tone: legends.isTone(layout, typed) };
+  }));
+}
+
+/** Whether the layout types some key with Shift (its picture then has a Shift switch). */
+export const hasShiftLayer = (legends, layout) => ROWS.flat().some(key => legends.keyLegend(layout, US_SHIFT[key]) !== "");
+
+/** "Tone keys: 6 ˊ · 3 ˇ · 4 ˋ · 7 ˙; …", from a Bopomofo layout's table. */
+export const bopomofoToneNote = table =>
+  `Tone keys: ${Object.entries(table.toneToKey).map(([mark, key]) => `${key} ${mark}`).join(" · ")}; the first tone types nothing.`;
+
+/** "Tone digits: 1 high level · …", from the Jyutping table. */
+export const jyutpingNote = table =>
+  `Each character is typed as its Jyutping syllable, then its tone digit: ${table.toneNames.map(([d, name]) => `${d} ${name}`).join(" · ")}.`;
+
+/**
+ * The JIS kana notes, from the table: the two voicing keys with an example
+ * each ([base key, voiced kana, its keys, mark]), and the kana typed with
+ * Shift ([typed, kana, key]) in keyboard order.
+ */
+export function kanaNotes(legends) {
+  const table = legends.layouts.data.ja_kana.keysByKana;
+  const oneKey = new Map(table.filter(([, keys]) => keys.length === 1));
+  const { marks } = legends.layouts.kanaLegend();
+  const voicing = [...marks].map(([markKey, mark]) => {
+    const [kana, keys] = table.find(([, k]) => k.length === 2 && k[1] === markKey);
+    return { markKey, mark, base: [...oneKey].find(([, k]) => k === keys[0])[0], kana, keys };
+  });
+  const shifted = ROWS.flat().filter(key => legends.keyLegend("ja_kana", US_SHIFT[key]))
+    .map(key => ({ typed: US_SHIFT[key], kana: legends.keyLegend("ja_kana", US_SHIFT[key]), key }));
+  return { voicing, shifted };
+}
+
 const VI = new Set(["vi_telex", "vi_vni"]);
 // How a syllable is typed (docs/10 §6.3): each letter's base letter, then its
 // modifier key, then (on the vowel that carries it) the syllable's one tone key
@@ -80,32 +135,24 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
         ", ", vi(m.placement[1][0]), " is ", h("kbd", { lang: "en" }, m.placement[1][1]), "."));
     return { highlight() {}, flash() {} };
   }
-  if (layout === "en_identity") return null;
 
-  const legendOf = key => {
-    if (layout === "zh_daqian") return legends.dq.get(key) || "";
-    if (layout === "ko_dubeolsik") return legends.ko.get(shift && /[qwertop]/.test(key) ? key.toUpperCase() : key) || "";
-    if (layout === "ru_jcuken") return legends.ru.get(key) || "";
-    if (layout === "zh_pinyin") return PINYIN_TONE[key] || (/[a-z]/.test(key) ? key : "");
-    if (SHAPE.has(layout)) return legends.shape.get(key) || "";
-    return "";
-  };
-  const legendLang = layout === "ru_jcuken" ? "ru" : layout === "ko_dubeolsik" ? "ko" : layout === "zh_pinyin" ? "en" : "zh-Hant";
+  if (!GRID_LAYOUTS.has(layout)) return null;
+  const legendLang = LEGEND_LANG[layout] || "zh-Hant";
+  const L = legends.layouts.data;
 
   const pic = h("div.kb-pic", { role: "img", "aria-label": "Keyboard picture" });
   const draw = () => {
     pic.replaceChildren();
     els.clear();
-    ROWS.forEach((row, r) => {
+    keyboardModel(legends, layout, shift).forEach((row, r) => {
       const rowEl = h("div.kb-row", { style: { "--indent": String(INDENT[r]) } });
-      for (const key of row) {
-        const typed = layout === "ko_dubeolsik" && shift && /[qwertop]/.test(key) ? key.toUpperCase() : key;
-        const leg = legendOf(key);
+      for (const { key, typed, legend, tone } of row) {
         const n = counts.get(typed) || 0;
         const el = h("span.kb-key", {
-          class: `kb-key${leg ? "" : " unused"}${n ? " used" : ""}${layout === "zh_daqian" && DAQIAN_TONES.has(key) ? " tone" : ""}`,
-        }, h("span.us", { lang: "en" }, typed === key ? key : `⇧${key.toUpperCase()}`),
-        leg ? h("span.sym", { lang: legendLang }, leg) : null,
+          class: `kb-key${legend ? "" : " unused"}${n ? " used" : ""}${tone ? " tone" : ""}`,
+          "data-key": key,
+        }, h("span.us", { lang: "en" }, typed === key ? key : `⇧${typed}`),
+        legend ? h("span.sym", { lang: legendLang }, legend) : null,
         n ? h("span.cnt", String(n)) : null);
         els.set(typed, el);
         rowEl.append(el);
@@ -115,13 +162,28 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
   };
   draw();
   const parts = [pic];
-  if (layout === "ko_dubeolsik") {
+  if (hasShiftLayer(legends, layout)) {
     const box = h("input", { type: "checkbox" });
     box.addEventListener("change", () => { shift = box.checked; draw(); });
     parts.unshift(h("label.kb-shift", box, " Shift"));
   }
   if (layout === "zh_pinyin") parts.push(h("p.kb-note", "Tone digits: 1 ˉ · 2 ˊ · 3 ˇ · 4 ˋ · 5 neutral"));
-  if (layout === "zh_daqian") parts.push(h("p.kb-note", "Tone keys: 6 ˊ · 3 ˇ · 4 ˋ · 7 ˙; the first tone types nothing."));
+  if (layout === "zh_daqian") parts.push(h("p.kb-note", bopomofoToneNote(L.zh_daqian)));
+  if (layout === "zh_eten") {
+    parts.push(h("p.kb-note", "ETen types the same Bopomofo symbols as the Dàqiān keyboard, on other keys. ", bopomofoToneNote(L.zh_eten)));
+  }
+  if (layout === "zh_jyutping") parts.push(h("p.kb-note", jyutpingNote(L.zh_jyutping)));
+  if (layout === "ja_kana") {
+    const { voicing, shifted } = kanaNotes(legends);
+    const kbd = text => h("kbd", { lang: "en" }, text);
+    const ja = text => h("span", { lang: "ja" }, text);
+    parts.push(h("p.kb-note", "Each key types one kana. ",
+      voicing.flatMap((v, i) => [i ? "; " : "", kbd(v.markKey), " after a kana adds ", ja(v.mark), " (", ja(v.base), " ", kbd(v.keys[0]), ", ",
+        ja(v.kana), " ", kbd(v.keys), ")"]), "."),
+    h("p.kb-note", "With Shift:"),
+    h("ul.kb-es", { "aria-label": "Kana typed with Shift" }, shifted.map(x => h("li", { class: counts.has(x.typed) ? "used" : null },
+      kbd(x.typed), " ", ja(x.kana), ` (Shift+${x.key})`))));
+  }
   if (SHAPE.has(layout)) {
     parts.push(h("p.kb-note", "Each letter stands for a shape, its radical; a character's code spells its parts (codes from Unihan). ",
       h("kbd", { lang: "en" }, "x"), " ", h("span", { lang: "zh-Hant" }, legends.shape.get("x")),

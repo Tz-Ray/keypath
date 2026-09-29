@@ -55,6 +55,7 @@ from keypath.keycodec import pack as kp1_pack, payload as kp1_payload, text as k
 from keypath.keycodec import unpack as kp1_unpack  # noqa: E402
 from keypath.layouts import ja_kana as kana_layout  # noqa: E402
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
+from keypath.layouts.keyboard import US_ROWS, US_SHIFTED_ROWS  # noqa: E402
 from keypath.layouts import vi_telex as vi_telex_layout  # noqa: E402
 from keypath.layouts import vi_vni as vi_vni_layout  # noqa: E402
 from keypath.layouts import zh_cangjie as cangjie_layout  # noqa: E402
@@ -147,8 +148,9 @@ ALLOWED = {
 # The workbench's keyboards (docs/10 §9.7, M14): lookup and type answer for
 # the one layout the visitor names, over every surface typed on it (both of
 # ko_dubeolsik's: Korean and hanja).  No Japanese.
-# M15 adds Vietnamese Telex and VNI.
-WORKBENCH_LAYOUTS = ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik",
+# M15 adds Vietnamese Telex and VNI; M16 ETen and Jyutping, each placed after
+# its twin (Dàqiān, Pinyin) as the page's chips are.
+WORKBENCH_LAYOUTS = ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "ko_dubeolsik",
                      "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni"]
 
 # Examples used by the page (§6); every one is re-encoded and asserted.
@@ -404,8 +406,10 @@ def m16_layouts_data() -> dict[str, Any]:
     marks, in its order, on other keys), Jyutping's unit shape (1-6
     letters, then a tone digit), and the JIS kana keys of the 77 kana, in
     ja_kana.tsv's order (a voiced kana is its base key and `[`, a
-    semi-voiced one its base key and `]`)."""
+    semi-voiced one its base key and `]`).  Jyutping also names its six
+    tones, for the keyboard picture."""
     dq, et = zh_daqian(), zh_eten()
+    assert list(jyutping_layout.TONE_NAMES) == list(jyutping_layout.TONE_DIGITS)
     assert list(et.symbol_to_key) == list(dq.symbol_to_key) and list(et.tone_to_key) == list(dq.tone_to_key)
     keys = [*et.symbol_to_key.values(), *et.tone_to_key.values()]
     assert len(set(keys)) == len(keys) == 41
@@ -415,7 +419,8 @@ def m16_layouts_data() -> dict[str, Any]:
     assert set(kana) == {k for reading in ja_romaji().kana_to_romaji for k in reading} | {"っ"}
     return {
         "zh_eten": {"symbolToKey": dict(et.symbol_to_key), "toneToKey": dict(et.tone_to_key)},
-        "zh_jyutping": {"toneDigits": jyutping_layout.TONE_DIGITS, "maxLetters": jyutping_layout.MAX_LETTERS},
+        "zh_jyutping": {"toneDigits": jyutping_layout.TONE_DIGITS, "maxLetters": jyutping_layout.MAX_LETTERS,
+                        "toneNames": [[digit, name] for digit, name in jyutping_layout.TONE_NAMES.items()]},
         "ja_kana": {"keysByKana": [[k, v] for k, v in kana.items()]},
     }
 
@@ -437,6 +442,25 @@ def vi_layouts_data() -> dict[str, Any]:
         out[layout] = {"letters": [[letter, table.keys_by_name[letter]] for letter in table.letter_keys],
                        "tones": [[name, table.keys_by_name[name]] for name in VI_TONE_MARKS]}
     return out
+
+
+def legends_fixture(out: Out) -> None:
+    """tests/fixtures/legends.json: what each key alone means on every
+    registered layout (docs/10 §8.4, `LayoutInfo.legends`, read from the
+    tables) and the US keys row by row with their shifted keys.  The page's
+    keyboard pictures must draw exactly these legends (docs/10 §9.7)."""
+    layouts = {layout: dict(registry.layout_info(layout).legends) for layout in registry.registered_layouts()}
+    grid = set("".join(US_ROWS)) | set("".join(US_SHIFTED_ROWS))
+    assert [len(r) for r in US_ROWS] == [len(r) for r in US_SHIFTED_ROWS]
+    for layout, legends in layouts.items():
+        assert set(legends) <= grid, (layout, set(legends) - grid)
+    # docs/10 §9.7: legends asserted from the tables
+    et, kana = zh_eten(), ja_kana().keys_by_kana
+    assert layouts["zh_eten"]["7"] == "ㄑ" == next(s for s, k in et.symbol_to_key.items() if k == "7")
+    for key, want in (("\\", "む"), (")", "を"), ("V", "ゐ"), ("Z", "っ")):
+        assert layouts["ja_kana"][key] == want and kana[want] == key, key
+    out.json("tests/fixtures/legends.json", {"usRows": list(US_ROWS), "usShiftedRows": list(US_SHIFTED_ROWS),
+                                             "layouts": layouts})
 
 
 def unicode14_ranges() -> list[list[int]]:
@@ -1827,6 +1851,11 @@ WB_RULES: dict[str, str] = {
     "no-base": r"digit LIT has no base letter in unit LIT",
     "no-variant": r"no variant LIT for base LIT in unit LIT",
     "not-word": r"unit LIT is not well-formed for en_identity",
+    # Jyutping (docs/10 §4.4): the unit shape, then the table's readings
+    "jy-no-tone-digit": r"unit LIT does not end in a tone digit 1-6",
+    "jy-spelling-key": r"key LIT in unit LIT: a Jyutping syllable is letters a-z, and one tone digit 1-6 ends the unit",
+    "jy-too-long": r"unit LIT has \d+ letters; a Jyutping syllable has 1-6",
+    "not-reading": r"unit LIT is not a Jyutping reading on layout zh_jyutping: no character of zh_jyutping\.tsv reads LIT",
     # docs/10 §8.2 (a) and (b); (c) cannot fire
     "vi-undefined": r"key LIT at position \d+ cannot follow LIT \(VNI: a digit must follow the letter it marks\)",
     "vi-not-g": r"D\([a-z0-9]+\) = [^ ]+ is not a syllable of G; canonical (?:Telex|VNI) types a vowel's tone key "
@@ -1835,8 +1864,11 @@ WB_RULES: dict[str, str] = {
 WB_RULE_RE = {name: re.compile("^" + pattern.replace("LIT", _LIT) + "$") for name, pattern in WB_RULES.items()}
 WB_SURFACE_RULES: dict[str, list[str]] = {
     "(zh, zh_daqian)": ["alphabet", "empty", "tone-not-final", "bare-tone", "not-syllable"],
+    "(zh, zh_eten)": ["alphabet", "empty", "tone-not-final", "bare-tone", "not-syllable"],
     "(zh, zh_pinyin)": ["alphabet", "empty", "no-tone-digit", "bare-digit", "spelling-key", "not-spelling",
                         "not-syllable"],
+    "(zh, zh_jyutping)": ["alphabet", "empty", "jy-no-tone-digit", "bare-digit", "jy-spelling-key", "jy-too-long",
+                          "not-reading"],
     "(zh, zh_cangjie)": ["alphabet", "empty", "too-long", "not-code"],
     "(zh, zh_quick)": ["alphabet", "empty", "too-long", "not-code"],
     "(ko, ko_dubeolsik)": ["alphabet", "empty", "no-unit"],
@@ -1889,6 +1921,10 @@ def wb_units(layout: str) -> list[str]:
     """Well-formed chunks of `layout`, from its tables."""
     if layout == "zh_daqian":
         return sorted({daqian_layout.keys_for_reading(r) for r in zh_chars().candidates_by_reading})
+    if layout == "zh_eten":
+        return sorted({eten_layout.keys_for_reading(r) for r in zh_chars().candidates_by_reading})
+    if layout == "zh_jyutping":
+        return sorted(zh_jyutping().candidates_by_reading)
     if layout == "zh_pinyin":
         return sorted({pinyin_layout.keys_for_reading(r) for r in zh_chars().candidates_by_reading})
     if layout == "zh_cangjie":
@@ -1954,7 +1990,11 @@ def wb_lookup_fixtures(rng: random.Random) -> tuple[list[dict[str, Any]], dict[s
 
     goldens = {
         "zh_daqian": [["su3"], ["cj0", "u/6", "ru8"], ["-"]],
+        # docs/10 §4.3 and §8.4: ETen types Dàqiān's readings on other keys
+        "zh_eten": [["ne3"], ["ne3", "hz3"], ["=2", ";3"], ["7"], ["su3"], ["1"]],
         "zh_pinyin": [["ni3"], ["huan1", "ying2", "jia1"], ["su3"]],
+        # docs/10 §4.4: the goldens and the pun (hou2, si1, nei5 on Pinyin)
+        "zh_jyutping": [["nei5", "hou2"], ["si1"], ["hou2"], ["jyu4"], ["ni3"], ["gwong2", "dung1", "waa6"]],
         "zh_cangjie": [["tgno"], ["ykhaf"], ["tgno", "yhvl", "jmso"]],
         "zh_quick": [["of"], ["to", "yl", "jo"], ["ab", "mk"]],
         "ko_dubeolsik": [["gks"], ["rnr"], ["z"], ["ghks", "dud", "rk"]],
@@ -2059,6 +2099,10 @@ def wb_type_texts(rng: random.Random, corpora: dict[str, list[str]]) -> dict[str
         if layout.startswith("zh_") or layout == "ko_dubeolsik":
             own += some(zh, 10) + [long_zh]
             own += ["".join(rng.choice(phrases) for _ in range(rng.randint(2, 5))) for _ in range(3)]
+        if layout in ("zh_eten", "zh_jyutping"):
+            # docs/10 §4.3-§4.4's goldens, and characters with no Jyutping reading
+            own += ["你好", "植物學", "無所不能", "明天見", "中國", "兒子", "香港", "銀行", "廣東話", "中文", "倉頡",
+                    "我愛你", "歡迎家", "詩", "ㄅㄆㄇ 〇 𢔶"]
         if layout == "ko_dubeolsik":
             own += some(corpora["vectors_ko"], 8) + some(corpora["vectors_ko_hanja"], 4)
         if layout == "ru_jcuken":
@@ -2123,6 +2167,19 @@ def workbench_fixtures(out: Out, corpora: dict[str, list[str]]) -> None:
     assert "  violated rule: key '5' at position 4 cannot follow 'vie5' (VNI: a digit must follow the letter it " \
         "marks)" in one("vi_vni", ["vie55"])
     assert typed[("vi_telex", "tôi có gì")] == "(vi, vi_telex)\ntôi tooi -\ncó cos -\ngì gif -"
+    # docs/10 §4.3-§4.4 and §8.2: ETen reads as Dàqiān does, Jyutping as the syllable
+    assert one("zh_eten", ["ne3"]).startswith("ne3 · (zh, zh_eten) · well-formed: yes\n  reading: ㄋㄧˇ / ni3\n"
+                                              "  candidates: 32\n  0:你 ")
+    assert one("zh_eten", ["7"]).startswith("7 · (zh, zh_eten) · well-formed: yes\n  reading: ㄑ / ")
+    assert one("zh_jyutping", ["nei5", "hou2"]).startswith("nei5 · (zh, zh_jyutping) · well-formed: yes\n"
+                                                         "  reading: nei5\n  candidates: 14\n  0:你 ")
+    assert "\n  candidates: 2\n  0:好 1:" in one("zh_jyutping", ["hou2"])
+    assert "\n  candidates: 113\n" in one("zh_jyutping", ["jyu4"])
+    assert "\n  candidates: 68\n" in one("zh_jyutping", ["si1"]) and "7:詩" in one("zh_jyutping", ["si1"])
+    assert typed[("zh_eten", "你好")] == "(zh, zh_eten)\n你 ne3 0/32\n好 hz3 0/4"
+    assert typed[("zh_jyutping", "你好")] == "(zh, zh_jyutping)\n你 nei5 0/14\n好 hou2 0/2"
+    assert typed[("zh_jyutping", "銀行")] == "(zh, zh_jyutping)\n銀 ngan4 0/{}\n行 hang4 0/{}".format(
+        len(zh_jyutping().candidates_by_reading["ngan4"]), len(zh_jyutping().candidates_by_reading["hang4"]))
     assert typed[("vi_vni", "tôi có gì")] == "(vi, vi_vni)\ntôi to6i -\ncó co1 -\ngì gi2 -"
 
     # coverage: every template of every surface, and each quote class, in a
@@ -2471,6 +2528,7 @@ def build(root: Path) -> Out:
     corpora = load_corpora()
     build_fixtures(out, vocab, rows, corpora, shipped)
     workbench_fixtures(out, corpora)
+    legends_fixture(out)
     digests(out, vocab, rows)
     vi_chunk_fixture(out)
     unicode_fixture(out)

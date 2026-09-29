@@ -7,7 +7,9 @@ unicode-range, so a browser downloads a file only when some glyph on the
 page has no system font.  The subsets cover the curated content only:
 
   glyphs-tc.woff2  Bopomofo U+3100-312F, the tone marks U+02C7 U+02CA U+02CB
-                   U+02D9, hiragana U+3041-3096, and every Han character in
+                   U+02D9, hiragana U+3041-3096, the voicing marks U+309B
+                   U+309C (the JIS kana keyboard's [ and ] keys, which the
+                   page reads from the kana table), and every Han character in
                    index.html, assets/js/ui/text.js, data/hero.json (with
                    its candidate lists), data/layouts.json (the keyboard
                    pictures' legends) and the Python traces of the site's
@@ -57,7 +59,7 @@ SOURCES = {
 }
 FAMILY = "KeyPath Glyphs"
 TC_FIXED = (list(range(0x3100, 0x3130)) + [0x02C7, 0x02CA, 0x02CB, 0x02D9]
-            + list(range(0x3041, 0x3097)))
+            + list(range(0x3041, 0x3097)) + [0x309B, 0x309C])
 KR_FIXED = list(range(0x3131, 0x318F))
 LIMITS = {"glyphs-tc.woff2": 70 * 1024, "glyphs-kr.woff2": 70 * 1024}
 

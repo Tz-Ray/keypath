@@ -51,11 +51,19 @@ export function createWorkbench({ registry, layouts, native, siteId, firstNewer 
       if (!alphabet.includes(ch)) fail(`unit ${R(chunk)} contains ${R(ch)}, which is outside the ${layout} alphabet`);
     }
     const sid = siteId(language, layout);
-    if (sid === "zh_daqian" || sid === "zh_pinyin") {
-      const reading = sid === "zh_daqian" ? layouts.daqianReading(chunk) : layouts.pinyinReading(chunk);
+    if (sid === "zh_daqian" || sid === "zh_eten" || sid === "zh_pinyin") {
+      const reading = sid === "zh_daqian" ? layouts.daqianReading(chunk)
+        : sid === "zh_eten" ? layouts.etenReading(chunk) : layouts.pinyinReading(chunk);
       const candidates = native.zhState().lists.get(reading);
       if (!candidates) fail(`unit ${R(chunk)} maps to ${R(reading)}, which is not a syllable in the reading table`);
       return { reading, romanized: layouts.numberedPinyin(reading), candidates, identity: false };
+    }
+    if (sid === "zh_jyutping") {
+      // docs/10 §4.4: the unit is the reading as written; the table decides whether it is one
+      const reading = layouts.jyutpingReading(chunk);
+      const candidates = native.jyutpingState().lists.get(reading);
+      if (!candidates) fail(`unit ${R(chunk)} is not a Jyutping reading on layout ${layout}: no character of zh_jyutping.tsv reads ${R(reading)}`);
+      return { reading, romanized: null, candidates, identity: false };
     }
     if (sid === "zh_cangjie" || sid === "zh_quick") {
       const code = layouts.shapeCode(chunk, layout);
@@ -77,7 +85,8 @@ export function createWorkbench({ registry, layouts, native, siteId, firstNewer 
   function prepare(surfaces, chunks) {
     return Promise.all(surfaces.map(([language, layout]) => {
       const sid = siteId(language, layout);
-      if (sid === "zh_daqian" || sid === "zh_pinyin") return native.loadZhCore();
+      if (sid === "zh_daqian" || sid === "zh_eten" || sid === "zh_pinyin") return native.loadZhCore();
+      if (sid === "zh_jyutping") return native.loadJyutping();
       if (sid === "zh_quick") return native.loadQuick();
       if (sid === "zh_cangjie") return native.loadCangjieShards(chunks.map(c => c[0]).filter(Boolean));
       if (sid === "zh_hanja") return native.loadHanjaCore();

@@ -6,16 +6,20 @@
 // so the script never measures anything.
 import { h, reducedMotion, cps } from "./dom.js";
 import { T, LANG_TAGS, SURFACE_BADGE } from "./text.js";
+import { US_SHIFT } from "./keyboard.js";
 
 const US_PUNCT = /[^a-zA-Z]/;
 const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
+const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 const UNIT_LIMIT = 60;
 /** Layouts whose units are shape codes: their band under the characters shows radicals. */
 export const SHAPE_LAYOUTS = new Set(["zh_cangjie", "zh_quick"]);
 /** Vietnamese layouts: a letter's keys are its base, then a modifier key, then a tone key (docs/10 §6.3). */
 export const VI_LAYOUTS = new Set(["vi_telex", "vi_vni"]);
 /** The lang tag of a key's legend on each layout. */
-const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", es_accent: "es", vi_telex: "vi", vi_vni: "vi" };
+const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", es_accent: "es", vi_telex: "vi", vi_vni: "vi", ja_kana: "ja" };
+/** Characters typed with Shift (capitals, shifted punctuation), from the one US shift map (docs/10 §9.7). */
+const SHIFTED = new Set(Object.values(US_SHIFT));
 const FAN_MAX = 10;
 
 // ------------------------------------------------------------ legends
@@ -23,15 +27,48 @@ const FAN_MAX = 10;
 /** Per-layout key -> legend maps, built once from data/layouts.json. */
 export function makeLegends(layouts) {
   const L = layouts.data;
-  const dq = new Map();
-  for (const [sym, key] of Object.entries(L.zh_daqian.symbolToKey)) dq.set(key, sym);
-  for (const [tone, key] of Object.entries(L.zh_daqian.toneToKey)) dq.set(key, tone);
+  // Dàqiān and ETen: each key's bopomofo symbol or tone mark
+  const bopomofo = table => new Map([...Object.entries(table.symbolToKey), ...Object.entries(table.toneToKey)].map(([sym, key]) => [key, sym]));
+  const dq = bopomofo(L.zh_daqian), et = bopomofo(L.zh_eten);
   const ko = new Map();
   for (const [jamo, keys] of Object.entries(L.ko_dubeolsik.keysByJamo)) if (keys.length === 1) ko.set(keys, jamo);
   const ru = new Map(Object.entries(L.ru_jcuken.keysByLetter).map(([l, k]) => [k, l]));
   const es = new Map(L.es_accent.rows.map(([b, d, v]) => [b + d, v]));
   // Cangjie and Quick keys: each letter's radical (X 難 is the difficult-character key)
   const shape = new Map(Object.entries(L.zh_cangjie.radicals));
+  // JIS kana: each key's kana (the shift layer included); [ and ] show the voicing marks
+  const kanaLegend = layouts.kanaLegend();
+  const kana = new Map([...kanaLegend.oneKey, ...kanaLegend.marks]);
+  const pinyinTones = new Map(L.zh_pinyin.toneDigits.map(([, digit]) => [digit, PINYIN_TONE[digit]]));
+  const jyutpingKeys = new Set([...LETTERS, ...L.zh_jyutping.toneDigits]);
+  // the tone keys of each layout that has them, from its table
+  const toneKeys = {
+    zh_daqian: new Set(Object.values(L.zh_daqian.toneToKey)),
+    zh_eten: new Set(Object.values(L.zh_eten.toneToKey)),
+    zh_pinyin: new Set(pinyinTones.keys()),
+    zh_jyutping: new Set(L.zh_jyutping.toneDigits),
+  };
+
+  /**
+   * What the character `ch` (a key, or a key with Shift) alone means on
+   * `layout`, as the keyboard picture labels it (docs/10 §8.4's legends: the
+   * tables' own maps; Pinyin's tone digits show their marks), or "".
+   */
+  function keyLegend(layout, ch) {
+    switch (layout) {
+      case "zh_daqian": return dq.get(ch) || "";
+      case "zh_eten": return et.get(ch) || "";
+      case "zh_pinyin": return pinyinTones.get(ch) || (ch.length === 1 && ch >= "a" && ch <= "z" ? ch : "");
+      case "zh_jyutping": return jyutpingKeys.has(ch) ? ch : "";
+      case "zh_cangjie": case "zh_quick": return shape.get(ch) || "";
+      case "ko_dubeolsik": return ko.get(ch) || "";
+      case "ru_jcuken": return ru.get(ch) || "";
+      case "ja_kana": return kana.get(ch) || "";
+      default: return "";
+    }
+  }
+  /** Whether `ch` is a tone key on `layout`. */
+  const isTone = (layout, ch) => !!toneKeys[layout] && toneKeys[layout].has(ch);
 
   /** keys (string) on a layout -> [{key, legend, mis, shift}] */
   function legends(layout, keys) {
@@ -39,12 +76,14 @@ export function makeLegends(layouts) {
     const ks = cps(keys);
     return ks.map((key, i) => {
       let legend = "", mis = false, shift = false;
-      if (layout === "zh_daqian") { legend = dq.get(key) || ""; mis = US_PUNCT.test(key); }
+      if (layout === "zh_daqian" || layout === "zh_eten") { legend = keyLegend(layout, key); mis = US_PUNCT.test(key); }
       else if (layout === "zh_pinyin") legend = PINYIN_TONE[key] || "";
-      else if (layout === "ko_dubeolsik") { legend = ko.get(key) || ""; shift = key >= "A" && key <= "Z"; }
+      else if (layout === "ko_dubeolsik") { legend = ko.get(key) || ""; shift = SHIFTED.has(key); }
       else if (layout === "ru_jcuken") { legend = ru.get(key) || ""; mis = US_PUNCT.test(key); }
       else if (layout === "es_accent" && key >= "0" && key <= "9" && i > 0) legend = es.get(ks[i - 1] + key) || "";
       else if (SHAPE_LAYOUTS.has(layout)) legend = shape.get(key) || "";
+      // a digit or punctuation key that types a kana (or a voicing mark) is misdirection
+      else if (layout === "ja_kana") { legend = kana.get(key) || ""; mis = US_PUNCT.test(key); shift = SHIFTED.has(key); }
       return { key, legend, mis, shift };
     });
   }
@@ -58,7 +97,7 @@ export function makeLegends(layouts) {
     try { letters = layouts.viLetters(layout, keys); } catch { return cps(keys).map(key => ({ key, legend: "", mis: false, shift: false })); }
     return letters.flatMap(l => l.keys.map(k => ({ key: k.key, legend: k.shows, mis: k.role !== "letter" && k.key >= "0" && k.key <= "9", shift: false })));
   }
-  return { legends, dq, ko, ru, es, shape, layouts };
+  return { legends, keyLegend, isTone, dq, et, ko, ru, es, shape, kana, layouts };
 }
 
 // ------------------------------------------------------------ model
@@ -164,7 +203,7 @@ function fan(n) {
 function rankText(u) {
   const { unit, seg } = u;
   if (unit.selected !== null && unit.selected !== undefined) return T.pickedByDigit(unit.selected);
-  if (seg.layout === "ja_romaji" && unit.index === null) return T.kanaAsTyped;
+  if (seg.language === "ja" && unit.index === null) return T.kanaAsTyped;
   if (unit.count === 1) return T.onlyOne;
   return T.rank(unit.index, unit.count);
 }
@@ -302,7 +341,7 @@ export function renderWalk(host, trace, ctx) {
       const pinyin = seg.language === "zh" && seg.layout !== "ko_dubeolsik" && !shape ? ctx.layouts.numberedPinyin(unit.reading) : null;
       const ghosts = unit.head.filter(c => c !== unit.out).slice(0, 3);
       const rank = rankText(u);
-      const soundTag = seg.layout === "ko_dubeolsik" ? "ko" : seg.language === "ja" ? "ja" : "zh-Hant";
+      const soundTag = seg.layout === "ko_dubeolsik" ? "ko" : seg.language === "ja" ? "ja" : seg.layout === "zh_jyutping" ? "en" : "zh-Hant";
       // a shape code reads as its radicals, with the code beneath
       const radicals = shape ? ctx.layouts.radicalsOf(unit.reading) : null;
       const reads = shape ? `shape ${radicals} ${unit.reading}` : `sound ${unit.reading}${pinyin ? ` ${pinyin}` : ""}`;
@@ -531,7 +570,8 @@ export function renderTable(host, trace, ctx) {
       tr.append(
         h("td", u.kind === "homophone" ? [h("span", { lang: tag }, u.unit.out), " ", rankText(u)] : h("span", { lang: tag }, u.unit.out)),
         h("td", shape ? [h("span", { lang: "zh-Hant" }, ctx.layouts.radicalsOf(u.unit.reading)), " ", h("span", { lang: "en", translate: "no" }, u.unit.reading)]
-          : u.kind === "homophone" ? [h("span", { lang: u.seg.layout === "ko_dubeolsik" ? "ko" : tag }, u.unit.reading), pinyin ? ` ${pinyin}` : ""] : "—"),
+          : u.kind === "homophone" ? [h("span", { lang: u.seg.layout === "ko_dubeolsik" ? "ko" : u.seg.layout === "zh_jyutping" ? "en" : tag }, u.unit.reading),
+            pinyin ? ` ${pinyin}` : ""] : "—"),
         h("td.mono", { lang: "en", translate: "no" }, u.unit.keys));
       tbody.append(tr);
     });

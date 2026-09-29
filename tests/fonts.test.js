@@ -58,6 +58,18 @@ test("the fonts cover every CJK character the page's own text shows", () => {
       if (cjk.test(ch)) assert.ok(covers(all, ch.codePointAt(0)), `${f}: ${ch}`);
 });
 
+test("the fonts cover every legend the keyboard pictures draw", async () => {
+  const { GRID_LAYOUTS } = await import("../assets/js/ui/keyboard.js");
+  const all = [...parse(ranges["glyphs-tc.woff2"]), ...parse(ranges["glyphs-kr.woff2"])];
+  const legends = readJson("tests/fixtures/legends.json").layouts;
+  const cjk = /[ˇˊˋ˙ぁ-ゖ゛゜ㄅ-ㄯㄱ-ㆎ㐀-䶿一-鿿]/u;
+  let n = 0;
+  for (const layout of GRID_LAYOUTS)
+    for (const legend of Object.values(legends[layout]))
+      for (const ch of legend) if (cjk.test(ch)) { n++; assert.ok(covers(all, ch.codePointAt(0)), `${layout}: ${ch}`); }
+  assert.ok(n > 200, n);
+});
+
 test("site.css gives each font exactly the unicode-range of its subset", () => {
   const css = readFileSync(join(ROOT, "assets/css/site.css"), "utf8");
   const faces = [...css.matchAll(/@font-face \{([\s\S]*?)\}/g)].map(m => m[1]);
