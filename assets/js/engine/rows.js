@@ -13,11 +13,16 @@
 // list of each target and, for ja_romaji, the SKK candidates it names.
 //
 // A derived surface (registry.derivedRows, docs/10 §9.7) ships no row files:
-// its rows are computed from its base surface's.  Quick rows are the Cangjie
-// rows with each unit's code recoded to its Quick code (the code up to 2
-// letters, else its first and last) and the index the character's place in
-// that Quick list; tools/build_data.py asserts that this gives Python's own
-// row for every vocabulary word.
+// its rows are computed from its base surface's.
+//   - ETen rows are the Dàqiān rows with each key remapped to the ETen key
+//     of the same bopomofo symbol (lens and indices equal);
+//   - Quick rows are the Cangjie rows with each unit's code recoded to its
+//     Quick code (the code up to 2 letters, else its first and last) and the
+//     index the character's place in that Quick list;
+//   - JIS kana rows are the romaji rows with each unit's kana (read back
+//     from its romaji) typed on the kana keys (index, count and head equal).
+// tools/build_data.py asserts that this gives Python's own row for every
+// vocabulary word, and that the same words have rows.
 import { assembleWords, regexTokens, tokensToItems } from "./assemble.js";
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
@@ -46,6 +51,9 @@ export function createEnglish({ data, layouts, lists, surfaceById, derivedRows =
     vocab.set(letter, new Set(words));
   }));
 
+  /** A ja row's reading: its keys read back as kana on its own keyboard. */
+  const kanaOfKeys = (sid, keys) => (sid === "ja_kana" ? layouts.keysToKana(keys) : layouts.romajiToKana(keys));
+
   function register(sid, table) {
     const { language } = surfaceById(sid);
     const edge = `translate:en>${language}`;
@@ -53,7 +61,7 @@ export function createEnglish({ data, layouts, lists, surfaceById, derivedRows =
       const [target, hopIndex, hopCount, keys] = row;
       lists.addEntry(edge, target, hopCount, hopIndex, word);
       if (language === "ja") {
-        const reading = layouts.romajiToKana(keys);
+        const reading = kanaOfKeys(sid, keys);
         const [, , , , , idx, count, head] = row;
         lists.addEntry("homophone:ja", reading, count, idx[0], target);
         head.forEach((item, i) => lists.addEntry("homophone:ja", reading, count, i, item));
@@ -81,7 +89,24 @@ export function createEnglish({ data, layouts, lists, surfaceById, derivedRows =
     });
     return [target, hopIndex, hopCount, qkeys.join(""), qlens, qidx];
   }
-  const DERIVE = { zh_quick: { load: () => native.loadQuick(), row: quickRow } };
+  /** ETen's row from Dàqiān's: the keys remapped symbol by symbol. */
+  const etenRow = row => [row[0], row[1], row[2], layouts.etenFromDaqian(row[3]), ...row.slice(4)];
+  /** JIS kana's row from romaji's: each unit's kana retyped on the kana keys. */
+  function kanaRow(row) {
+    const [target, hopIndex, hopCount, keys, lens, ...rest] = row;
+    const units = [];
+    let pos = 0;
+    for (const n of lens) {
+      units.push(layouts.kanaToKeys(layouts.romajiToKana(keys.slice(pos, pos + n))));
+      pos += n;
+    }
+    return [target, hopIndex, hopCount, units.join(""), units.map(u => u.length), ...rest];
+  }
+  const DERIVE = {
+    zh_eten: { load: () => null, row: etenRow },
+    zh_quick: { load: () => native.loadQuick(), row: quickRow },
+    ja_kana: { load: () => null, row: kanaRow },
+  };
   const isDerived = sid => Object.prototype.hasOwnProperty.call(derivedRows, sid);
 
   const loadRows = (sid, letter) => once(`r/${sid}/${letter}`, () => {

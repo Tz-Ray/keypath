@@ -4,10 +4,8 @@
 import { renderWalk, renderTable } from "./walk.js";
 import { openCandidates, openSense, whatIfBanner } from "./popover.js";
 
-const SHAPE_EDGES = { zh_cangjie: "shape:zh_cangjie", zh_quick: "shape:zh_quick" };
-const EDGE = seg => (seg.language !== "zh" ? "homophone:ja"
-  : seg.layout === "ko_dubeolsik" ? "homophone:ko_hanja"
-  : Object.prototype.hasOwnProperty.call(SHAPE_EDGES, seg.layout) ? SHAPE_EDGES[seg.layout] : "homophone:zh");
+/** A segment's candidate layer: the first step of its surface's route tail (homophone:zh, shape:zh_cangjie, …). */
+const EDGE = (registry, seg) => registry.surfaces[seg.language][seg.layout].routeTail[0];
 
 /**
  * mountFigure(host, trace, {engine, legends, animate, prevKeys, message, surfaceName,
@@ -25,7 +23,7 @@ export function mountFigure(host, trace, opts) {
   };
 
   async function listFor(u) {
-    const edge = EDGE(u.seg);
+    const edge = EDGE(opts.registry, u.seg);
     if (opts.heroLists && edge === "homophone:zh" && opts.heroLists[u.unit.reading]) {
       const items = Array.from(opts.heroLists[u.unit.reading]);
       return { count: items.length, items, complete: true };
@@ -55,7 +53,8 @@ export function mountFigure(host, trace, opts) {
         async onPick(index, char) {
           if (index === u.unit.index) { clearWhatIf(); return; }
           const e = await engine();
-          if (EDGE(u.seg) !== "homophone:ja") await e.list(EDGE(u.seg), u.unit.reading);
+          const edge = EDGE(opts.registry, u.seg);
+          if (edge !== "homophone:ja") await e.list(edge, u.unit.reading);
           let parts;
           try { parts = e.whatIfParts(trace, u.path, index); } catch { return; }
           whatIf = { path: u.path, index };

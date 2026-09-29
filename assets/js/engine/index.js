@@ -1,5 +1,5 @@
 // The in-browser KeyPath engine: encodes the site's live routes exactly like
-// keypath 2.3.0 and decodes keys, returning the Trace the page draws.
+// keypath 2.4.0 and decodes keys, returning the Trace the page draws.
 //
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })
@@ -107,6 +107,7 @@ export async function createEngine({ fetchText } = {}) {
       needs.zh ? native.loadZhCore() : null,
       needs.hanja ? native.loadHanjaCore() : null,
       needs.quick ? native.loadQuick() : null,
+      needs.jyutping ? native.loadJyutping() : null,
       native.loadCangjieShards([...needs.cangjie]),
       ...(withRows ? [...needs.rows].map(sid => english.loadAllRows(sid)) : []),
       needs.challenges ? loadChallengeLists() : null,
@@ -230,6 +231,7 @@ export async function createEngine({ fetchText } = {}) {
     if (edge === "homophone:zh") await native.loadZhCore();
     if (edge === "homophone:ko_hanja") await native.loadHanjaCore();
     if (edge === "shape:zh_quick") await native.loadQuick();
+    if (edge === "homophone:zh_jyutping") await native.loadJyutping();
     if (edge === "shape:zh_cangjie" && typeof value === "string" && value) await native.loadCangjieShards([value[0]]);
     const d = lists.describe(edge, value);
     return d || { count: 0, items: [], complete: false };

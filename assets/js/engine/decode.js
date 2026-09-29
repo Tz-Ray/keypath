@@ -2,8 +2,9 @@
 // (the walk the page draws).  Adapted from cipher-project
 // scripts/build_demo.py (v2.0), MIT: decodeUnits / decodeKeypath and the
 // layout readers, extended with ja_romaji (keyed and inline selectors),
-// en_identity, the Cangjie and Quick shape codes and the Vietnamese
-// syllables (Telex, VNI; docs/10 §6.5), and reading every
+// en_identity, the Cangjie and Quick shape codes, the Vietnamese
+// syllables (Telex, VNI; docs/10 §6.5), ETen, Jyutping and JIS kana
+// (docs/10 §4.3-§5), and reading every
 // candidate list through the list store so the page refuses, never
 // misreads, when it lacks a list.
 import { cpLength } from "./unicode.js";
@@ -39,8 +40,19 @@ function makeUnitReader({ layouts, lists }) {
   const bijective = out => ({ reading: out, count: 1, head: [out], index: null, selected: null, out });
   const unitIndex = unit => (has(unit, "homophone_index") ? unit.homophone_index : undefined);
 
+  /** A ja unit with no index is its own kana (Python still reports that kana's SKK candidates when it has some). */
+  const kanaIdentity = kana => {
+    const d = lists.describe("homophone:ja", kana);
+    return d ? { reading: kana, count: d.count, head: d.items.slice(0, Math.min(d.count, 4)), index: null, selected: null, out: kana }
+      : { reading: kana, count: 1, head: [kana], index: null, selected: null, out: kana };
+  };
   const readers = {
     "zh/zh_daqian": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.daqianReading(chunk)), unitIndex(unit)),
+    // Dàqiān's readings and candidate lists, on the ETen keys
+    "zh/zh_eten": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.etenReading(chunk)), unitIndex(unit)),
+    // a Jyutping unit is its reading as written; a well-shaped chunk that is
+    // no reading of the table is malformed (the lists are complete)
+    "zh/zh_jyutping": (chunk, unit) => homophone("homophone:zh_jyutping", guard(chunk, () => layouts.jyutpingReading(chunk)), unitIndex(unit)),
     "zh/zh_pinyin": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.pinyinReading(chunk)), unitIndex(unit)),
     "zh/ko_dubeolsik": (chunk, unit) => homophone("homophone:ko_hanja", guard(chunk, () => layouts.koUnit(chunk)), unitIndex(unit)),
     // a shape unit's reading is its code; a well-shaped chunk that is no code
@@ -70,15 +82,16 @@ function makeUnitReader({ layouts, lists }) {
         index = has(unit, "homophone_index") ? unit.homophone_index : null;
       }
       const kana = guard(chunk, () => layouts.romajiToKana(romaji));
-      if (index === null) {
-        // a kana-identity unit: its own reading (Python still reports the
-        // SKK candidates of that reading when it has some)
-        const d = lists.describe("homophone:ja", kana);
-        return d ? { reading: kana, count: d.count, head: d.items.slice(0, Math.min(d.count, 4)), index: null, selected: null, out: kana }
-          : { reading: kana, count: 1, head: [kana], index: null, selected: null, out: kana };
-      }
+      if (index === null) return kanaIdentity(kana);
       const u = homophone("homophone:ja", kana, index, "candidate index");
       return mode === "inline" ? { ...u, index: null, selected } : u;
+    },
+    // keyed only (the key check refuses inline): a trailing digit is a kana
+    // key, never a selector
+    "ja/ja_kana": (chunk, unit) => {
+      const kana = guard(chunk, () => layouts.keysToKana(chunk));
+      const index = has(unit, "homophone_index") ? unit.homophone_index : null;
+      return index === null ? kanaIdentity(kana) : homophone("homophone:ja", kana, index, "candidate index");
     },
   };
   return (seg, chunk, unit) => {
@@ -165,16 +178,17 @@ export function walkKey(ctx, cipher, key) {
 
 /**
  * What a key needs loaded before walking over `cipher`: {zh, hanja, quick,
- * cangjie: first letters of its Cangjie units, rows: [sid], challenges}.
+ * jyutping, cangjie: first letters of its Cangjie units, rows: [sid], challenges}.
  */
 export function keyNeeds(key, cipher, { siteId, liveEnglishTargets }) {
-  const needs = { zh: false, hanja: false, quick: false, cangjie: new Set(), rows: new Set(), challenges: false };
+  const needs = { zh: false, hanja: false, quick: false, jyutping: false, cangjie: new Set(), rows: new Set(), challenges: false };
   let pos = 0;
   for (const seg of key.segments) {
     const [hops, tail] = splitRoute(seg.route);
     if (tail[0] === "homophone:zh") needs.zh = true;
     if (tail[0] === "homophone:ko_hanja") needs.hanja = true;
     if (tail[0] === "shape:zh_quick") needs.quick = true;
+    if (tail[0] === "homophone:zh_jyutping") needs.jyutping = true;
     for (const word of seg.words)
       for (const unit of has(word, "units") && Array.isArray(word.units) ? word.units : []) {
         if (tail[0] === "shape:zh_cangjie" && pos < cipher.length) needs.cangjie.add(cipher[pos]);

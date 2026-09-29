@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.3 (tag `v2.3`). The scripts, tests and design documents
+> From KeyPath 2.4 (tag `v2.4`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -99,7 +99,10 @@ rewrites the blocks. With no flag the script prints them.
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, ko_dubeolsik) | 86 | 177 |
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_cangjie) | 86 | 177 |
 | zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_quick) | 86 | 177 |
+| zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_eten) | 86 | 177 |
+| zh round-trip | `test_walk_roundtrip_zh: corpus() + OOV_CASES` | zh on (zh, zh_jyutping) | 86 | 177 |
 | ja round-trip | `test_walk_roundtrip_ja_es: JA_CORPUS` | ja on (ja, ja_romaji) | 11 | 49 |
+| ja round-trip | `test_walk_roundtrip_ja_es: JA_CORPUS` | ja on (ja, ja_kana) | 11 | 49 |
 | es round-trip | `test_walk_roundtrip_ja_es: ES_CORPUS` | es on (es, es_accent) | 9 | 111 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en on (en, en_identity) | 25 | 483 |
 | ko vectors | `test_ko: GOLDEN plaintexts` | ko on (ko, ko_dubeolsik) | 4 | 14 |
@@ -122,7 +125,11 @@ each variant, and ЙЦУКЕН puts each Russian letter on its own key. On Korea
 jamo has its own key sequence. Such a layout is a bijection. Its keys
 carry no index, and its unit space (every word) is infinite, so it is
 checked rather than enumerated. Every symbol its units spell is
-encoded by the surface and parsed back to exactly one candidate:
+encoded by the surface and parsed back to exactly one candidate. A
+domain too large to check quickly is checked on a fixed seeded sample
+instead, and its row says so (the sampling rule of
+`docs/10-v3-spec.md` §10, in force since M16; twin layouts share the
+sample):
 
 <!-- BEGIN GENERATED: bijective -->
 |  | symbols checked | symbols | distinct keystrokes | largest candidate set |
@@ -131,16 +138,18 @@ encoded by the surface and parsed back to exactly one candidate:
 | (en, en_identity) | a-z | 26 | 26 | 1 |
 | (ko, ko_dubeolsik) | syllables and jamo | 11,223 | 11,223 | 1 |
 | (ru, ru_jcuken) | ru_jcuken.tsv letters | 33 | 33 | 1 |
-| (vi, vi_telex) | G, the syllables of vi_syllables.tsv | 111,003 | 111,003 | 1 |
-| (vi, vi_vni) | G, the syllables of vi_syllables.tsv | 111,003 | 111,003 | 1 |
+| (vi, vi_telex) | G, the syllables of vi_syllables.tsv, sample of 20,000 of 111,003 | 20,000 | 20,000 | 1 |
+| (vi, vi_vni) | G, the syllables of vi_syllables.tsv, sample of 20,000 of 111,003 | 20,000 | 20,000 | 1 |
 <!-- END GENERATED: bijective -->
 
 The other surfaces are homophone layers, or shape layers: Cangjie and
 Quick list the characters that share a code the way a homophone layer
 lists those that share a reading. For each one, every reading or code
 its table lists is typed on its layout and parsed back by the surface,
-and the size of the candidate set is recorded. The Japanese
-row counts SKK candidates; a keyed Japanese unit's key chooses from one
+and the size of the candidate set is recorded; the Japanese readings
+are measured on the sampling rule's sample, which their rows name, and
+both Japanese keyboards type the same sample. The Japanese
+rows count SKK candidates; a keyed Japanese unit's key chooses from one
 more, the kana itself (see Definitions):
 
 <!-- BEGIN GENERATED: candidate-sets -->
@@ -148,10 +157,13 @@ more, the kana itself (see Definitions):
 |---|---|---|---|---|---|---|---|---|---|
 | (zh, zh_daqian) | zh_chars.tsv readings | 1,412 | 11.1% | 1 | 11 | 18.48 | 45 | 106 | 215 |
 | (zh, zh_pinyin) | zh_chars.tsv readings | 1,412 | 11.1% | 1 | 11 | 18.48 | 45 | 106 | 215 |
-| (ja, ja_romaji) | ja_skk.tsv readings | 130,697 | 84.3% | 1 | 1 | 1.38 | 2 | 7 | 239 |
+| (ja, ja_romaji) | ja_skk.tsv readings, sample of 20,000 of 130,697 | 20,000 | 84.2% | 1 | 1 | 1.37 | 2 | 7 | 239 |
 | (zh, ko_dubeolsik) | ko_hanja.tsv syllables | 555 | 10.3% | 1 | 33 | 51.30 | 123 | 282 | 352 |
 | (zh, zh_cangjie) | zh_cangjie.tsv codes | 17,758 | 95.3% | 1 | 1 | 1.05 | 1 | 2 | 6 |
 | (zh, zh_quick) | Quick codes of zh_cangjie.tsv | 646 | 3.9% | 1 | 26 | 28.93 | 55 | 81 | 105 |
+| (zh, zh_eten) | zh_chars.tsv readings | 1,412 | 11.1% | 1 | 11 | 18.48 | 45 | 106 | 215 |
+| (zh, zh_jyutping) | zh_jyutping.tsv readings | 1,716 | 13.4% | 1 | 7 | 10.71 | 24 | 56 | 113 |
+| (ja, ja_kana) | ja_skk.tsv readings, sample of 20,000 of 130,697 | 20,000 | 84.2% | 1 | 1 | 1.37 | 2 | 7 | 239 |
 <!-- END GENERATED: candidate-sets -->
 
 <!-- BEGIN GENERATED: candidate-histogram -->
@@ -159,10 +171,13 @@ more, the kana itself (see Definitions):
 |---|---|---|---|---|---|---|
 | (zh, zh_daqian) | 157 | 231 | 257 | 517 | 233 | 17 |
 | (zh, zh_pinyin) | 157 | 231 | 257 | 517 | 233 | 17 |
-| (ja, ja_romaji) | 110,208 | 17,685 | 2,116 | 604 | 74 | 10 |
+| (ja, ja_romaji) | 16,836 | 2,730 | 335 | 90 | 8 | 1 |
 | (zh, ko_dubeolsik) | 57 | 34 | 49 | 130 | 194 | 91 |
 | (zh, zh_cangjie) | 16,919 | 837 | 2 | 0 | 0 | 0 |
 | (zh, zh_quick) | 25 | 24 | 48 | 290 | 258 | 1 |
+| (zh, zh_eten) | 157 | 231 | 257 | 517 | 233 | 17 |
+| (zh, zh_jyutping) | 230 | 397 | 405 | 592 | 91 | 1 |
+| (ja, ja_kana) | 16,836 | 2,730 | 335 | 90 | 8 | 1 |
 <!-- END GENERATED: candidate-histogram -->
 
 What the tables say:
@@ -185,15 +200,15 @@ What the tables say:
   readings are the ones everyday words use.
 
 <!-- BEGIN GENERATED: ja-by-length -->
-| reading length (kana) | readings | size 1 | median | mean | p90 | max |
+| reading length (kana) | readings, sample of 20,000 of 130,697 | size 1 | median | mean | p90 | max |
 |---|---|---|---|---|---|---|
-| 1 | 69 | 4.3% | 17 | 25.99 | 63 | 139 |
-| 2 | 1,934 | 32.3% | 2 | 5.23 | 10 | 239 |
-| 3 | 13,057 | 61.1% | 1 | 2.01 | 4 | 174 |
-| 4 | 28,646 | 70.8% | 1 | 1.59 | 3 | 39 |
-| 5 | 21,672 | 84.2% | 1 | 1.29 | 2 | 28 |
-| 6 | 21,195 | 94.0% | 1 | 1.08 | 1 | 28 |
-| 7+ | 44,124 | 97.8% | 1 | 1.03 | 1 | 40 |
+| 1 | 8 | 0.0% | 23 | 21.75 | 39 | 39 |
+| 2 | 289 | 31.8% | 2 | 5.06 | 9 | 239 |
+| 3 | 2,043 | 61.5% | 1 | 1.97 | 4 | 30 |
+| 4 | 4,369 | 71.1% | 1 | 1.60 | 3 | 37 |
+| 5 | 3,296 | 84.0% | 1 | 1.30 | 2 | 14 |
+| 6 | 3,232 | 93.1% | 1 | 1.09 | 1 | 14 |
+| 7+ | 6,763 | 97.6% | 1 | 1.02 | 1 | 4 |
 <!-- END GENERATED: ja-by-length -->
 
 ## 2. Candidate lists of the translation hops
@@ -271,7 +286,10 @@ and the tables show how far each one does:
 | zh round-trip | zh on (zh, ko_dubeolsik) | (zh, ko_dubeolsik) | 154 | 154 | 41.6% | 41.6% | 4.44 | 94 |
 | zh round-trip | zh on (zh, zh_cangjie) | (zh, zh_cangjie) | 154 | 19 | 100.0% | 100.0% | 0.00 | 0 |
 | zh round-trip | zh on (zh, zh_quick) | (zh, zh_quick) | 154 | 147 | 74.7% | 73.5% | 0.55 | 11 |
+| zh round-trip | zh on (zh, zh_eten) | (zh, zh_eten) | 154 | 154 | 73.4% | 73.4% | 0.64 | 11 |
+| zh round-trip | zh on (zh, zh_jyutping) | (zh, zh_jyutping) | 154 | 151 | 83.1% | 82.8% | 0.24 | 4 |
 | ja round-trip | ja on (ja, ja_romaji) | (ja, ja_romaji) | 15 | 15 | 40.0% | 40.0% | 11.00 | 118 |
+| ja round-trip | ja on (ja, ja_kana) | (ja, ja_kana) | 15 | 15 | 40.0% | 40.0% | 11.00 | 118 |
 | es round-trip | es on (es, es_accent) | (es, es_accent) | 0 | 0 | — | — | — | — |
 | en round-trip | en on (en, en_identity) | (en, en_identity) | 0 | 0 | — | — | — | — |
 | ko vectors | ko on (ko, ko_dubeolsik) | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
@@ -368,7 +386,10 @@ apart from the key size, the unit-boundary bits per character:
 | zh round-trip | zh on (zh, ko_dubeolsik) | 85 | 14.57 | 12.87 | 93.04 | 7.00 | 18.7% | 0.00 |
 | zh round-trip | zh on (zh, zh_cangjie) | 85 | 2.98 | 0 | 80 | 1.43 | 91.6% | 1.83 |
 | zh round-trip | zh on (zh, zh_quick) | 85 | 11.74 | 9.71 | 91.68 | 5.64 | 23.3% | 0.96 |
+| zh round-trip | zh on (zh, zh_eten) | 85 | 11.27 | 9.04 | 87 | 5.41 | 24.2% | 0.83 |
+| zh round-trip | zh on (zh, zh_jyutping) | 85 | 9.54 | 7 | 84.81 | 4.58 | 28.6% | 0.00 |
 | ja round-trip | ja on (ja, ja_romaji) | 10 | 13.66 | 1.95 | 96 | 2.79 | 76.2% | 0.96 |
+| ja round-trip | ja on (ja, ja_kana) | 10 | 13.66 | 1.95 | 96 | 2.79 | 76.2% | 0.96 |
 | es round-trip | es on (es, es_accent) | 8 | 11.00 | 0 | 88 | 0.79 | 100.0% | 0.73 |
 | en round-trip | en on (en, en_identity) | 24 | 6.67 | 0 | 72 | 0.33 | 100.0% | 0.79 |
 | ko vectors | ko on (ko, ko_dubeolsik) | 4 | 0.00 | 0 | 0 | 0.00 | — | 1.04 |

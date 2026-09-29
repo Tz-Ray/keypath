@@ -112,3 +112,36 @@ test("the Vietnamese tables are credited as authored, MIT, and add no copyleft s
   assert.match(row, /authored in KeyPath \(MIT\)/);
   assert.deepEqual(copyleft(entryOf("data/layouts.json")), ["chewing"], "only the Pinyin spellings are LGPL-derived");
 });
+
+// docs/10 §9.2, §9.7 (M16): the Jyutping lists and rows are Unihan
+// kCantonese readings (Unicode License V3, whose text travels in LICENSES/)
+// over libchewing-data's characters; the ETen and JIS kana key tables are
+// authored (MIT) and ship inside data/layouts.json; the ETen and kana rows
+// are derived by the page and ship as no files
+test("ETen, Jyutping and JIS kana are credited, with the Unicode license text for Unihan", () => {
+  const layouts = JSON.parse(readFileSync(join(ROOT, "data/layouts.json"), "utf8"));
+  assert.ok(["zh_eten", "zh_jyutping", "ja_kana"].every(k => k in layouts));
+  const layoutsRow = md.split("\n").find(l => l.startsWith("| `data/layouts.json`"));
+  for (const table of ["zh_eten.tsv", "ja_kana.tsv"]) {
+    assert.ok(layoutsRow.includes(`\`${table}\``), `DATA-LICENSES data/layouts.json row: ${table}`);
+    assert.ok(section("Sources").includes(`\`${table}\``), `DATA-LICENSES KeyPath section: ${table}`);
+  }
+  assert.deepEqual(copyleft(entryOf("data/layouts.json")), ["chewing"], "the key tables add no copyleft source");
+  for (const file of ["data/jyutping.json", "data/en/zh_jyutping/a.json"]) {
+    const e = entryOf(file);
+    assert.ok(e.sources.unihan && e.sources.chewing, `${file}: Unihan and libchewing-data`);
+    const row = tableRows.findIndex(ts => ts.some(t => covers(t, file)));
+    const line = md.split("\n").filter(l => l.startsWith("| `"))[row];
+    assert.match(line, /Unihan `kCantonese`/, file);
+    assert.ok(line.includes("[Unicode License V3](LICENSES/Unicode-3.0.txt)"), `${file}: links LICENSES/Unicode-3.0.txt`);
+    assert.ok(existsSync(join(ROOT, "LICENSES/Unicode-3.0.txt")));
+  }
+  assert.match(section("Sources"), /`kCantonese` lines of `Unihan_Readings\.txt`/);
+  // the derived rows ship as no files, and the rows they derive from say so
+  const reg = JSON.parse(readFileSync(join(ROOT, "data/registry.json"), "utf8"));
+  for (const [sid, base] of Object.entries(reg.derivedRows)) {
+    assert.ok(!files.some(f => f.startsWith(`data/en/${sid}/`)), sid);
+    const line = md.split("\n").find(l => l.startsWith("| ") && l.includes(`\`data/en/${base}/\``));
+    assert.match(line, /the page derives the [\w ]+ rows from these/, base);
+  }
+});

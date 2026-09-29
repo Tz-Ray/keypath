@@ -1,6 +1,6 @@
-// Hop-free encoders, ported from keypath 2.3.0:
-//   zh on Dàqiān / Pinyin  - zh.greedy_segment + make_surface.encode_native + word_units
-//   zh on Cangjie / Quick   - the same segmentation + zh_coded.make_surface's encode_word
+// Hop-free encoders, ported from keypath 2.4.0:
+//   zh on Dàqiān / ETen / Pinyin - zh.greedy_segment + make_surface.encode_native + word_units
+//   zh on Cangjie / Quick / Jyutping - the same segmentation + zh_coded.make_surface's encode_word
 //   zh on Dubeolsik (hanja) - zh_ko_hanja.encode_native / encode_word
 //   ko, ru, es, en          - tokenized_native_encoder over each surface's encode_word
 //   vi on Telex / VNI       - docs/10 §3.2 and §6.5: a word (a maximal run of
@@ -17,6 +17,9 @@
 // Quick lists and data/cangjie/{a..y}.json the Cangjie lists by first
 // letter (a character's Quick code starts with the same letter, which is
 // how a character's Cangjie shard is found).  Both keep the table's order.
+// Jyutping gives each character one reading, typed as written:
+// data/jyutping.json holds its lists, in the table's order.  ETen types
+// Dàqiān's readings on other keys, so its words and indices are Dàqiān's.
 import { assembleWords, regexTokens, tokensToItems } from "./assemble.js";
 import { LayoutError } from "./layouts.js";
 
@@ -28,6 +31,8 @@ export const QUICK = "data/quick.json";
 export const SHAPE_LETTERS = "abcdefghijklmnopqrstuvwxy";
 export const cangjiePath = letter => `data/cangjie/${letter}.json`;
 export const SHAPE_EDGE = { zh_cangjie: "shape:zh_cangjie", zh_quick: "shape:zh_quick" };
+export const JYUTPING = "data/jyutping.json";
+export const JYUTPING_EDGE = "homophone:zh_jyutping";
 
 export function createNative({ data, layouts, lists }) {
   // ------------------------------------------------------------- zh core
@@ -127,9 +132,31 @@ export function createNative({ data, layouts, lists }) {
     await loadCangjieShards(cps.map(ch => q.codeOf.get(ch)).filter(Boolean).map(code => code[0]));
   }
 
-  /** zh_coded encode_word: [units, keys], or null when some character has no code. */
+  // ----------------------------------------------------- Jyutping lists
+  let jyutping = null;    // {lists: Map(reading -> [chars]), codeOf: Map(char -> reading)}
+  let jyutpingLoading = null;
+  function loadJyutping() {
+    if (!jyutpingLoading) {
+      jyutpingLoading = data.json(JYUTPING).then(obj => {
+        const byReading = new Map(), codeOf = new Map();
+        for (const [reading, chars] of Object.entries(obj)) {
+          const arr = Array.from(chars);
+          byReading.set(reading, arr);
+          lists.setFull(JYUTPING_EDGE, reading, arr);
+          for (const ch of arr) codeOf.set(ch, reading);
+        }
+        lists.markComplete(JYUTPING_EDGE);
+        jyutping = { lists: byReading, codeOf };
+        return jyutping;
+      });
+      jyutpingLoading.catch(() => { jyutpingLoading = null; });
+    }
+    return jyutpingLoading;
+  }
+
+  /** zh_coded encode_word: [units, keys], or null when some character has no code (or reading). */
   function shapeWordUnits(word, sid) {
-    const table = sid === "zh_quick" ? quick : cangjie;
+    const table = sid === "zh_quick" ? quick : sid === "zh_jyutping" ? jyutping : cangjie;
     const units = [];
     let keys = "";
     for (const ch of Array.from(word)) {
@@ -224,12 +251,12 @@ export function createNative({ data, layouts, lists }) {
     return [units, keys];
   }
 
-  const zhKeysFor = sid => (sid === "zh_pinyin" ? layouts.pinyinKeys : layouts.daqianKeys);
+  const zhKeysFor = sid => (sid === "zh_pinyin" ? layouts.pinyinKeys : sid === "zh_eten" ? layouts.etenKeys : layouts.daqianKeys);
 
   /** A zh word encoded on a zh surface: [units, keys] or null when some char is not in zh. */
   function encodeZhWord(word, sid) {
     if (sid === "zh_hanja") return hanjaWordUnits(word);
-    if (Object.prototype.hasOwnProperty.call(SHAPE_EDGE, sid)) return shapeWordUnits(word, sid);
+    if (Object.prototype.hasOwnProperty.call(SHAPE_EDGE, sid) || sid === "zh_jyutping") return shapeWordUnits(word, sid);
     if (!Array.from(word).every(inZh)) return null;
     return zhWordUnits(word, zhKeysFor(sid));
   }
@@ -237,7 +264,8 @@ export function createNative({ data, layouts, lists }) {
   async function prepareZh(text, sid) {
     const cps = Array.from(text);
     await Promise.all([loadZhCore(), sid === "zh_hanja" ? loadHanjaCore() : null, loadShardsFor(cps),
-      sid === "zh_quick" ? loadQuick() : sid === "zh_cangjie" ? loadCangjieFor(cps) : null]);
+      sid === "zh_quick" ? loadQuick() : sid === "zh_cangjie" ? loadCangjieFor(cps) : null,
+      sid === "zh_jyutping" ? loadJyutping() : null]);
     return cps;
   }
 
@@ -294,9 +322,10 @@ export function createNative({ data, layouts, lists }) {
 
   return {
     loadZhCore, loadHanjaCore, loadShardsFor, loadAllShards,
-    loadQuick, loadCangjieShard, loadCangjieShards, loadAllShapes,
+    loadQuick, loadCangjieShard, loadCangjieShards, loadAllShapes, loadJyutping,
     encodeZh, encodeBijective, encodeZhWord, encodeBijectiveWord, segment,
-    zhState: () => zh, hanjaState: () => hanja, quickState: () => quick, cangjieState: () => cangjie, phrases,
+    zhState: () => zh, hanjaState: () => hanja, quickState: () => quick, cangjieState: () => cangjie,
+    jyutpingState: () => jyutping, phrases,
     TOKENIZERS,
   };
 }

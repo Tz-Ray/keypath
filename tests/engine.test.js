@@ -141,7 +141,7 @@ test("the examples on every keyboard", async () => {
   const e = await engine();
   const all = { zh_daqian: "cj0u/6ru8", zh_pinyin: "huan1ying2jia1", zh_cangjie: "tgnoyhvljmso", zh_quick: "toyljo",
     zh_hanja: "ghksdudrk", ko_dubeolsik: "ghksduddkstlrcj", ru_jcuken: "ghbdtncndjdfnmljvf", ja_romaji: "kanngeikokunai",
-    es_accent: "bienvenida", en_identity: "welcomehome" };
+    es_accent: "bienvenida", en_identity: "welcomehome", zh_eten: "hx8e-2gea", zh_jyutping: "fun1jing4gaa1", ja_kana: "ty'[ebhue" };
   for (const [surface, ciphertext] of Object.entries(all))
     assert.equal((await e.encode({ text: "welcome home", source: "en", surface })).ciphertext, ciphertext, surface);
   const es = await e.encode({ text: "welcome home", source: "en", surface: "es_accent" });
@@ -193,10 +193,10 @@ test("decode refusals: invalid key, missing data, free translation", async () =>
 
 test("detect, allowed routes and surfaces", async () => {
   const e = await engine();
-  assert.deepEqual(e.surfaces.map(s => s.id), ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja",
-    "ja_romaji", "ko_dubeolsik", "ru_jcuken", "es_accent", "vi_telex", "vi_vni", "en_identity"]);
-  assert.deepEqual(e.allowed("zh"), ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja"]);
-  assert.equal(e.allowed("en").length, 10);
+  assert.deepEqual(e.surfaces.map(s => s.id), ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick",
+    "zh_hanja", "ja_romaji", "ja_kana", "ko_dubeolsik", "ru_jcuken", "es_accent", "vi_telex", "vi_vni", "en_identity"]);
+  assert.deepEqual(e.allowed("zh"), ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "zh_hanja"]);
+  assert.equal(e.allowed("en").length, 13);
   assert.ok(!e.allowed("en").some(s => s.startsWith("vi_")));
   assert.deepEqual(e.allowed("vi"), ["vi_telex", "vi_vni"]);
   assert.deepEqual(e.allowed("ja"), []);
@@ -330,4 +330,79 @@ test("the Cangjie keyboard legends are read from the table (docs/10 §4.1)", () 
       assert.ok(!Object.hasOwn(shard, "x"));
     } else assert.ok(Array.from(shard[key] || "").includes(radical), `${key}: ${radical} is not coded ${key}`);
   }
+});
+
+test("ETen, Jyutping and JIS kana: the docs/10 §4.3-§5 facts and refusals", async () => {
+  const e = await freshEngine();
+  const enc = (text, source, surface) => e.encode({ text, source, surface });
+  const units = r => r.trace.segments.flatMap(s => s.words.flatMap(w => w.units || []));
+  // ETen: Dàqiān's readings and indices on other keys (§4.3)
+  for (const [text, eten, daqian, idx] of [["你好", "ne3hz3", "su3cl3", [0, 0]], ["植物學", ",2x4cuw2", "56j4vm,6", [5, 1, 0]],
+    ["明天見", "me-2te8ge84", "au/6wu0ru04", [1, 0, 3]], ["兒子", "=2;3", "-6y3", [1, 0]]]) {
+    const r = await enc(text, "zh", "zh_eten"), d = await enc(text, "zh", "zh_daqian");
+    assert.deepEqual([r.ciphertext, d.ciphertext], [eten, daqian], text);
+    assert.deepEqual(units(r).map(u => u.index), idx, text);
+    assert.deepEqual(units(r).map(u => [u.reading, u.count]), units(d).map(u => [u.reading, u.count]), text);
+  }
+  // Jyutping: one reading per character, typed as written (§4.4), and the pun of hou2
+  const jy = await enc("歡迎家", "zh", "zh_jyutping");
+  assert.equal(jy.ciphertext, "fun1jing4gaa1");
+  assert.deepEqual(units(jy).map(u => [u.reading, u.index, u.count]), [["fun1", 0, 17], ["jing4", 4, 54], ["gaa1", 0, 28]]);
+  assert.equal((await enc("銀行", "zh", "zh_jyutping")).ciphertext, "ngan4hang4");
+  const hou = await e.list("homophone:zh_jyutping", "hou2");
+  assert.deepEqual([hou.count, hou.items[0], hou.complete], [2, "好", true]);
+  for (const [reading, count] of [["nei5", 14], ["zung1", 69], ["jyu4", 113]])
+    assert.equal((await e.list("homophone:zh_jyutping", reading)).count, count, reading);
+  // JIS kana: the romaji key's words and indices, on the kana keys (§5)
+  const kana = await enc("welcome home", "en", "ja_kana"), romaji = await enc("welcome home", "en", "ja_romaji");
+  assert.equal(kana.ciphertext, "ty'[ebhue");
+  assert.deepEqual(units(kana).map(u => [u.reading, u.index, u.count, u.out]), units(romaji).map(u => [u.reading, u.index, u.count, u.out]));
+  assert.deepEqual(units(kana).map(u => u.keys), ["ty'[e", "bhue"]);
+  for (const [keys, reading] of [["3lt[s4", "ありがとう"], ["iZ-]yb[", "にっぽんご"], ["s4g(4", "とうきょう"], ["\\r[tde", "むずかしい"],
+    ["t[Zb4", "がっこう"], ["gZw", "きって"], ["f]y", "ぱん"], ["b+", "こゑ"], ["d-xV", "しほさゐ"], ["t3", "かあ"]]) {
+    assert.equal(e.layouts.keysToKana(keys), reading, keys);
+    assert.equal(e.layouts.kanaToKeys(reading), keys, reading);
+  }
+  for (const bad of ["4[", "[", "t[[", "Z", "&"]) assert.throws(() => e.layouts.keysToKana(bad), /cannot be typed|voices no kana/, bad);
+  // a kana key names no inline selector (docs/10 §2.1, §5): §5's t3, as JSON and as kp1
+  const t3 = { keypath: "1.1", tables_sha256: e.edition, source_language: "ja", segments: [{ language: "ja", layout: "ja_kana",
+    route: ["homophone:ja", "keystroke:ja_kana"], selector_mode: "inline", words: [{ units: [{ len: 2 }] }] }] };
+  assert.equal((await e.decode({ ciphertext: "t3", keyText: JSON.stringify(t3) })).reason, "keyInvalid");
+  const keyed = await e.decode({ ciphertext: "t3", keyText: JSON.stringify({ ...t3, segments: [{ ...t3.segments[0], selector_mode: "keyed" }] }) });
+  assert.deepEqual([keyed.ok, keyed.text], [true, "かあ"]);
+  for (const sid of ["zh_eten", "zh_jyutping", "ja_kana"]) {
+    const r = await enc(sid === "ja_kana" ? "welcome home" : "你好", sid === "ja_kana" ? "en" : "zh", sid);
+    const inline = JSON.parse(r.keyText);
+    inline.segments[0].selector_mode = "inline";
+    assert.equal((await e.decode({ ciphertext: r.ciphertext, keyText: JSON.stringify(inline) })).reason, "keyInvalid", sid);
+    // and kp1 carries every one of these keys and gives it back
+    const short = e.kp1Pack(r.keyText);
+    assert.ok(short.ok, sid);
+    const back = await e.decode({ ciphertext: r.ciphertext, keyText: short.text });
+    assert.deepEqual([back.ok, back.keyText], [true, r.keyText], sid);
+  }
+});
+
+test("ETen and kana keys load the rows they derive from, not files of their own", async () => {
+  const { createEngine } = await import("../assets/js/engine/index.js");
+  const { fetchText } = await import("./helpers.js");
+  for (const [sid, base, ciphertext] of [["zh_eten", "zh_daqian", "hx8e-2gea"], ["ja_kana", "ja_romaji", "ty'[ebhue"]]) {
+    const seen = [];
+    const e = await createEngine({ fetchText: p => { seen.push(p); return fetchText(p); } });
+    const r = await e.encode({ text: "welcome home", source: "en", surface: sid });
+    assert.equal(r.ciphertext, ciphertext, sid);
+    assert.ok(!seen.some(p => p.startsWith(`data/en/${sid}/`)), seen.join(" "));
+    assert.ok(seen.includes(`data/en/${base}/w.json`) && seen.includes(`data/en/${base}/h.json`), seen.join(" "));
+    // a fresh engine walks the key back through all 26 of the base surface's row files
+    const seen2 = [];
+    const d = await (await createEngine({ fetchText: p => { seen2.push(p); return fetchText(p); } })).decode({ ciphertext: r.ciphertext, keyText: r.keyText });
+    assert.deepEqual([d.ok, d.text], [true, "welcome home"], sid);
+    assert.equal(seen2.filter(p => p.startsWith(`data/en/${base}/`)).length, 26, sid);
+    assert.ok(!seen2.some(p => p.startsWith(`data/en/${sid}/`)), sid);
+  }
+  // Jyutping ships its own rows and lists
+  const seen = [];
+  const e = await createEngine({ fetchText: p => { seen.push(p); return fetchText(p); } });
+  assert.equal((await e.encode({ text: "welcome home", source: "en", surface: "zh_jyutping" })).ciphertext, "fun1jing4gaa1");
+  assert.ok(seen.includes("data/en/zh_jyutping/w.json") && seen.includes("data/jyutping.json"), seen.join(" "));
 });

@@ -14,11 +14,14 @@ export const DEFAULT_SURFACE = { zh: "zh_daqian", ko: "ko_dubeolsik", ru: "ru_jc
 /** Segment badge names. */
 export const SURFACE_BADGE = {
   zh_daqian: "Bopomofo · Chinese",
+  zh_eten: "ETen Bopomofo · Chinese",
   zh_pinyin: "Pinyin · Chinese",
+  zh_jyutping: "Jyutping · Chinese",
   zh_cangjie: "Cangjie · Chinese",
   zh_quick: "Quick · Chinese",
   zh_hanja: "Korean keyboard · Chinese hanja",
   ja_romaji: "Romaji · Japanese",
+  ja_kana: "JIS kana · Japanese",
   ko_dubeolsik: "Dubeolsik · Korean",
   ru_jcuken: "ЙЦУКЕН · Russian",
   es_accent: "Accent digits · Spanish",

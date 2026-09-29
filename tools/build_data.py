@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the site's data/ and tests/fixtures/ from keypath 2.3.0.
+"""Generate the site's data/ and tests/fixtures/ from keypath 2.4.0.
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v2.3); the cipher project
+site's own venv (from the cipher project at tag v2.4); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
 docs/09) and never imported from, executed or written to.  The walks the
 page draws come from keypath.trace (trace/1), mapped to the site's surface
@@ -50,8 +50,10 @@ from keypath.keyspec import (  # noqa: E402
     KEY_SCHEMA, KEY_VERSION, KEY_VERSIONS, V1_LANGUAGES, V1_LAYOUTS, compute_leakage, dumps_key, loads_key,
     validate_key,
 )
-from keypath.errors import KeyValidationError, KeypathError  # noqa: E402
-from keypath.keycodec import pack as kp1_pack, unpack as kp1_unpack  # noqa: E402
+from keypath.errors import KeyValidationError, KeypathError, LayoutError  # noqa: E402
+from keypath.keycodec import pack as kp1_pack, payload as kp1_payload, text as kp1_text  # noqa: E402
+from keypath.keycodec import unpack as kp1_unpack  # noqa: E402
+from keypath.layouts import ja_kana as kana_layout  # noqa: E402
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
 from keypath.layouts import vi_telex as vi_telex_layout  # noqa: E402
 from keypath.layouts import vi_vni as vi_vni_layout  # noqa: E402
@@ -59,25 +61,27 @@ from keypath.layouts import zh_cangjie as cangjie_layout  # noqa: E402
 from keypath.layouts import zh_quick as quick_layout  # noqa: E402
 from keypath.layouts import ko_dubeolsik as ko_layout  # noqa: E402
 from keypath.layouts import zh_daqian as daqian_layout  # noqa: E402
+from keypath.layouts import zh_eten as eten_layout  # noqa: E402
+from keypath.layouts import zh_jyutping as jyutping_layout  # noqa: E402
 from keypath.layouts import zh_pinyin as pinyin_layout  # noqa: E402
 from keypath.normalize import LOWERCASE_LANGUAGES, normalize  # noqa: E402
 from keypath.surfaces import zh as zh_surface  # noqa: E402
 from keypath.surfaces import zh_ko_hanja  # noqa: E402
 from keypath.surfaces.base import SPACED  # noqa: E402
 from keypath.tables import (  # noqa: E402
-    VI_CHECKED_TONES, VI_STOP_CODAS, VI_TONE_MARKS, es_accent, es_en, ja_romaji, ko_dubeolsik, ko_hanja, ko_hanja_readings,
-    ru_en, ru_jcuken, tables_sha256, vi_syllables, vi_telex, vi_vni, zh_cangjie, zh_chars, zh_daqian,
-    zh_phrases, zh_pinyin, zh_quick,
+    VI_CHECKED_TONES, VI_STOP_CODAS, VI_TONE_MARKS, es_accent, es_en, ja_kana, ja_romaji, ko_dubeolsik, ko_hanja,
+    ko_hanja_readings, ru_en, ru_jcuken, tables_sha256, vi_syllables, vi_telex, vi_vni, zh_cangjie, zh_chars, zh_daqian,
+    zh_eten, zh_jyutping, zh_phrases, zh_pinyin, zh_quick,
 )
 from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v2.3; by default next to this repository
+# a checkout of the cipher project at tag v2.4; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-VERSION = "2.3.0"
-TAG = "v2.3"
-EDITION = "ea386152bead693068cebb19c3d09244f19f299afaf9a650846fff2a6f8181af"
+VERSION = "2.4.0"
+TAG = "v2.4"
+EDITION = "b31f6b0c5fd8391c1fc7bc1c4a1491152a449308bdd1abe3e53dad8fa80dc55b"
 VOCAB_SIZE = 10_000
 SEED = 20260924
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
@@ -87,11 +91,14 @@ B36 = "0123456789abcdefghijklmnopqrstuvwxyz"
 # The site's surfaces, in chip order: id -> (language, layout).
 SURFACES: dict[str, tuple[str, str]] = {
     "zh_daqian": ("zh", "zh_daqian"),
+    "zh_eten": ("zh", "zh_eten"),
     "zh_pinyin": ("zh", "zh_pinyin"),
+    "zh_jyutping": ("zh", "zh_jyutping"),
     "zh_cangjie": ("zh", "zh_cangjie"),
     "zh_quick": ("zh", "zh_quick"),
     "zh_hanja": ("zh", "ko_dubeolsik"),
     "ja_romaji": ("ja", "ja_romaji"),
+    "ja_kana": ("ja", "ja_kana"),
     "ko_dubeolsik": ("ko", "ko_dubeolsik"),
     "ru_jcuken": ("ru", "ru_jcuken"),
     "es_accent": ("es", "es_accent"),
@@ -101,11 +108,14 @@ SURFACES: dict[str, tuple[str, str]] = {
 }
 SURFACE_LABELS = {
     "zh_daqian": ("ㄅ", "Bopomofo (Taiwan)", "a Bopomofo (Dàqiān) keyboard"),
+    "zh_eten": ("倚", "Bopomofo ETen", "a Bopomofo ETen keyboard"),
     "zh_pinyin": ("pīn", "Pinyin", "a Pinyin keyboard with tone numbers"),
+    "zh_jyutping": ("粵", "Cantonese Jyutping", "a Cantonese Jyutping keyboard with tone numbers"),
     "zh_cangjie": ("倉", "Cangjie", "a Cangjie keyboard"),
     "zh_quick": ("速", "Quick", "a Quick (simplified Cangjie) keyboard"),
     "zh_hanja": ("漢", "Chinese on a Korean keyboard", "a Korean keyboard, as hanja"),
     "ja_romaji": ("か", "Japanese romaji", "a Japanese romaji keyboard"),
+    "ja_kana": ("あ", "Japanese kana", "a Japanese JIS kana keyboard"),
     "ko_dubeolsik": ("한", "Korean", "a Korean (Dubeolsik) keyboard"),
     "ru_jcuken": ("Й", "Russian ЙЦУКЕН", "a Russian ЙЦУКЕН keyboard"),
     "es_accent": ("ñ", "Spanish accents", "a Spanish accent-digit keyboard"),
@@ -120,12 +130,15 @@ NATIVE_ONLY = {"vi"}
 VI = [sid for sid, (lang, _layout) in SURFACES.items() if lang == "vi"]
 EN_X = [sid for sid, (lang, _layout) in SURFACES.items() if sid != "en_identity" and lang not in NATIVE_ONLY]
 # Surfaces whose English rows the page derives from another surface's rows
-# instead of loading files (docs/10 §9.7): Quick rows are the Cangjie rows
-# with each unit recoded to its Quick code and re-indexed in the Quick list.
-DERIVED_ROWS = {"zh_quick": "zh_cangjie"}
+# instead of loading files (docs/10 §9.7): ETen rows are the Dàqiān rows
+# with each key remapped symbol by symbol; Quick rows are the Cangjie rows
+# with each unit recoded to its Quick code and re-indexed in the Quick list;
+# JIS kana rows are the romaji rows with each unit's kana retyped on the
+# kana keys.  Indices, counts and heads are the base rows'.
+DERIVED_ROWS = {"zh_eten": "zh_daqian", "zh_quick": "zh_cangjie", "ja_kana": "ja_romaji"}
 ALLOWED = {
     "en": [sid for sid, (lang, _layout) in SURFACES.items() if lang not in NATIVE_ONLY],
-    "zh": ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja"],
+    "zh": [sid for sid, (lang, _layout) in SURFACES.items() if lang == "zh"],
     "ko": ["ko_dubeolsik"],
     "ru": ["ru_jcuken"],
     "es": ["es_accent"],
@@ -154,6 +167,7 @@ HERO_ALL = {
     "zh_cangjie": "tgnoyhvljmso", "zh_quick": "toyljo",
     "ko_dubeolsik": "ghksduddkstlrcj", "ru_jcuken": "ghbdtncndjdfnmljvf",
     "ja_romaji": "kanngeikokunai", "es_accent": "bienvenida", "en_identity": "welcomehome",
+    "zh_eten": "hx8e-2gea", "zh_jyutping": "fun1jing4gaa1", "ja_kana": "ty'[ebhue",
 }
 STRIP = {
     "text": "la luna y el sol de la ciudad", "source": "es",
@@ -178,7 +192,21 @@ MIXED = [
                                  {"length": 5, "route": "vi", "layout": "vi_telex"},
                                  {"length": 4, "route": "vi", "layout": "vi_vni"},
                                  {"length": 3, "route": "vi", "layout": "vi_telex"}]),
+    # docs/10 §10 M16: Dàqiān and ETen over one text; Pinyin, Jyutping and
+    # Cangjie over one text; romaji and JIS kana; kana's backslash (む) right
+    # before an ЙЦУКЕН bracket (х)
+    ("無所不能明天見", "zh", [{"length": 4, "route": "zh", "layout": "zh_daqian"},
+                        {"length": 3, "route": "zh", "layout": "zh_eten"}]),
+    ("學而時習之", "zh", [{"length": 2, "route": "zh", "layout": "zh_pinyin"},
+                     {"length": 2, "route": "zh", "layout": "zh_jyutping"},
+                     {"length": 1, "route": "zh", "layout": "zh_cangjie"}]),
+    ("welcome home, thank you", "en", [{"length": 13, "route": "ja", "layout": "ja_romaji"},
+                                       {"length": 10, "route": "ja", "layout": "ja_kana"}]),
+    ("six good", "en", [{"length": 4, "route": "ja", "layout": "ja_kana"},
+                        {"length": 4, "route": "ru", "layout": "ru_jcuken"}]),
 ]
+# the tables edition of KeyPath 2.3, which lists none of the M16 tables
+EDITION_V2_3 = "ea386152bead693068cebb19c3d09244f19f299afaf9a650846fff2a6f8181af"
 # the tables edition of KeyPath 2.1 and 2.2, which lists no Vietnamese table
 EDITION_V2_2 = "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732"
 
@@ -367,6 +395,28 @@ def layouts_data() -> dict[str, Any]:
         "zh_cangjie": {"radicals": dict(cangjie_layout.RADICALS), "maxLetters": cangjie_layout.MAX_LETTERS},
         "zh_quick": {"maxLetters": quick_layout.MAX_LETTERS},
         **vi_layouts_data(),
+        **m16_layouts_data(),
+    }
+
+
+def m16_layouts_data() -> dict[str, Any]:
+    """docs/10 §4.3-§5: the ETen key map (zh_daqian.tsv's symbols and tone
+    marks, in its order, on other keys), Jyutping's unit shape (1-6
+    letters, then a tone digit), and the JIS kana keys of the 77 kana, in
+    ja_kana.tsv's order (a voiced kana is its base key and `[`, a
+    semi-voiced one its base key and `]`)."""
+    dq, et = zh_daqian(), zh_eten()
+    assert list(et.symbol_to_key) == list(dq.symbol_to_key) and list(et.tone_to_key) == list(dq.tone_to_key)
+    keys = [*et.symbol_to_key.values(), *et.tone_to_key.values()]
+    assert len(set(keys)) == len(keys) == 41
+    kana = ja_kana().keys_by_kana
+    assert len(kana) == 77 and list(kana) == sorted(kana)
+    # every kana has a key, and so does every kana of the romaji table
+    assert set(kana) == {k for reading in ja_romaji().kana_to_romaji for k in reading} | {"っ"}
+    return {
+        "zh_eten": {"symbolToKey": dict(et.symbol_to_key), "toneToKey": dict(et.tone_to_key)},
+        "zh_jyutping": {"toneDigits": jyutping_layout.TONE_DIGITS, "maxLetters": jyutping_layout.MAX_LETTERS},
+        "ja_kana": {"keysByKana": [[k, v] for k, v in kana.items()]},
     }
 
 
@@ -515,6 +565,23 @@ def shape_data(out: Out) -> dict[str, dict[str, str]]:
     return {"cangjie": {c: "".join(v) for c, v in cj.candidates_by_code.items()}, "quick": quick}
 
 
+# =============================================================== Jyutping
+
+def jyutping_data(out: Out) -> dict[str, str]:
+    """data/jyutping.json: the Jyutping lists {reading: characters}, each in
+    the table's candidate order (docs/10 §4.4: one reading per character,
+    so a character is in exactly one list).  -> the lists."""
+    table = zh_jyutping()
+    lists = {r: "".join(cs) for r, cs in table.candidates_by_reading.items()}
+    for reading, chars in lists.items():
+        assert re.fullmatch("[a-z]{1,6}[1-6]", reading), reading
+        assert all(table.reading_by_char[c] == reading for c in chars), reading
+    assert sum(len(cs) for cs in table.candidates_by_reading.values()) == len(table.reading_by_char)
+    out.json("data/jyutping.json", lists)
+    print(f"[jyutping] {len(lists)} readings, {len(table.reading_by_char)} characters")
+    return lists
+
+
 # ================================================================ English
 
 def vocabulary() -> list[str]:
@@ -557,13 +624,37 @@ def entry_from_row(row: list[Any], homophone: bool) -> dict[str, Any]:
     return {"units": units, "translation": {"tier": 1, "index": row[1]}}
 
 
+def eten_of_daqian() -> dict[str, str]:
+    """Each Dàqiān key -> the ETen key of the same bopomofo symbol or tone
+    mark (docs/10 §4.3: the same 41 symbols, on other keys)."""
+    dq, et = zh_daqian(), zh_eten()
+    out = {dq.symbol_to_key[s]: et.symbol_to_key[s] for s in dq.symbol_to_key}
+    out.update({dq.tone_to_key[t]: et.tone_to_key[t] for t in dq.tone_to_key})
+    assert len(out) == len(set(out.values())) == 41
+    return out
+
+
 def derive_row(sid: str, row: list[Any] | None, shape: dict[str, dict[str, str]]) -> list[Any] | None:
     """A derived surface's row from its base surface's row (DERIVED_ROWS), as
-    the page derives it: each unit's Cangjie code recoded to its Quick code,
-    the index the character's place in that Quick list."""
-    assert sid == "zh_quick", sid
+    the page derives it (docs/10 §9.7):
+    - ETen: each Dàqiān key remapped symbol by symbol (lens, indices equal);
+    - Quick: each unit's Cangjie code recoded to its Quick code, the index
+      the character's place in that Quick list;
+    - JIS kana: each unit's romaji read back to its kana and typed on the
+      kana keys (lens its new length; index, count and head equal)."""
+    assert sid in DERIVED_ROWS, sid
     if row is None:
         return None
+    if sid == "zh_eten":
+        remap = eten_of_daqian()
+        return [*row[:3], "".join(remap[k] for k in row[3]), *row[4:]]
+    if sid == "ja_kana":
+        target, hop_index, hop_count, keys, lens, *rest = row
+        units, pos = [], 0
+        for n in lens:
+            units.append(kana_layout.kana_to_keys(ja_layout.romaji_to_kana(keys[pos:pos + n])))
+            pos += n
+        return [target, hop_index, hop_count, "".join(units), [len(u) for u in units], *rest]
     target, hop_index, hop_count, keys, lens, _idx = row
     chars = list(target)
     assert len(chars) == len(lens), row
@@ -1006,6 +1097,23 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
             else:
                 assert key["segments"][0]["words"] == g["words"], (sid, g)
                 assert rec["expect"]["leak"] == [g["leaked"], g["chars"]], (sid, g)
+    # docs/10 §4.3-§5 goldens: ETen and Jyutping (zh, which the page types
+    # and walks back) and JIS kana (ja, which the page does not type; its
+    # keys still feed the kp1 fixtures)
+    for sid, source in (("zh_eten", "zh"), ("zh_jyutping", "zh"), ("ja_kana", "ja")):
+        golden = json.loads((PROJECT / "tests" / "golden" / f"vectors_{sid}.json").read_text(encoding="utf-8"))
+        for g in golden["vectors"]:
+            vec.add("golden-m16", g["plaintext"], source, sid)
+            rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (g["plaintext"], source, sid))
+            assert rec["expect"]["ciphertext"] == g["ciphertext"], (sid, g, rec["expect"])
+            units = [u for w in json.loads(rec["expect"]["keyText"])["segments"][0]["words"] for u in w.get("units", [])]
+            assert [u["len"] for u in units] == g["unit_lens"], (sid, g)
+            indices = [u.get("homophone_index") for u in units]
+            assert indices == g.get("homophone_indices", [g.get("homophone_index")]), (sid, g, indices)
+            if "zh_daqian_ciphertext" in g:
+                vec.add("golden-m16", g["plaintext"], "zh", "zh_daqian")
+                twin = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (g["plaintext"], "zh", "zh_daqian"))
+                assert twin["expect"]["ciphertext"] == g["zh_daqian_ciphertext"], (g, twin["expect"])
     for text, source, sid, cipher in CHIPS:
         vec.add("site", text, source, sid)
         rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (text, source, sid))
@@ -1029,7 +1137,8 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
         for sid in VI:
             vec.add("corpus-vi", t, "vi", sid)
     for t in corpora["JA_CORPUS"]:
-        vec.add("corpus-ja", t, "ja", "ja_romaji")
+        for sid in ("ja_romaji", "ja_kana"):
+            vec.add("corpus-ja", t, "ja", sid)
     # routes the page refuses
     vec.add("route", "你好", "zh", "ru_jcuken")
     vec.add("route", "привет", "ru", "zh_daqian")
@@ -1060,7 +1169,7 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
         for sid in VI:
             vec.add("fuzz-vi", t, "vi", sid)
     for text, source in EDGE_CASES:
-        for sid in ALLOWED[source] if source != "en" else ["en_identity", "zh_daqian", "ja_romaji"]:
+        for sid in ALLOWED[source] if source != "en" else ["en_identity", "zh_daqian", "ja_romaji", "ja_kana"]:
             vec.add("edge", text, source, sid)
     long_zh = "".join(rng.choice(list(zh_phrases().readings_by_word)) for _ in range(120))[:200]
     for sid in ALLOWED["zh"]:
@@ -1077,7 +1186,7 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     # traces: site, challenges, sample
     traces = []
     for rec in vec.valid:
-        if rec["class"] == "site":
+        if rec["class"] in ("site", "golden-m16"):
             traces.append({"id": rec["id"], "ciphertext": rec["expect"]["ciphertext"],
                            "keyText": rec["expect"]["keyText"],
                            "trace": site_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
@@ -1354,6 +1463,61 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
         k2 = copy.deepcopy(k)
         k2["segments"][0]["selector_mode"] = "inline"
         add(f"{layout.removeprefix('zh_')}-inline", c, k2)
+    # ETen, Jyutping and JIS kana (docs/10 §4.3-§5, §2.1): keyed only, an
+    # index past the list, the v2.3 edition (it lists none of their tables),
+    # another surface's route tail, and a unit's chunk swapped for keys of
+    # the same length that are no unit; kana's `t3` negative golden (§5),
+    # ゔ `4[` and a voicing key with nothing to voice
+    other_tail = {"zh_eten": ["homophone:zh", "keystroke:zh_daqian"],
+                  "zh_jyutping": ["homophone:zh", "keystroke:zh_pinyin"],
+                  "ja_kana": ["homophone:ja", "keystroke:ja_romaji"]}
+
+    def m16_bad_chunk(layout: str, chunk: str) -> str:
+        s = registry.surface(SURFACES[layout][0], layout)
+        alphabet = sorted(s.alphabet)
+        cands = [chunk[::-1]] + [chunk[:i] + ch + chunk[i + 1:] for i in range(len(chunk)) for ch in alphabet]
+        return next(x for x in cands if x != chunk and not toolkit.lookup_unit(s, x, top=0)["well_formed"])
+
+    for sid in ("zh_eten", "zh_jyutping", "ja_kana"):
+        keys = pick(lambda r, sid=sid: r["surface"] == sid and has_units(r, True), 18)
+        assert len(keys) == 18, sid
+        for i, (c, k) in enumerate(keys):
+            k2 = copy.deepcopy(k)
+            seg = k2["segments"][0]
+            choice = i % 6
+            if choice == 0:
+                seg["selector_mode"] = "inline"
+                add(f"{sid}-inline", c, k2)
+            elif choice == 1:
+                first_unit(k2, True)["homophone_index"] = unit_count(k, c)
+                add(f"{sid}-index-range", c, k2)
+            elif choice == 2:
+                k2["tables_sha256"] = EDITION_V2_3
+                add(f"{sid}-old-edition", c, k2)
+            elif choice == 3:
+                hops, _tail = registry.split_route(seg["route"])
+                seg["route"] = list(hops) + other_tail[sid]
+                add(f"{sid}-route-tail", c, k2)
+            elif choice == 4:
+                n = first_unit(k2, True)["len"]
+                add(f"{sid}-not-a-unit", m16_bad_chunk(seg["layout"], c[:n]) + c[n:], k2)
+            elif sid == "ja_kana":
+                first_unit(k2, True)["homophone_index"] = -1
+                add(f"{sid}-index-negative", c, k2)
+            else:
+                del first_unit(k2, True)["homophone_index"]
+                add(f"{sid}-index-missing", c, k2)
+
+    def kana_key(chunk: str, mode: str, unit: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+        return chunk, mode, {"keypath": "1.1", "tables_sha256": EDITION, "source_language": "ja",
+                             "segments": [{"language": "ja", "layout": "ja_kana", "route": ["homophone:ja", "keystroke:ja_kana"],
+                                           "selector_mode": mode, "words": [{"units": [unit]}]}]}
+
+    for name, (cipher, _mode, key) in (("kana-t3-inline", kana_key("t3", "inline", {"len": 2})),
+                                       ("kana-vu", kana_key("4[", "keyed", {"len": 2})),
+                                       ("kana-voicing-alone", kana_key("[", "keyed", {"len": 1})),
+                                       ("kana-voicing-after-voiced", kana_key("t[[", "keyed", {"len": 3}))):
+        add(name, cipher, key)
     records = []
     for name, cipher, key in muts:
         text = json.dumps(key, ensure_ascii=False, indent=2) + "\n"
@@ -1402,6 +1566,20 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
         assert (c[0] == "-") == (q[0] == "-"), w
         shape_shards[ord(w[0]) & 0xFF].append("\t".join([w, *c, *q]) + "\n")
     result["zhShape"] = {f"{i:02x}": sha("".join(shape_shards[i])) for i in range(256)}
+    # the same words on ETen (Dàqiān's readings and indices on other keys,
+    # asserted here) and Jyutping
+    et, jy = surface_of("zh_eten"), surface_of("zh_jyutping")
+    twin_shards: dict[int, list[str]] = {i: [] for i in range(256)}
+    remap = eten_of_daqian()
+    for w in words:
+        e_raw, d_raw = et.encode_word(w, "keyed"), dq.encode_word(w, "keyed")
+        assert (e_raw is None) == (d_raw is None), w
+        e = fmt(e_raw)
+        assert e_raw is None or (e[1:] == fmt(d_raw)[1:] and e[0] == "".join(remap[k] for k in d_raw[1])), w
+        j = fmt(jy.encode_word(w, "keyed"))
+        twin_shards[ord(w[0]) & 0xFF].append("\t".join([w, *e, *j]) + "\n")
+    result["zhEtenJyutping"] = {f"{i:02x}": sha("".join(twin_shards[i])) for i in range(256)}
+    m16_digests(result)
     # every character's (code, index) on both (docs/10 §9.7: `cangjie`
     # char<TAB>code<TAB>idx and `quick` char<TAB>quick<TAB>idx, lines sorted
     # by code point), through the surfaces' own encoders
@@ -1418,6 +1596,7 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
     result["readings"] = sha("".join(
         f"{r}\t{daqian_layout.keys_for_reading(r)}\t{pinyin_layout.keys_for_reading(r)}\n"
         for r in sorted(chars.candidates_by_reading)))
+    result["eten"] = sha("".join(f"{r}\t{eten_layout.keys_for_reading(r)}\n" for r in sorted(chars.candidates_by_reading)))
     result["ko"] = sha("".join(f"{u}\t{ko_layout.keys_for_unit(u)}\n" for u in ko_layout.units()))
     primary = ko_hanja_readings().primary_by_char
     result["hanjaPrimary"] = sha("".join(f"{c}\t{primary[c]}\n" for c in sorted(primary)))
@@ -1429,6 +1608,52 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
             lines.append(f"{w}\t{'-' if entry is None else jdump(entry)}\t{cipher if entry else '-'}\n")
         result["rows"][sid] = sha("".join(lines))
     out.json("tests/fixtures/digests.json", result)
+
+
+# docs/10 §9.7 (M16): every chunk of up to KANA_CHUNK_MAX JIS kana keys, and
+# every string of up to KANA_READING_MAX kana, with what the layout makes of it
+KANA_CHUNK_MAX = 3
+KANA_READING_MAX = 3
+
+
+def m16_digests(result: dict[str, Any]) -> None:
+    """docs/10 §9.7 `jyutping`: char<TAB>reading<TAB>idx for every character
+    of zh_jyutping.tsv, lines sorted by code point, through the surface's
+    own encoder.  `kanaChunks`: every chunk of 1 to KANA_CHUNK_MAX keys over
+    ja_kana's alphabet (length, then code-point order) as chunk<TAB>=kana,
+    or chunk<TAB>!rule with the layout's error; `kanaReadings`: every string
+    of 1 to KANA_READING_MAX of the 77 kana (the same order) as
+    reading<TAB>keys, or reading<TAB>!rule."""
+    import itertools
+
+    jy = surface_of("zh_jyutping")
+    lines = []
+    for char, reading in zh_jyutping().reading_by_char.items():
+        units, keys = jy.encode_word(char, "keyed")
+        assert keys == reading and len(units) == 1, char
+        lines.append(f"{char}\t{keys}\t{units[0]['homophone_index']}\n")
+    result["jyutping"] = sha("".join(sorted(lines)))
+    result["jyutpingCount"] = len(lines)
+
+    def verdict(fn: Callable[[str], str], text: str) -> str:
+        try:
+            return "=" + fn(text)
+        except LayoutError as exc:
+            return "!" + str(exc)
+
+    for name, symbols, n_max, fn in (
+            ("kanaChunks", sorted(surface_of("ja_kana").alphabet), KANA_CHUNK_MAX, kana_layout.keys_to_kana),
+            ("kanaReadings", sorted(ja_kana().keys_by_kana), KANA_READING_MAX, kana_layout.kana_to_keys)):
+        body, good = [], 0
+        for n in range(1, n_max + 1):
+            for parts in itertools.product(symbols, repeat=n):
+                text = "".join(parts)
+                v = verdict(fn, text)
+                good += v.startswith("=")
+                body.append(f"{text}\t{v}\n")
+        result[name] = {"maxLen": n_max, "count": len(body), "ok": good, "sha256": sha("".join(body))}
+    print(f"[kana] chunks: {result['kanaChunks']['ok']} of {result['kanaChunks']['count']} read; "
+          f"readings: {result['kanaReadings']['ok']} of {result['kanaReadings']['count']} typed")
 
 
 # docs/10 §9.7: exhaustive verdicts of every chunk up to these lengths (the
@@ -1967,6 +2192,7 @@ SOURCE_INFO: dict[str, tuple[str, str, str | None, bool]] = {
 }
 _CHEWING = {"chewing": ("2026-07-10", "2026-09-23", "2026-09-24")}
 _CHEWING_SHAPE = {"chewing": ("2026-07-10", "2026-09-28")}   # the Cangjie table's character set and order
+_CHEWING_JYUTPING = {"chewing": ("2026-07-10", "2026-09-29")}   # the Jyutping table's character set and order
 _SKK = {"skk": ("2026-07-10", "2026-09-24")}
 _SPA = {"spa": ("2026-07-10", "2026-09-24")}
 _KENG = {"keng": ("2026-09-23", "2026-09-24")}
@@ -1978,6 +2204,7 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/hero.json", "data", {"cedict": _, **_CHEWING}),
     ("data/layouts.json", "data", {"keypath": _, **_CHEWING}),
     ("data/quick.json", "data", {"unihan": _, **_CHEWING_SHAPE}),
+    ("data/jyutping.json", "data", {"unihan": _, **_CHEWING_JYUTPING}),
     ("data/zh/core.json", "data/zh", {**_CHEWING}),
     ("data/zh/p/*.txt", "data/zh", {**_CHEWING, "hanja": _}),
     ("data/hanja/core.json", None, {"hanja": _}),
@@ -1986,6 +2213,7 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/en/zh_daqian/*.json", "data/en/zh_daqian", {"cedict": _, **_CHEWING, "wordfreq": _}),
     ("data/en/zh_pinyin/*.json", "data/en/zh_pinyin", {"cedict": _, **_CHEWING, "wordfreq": _}),
     ("data/en/zh_cangjie/*.json", "data/en/zh_cangjie", {"cedict": _, "unihan": _, **_CHEWING_SHAPE, "wordfreq": _}),
+    ("data/en/zh_jyutping/*.json", "data/en/zh_jyutping", {"cedict": _, "unihan": _, **_CHEWING_JYUTPING, "wordfreq": _}),
     ("data/en/zh_hanja/*.json", "data/en/zh_hanja", {"cedict": _, **_CHEWING, "hanja": _, "wordfreq": _}),
     ("data/en/ja_romaji/*.json", "data/en/ja_romaji", {"jmdict": _, **_SKK, "wordfreq": _}),
     ("data/en/ko_dubeolsik/*.json", "data/en/ko_dubeolsik", {**_KENG, "wordfreq": _}),
@@ -1994,9 +2222,11 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/challenges/02.json", "data/challenges", {"keypath": _, "cedict": _, **_SPA, **_CHEWING, "wordfreq": _}),
     ("data/challenges/*.json", "data/challenges",
      {"keypath": _, "cedict": _, "rus": _, **_CHEWING, "hanja": _, "wordfreq": _}),
+    # (2026-09-28: Cangjie and Quick; 2026-09-29: Jyutping, and SKK readings
+    # typed on the JIS kana keys)
     ("tests/fixtures/*", "tests/fixtures",
-     {"keypath": _, "cedict": _, "jmdict": _, **_SKK, **_KENG, "hanja": _, "rus": _, **_SPA,
-      "chewing": _CHEWING["chewing"] + ("2026-09-28",), "unihan": _, "wordfreq": _, "ucd": _}),
+     {"keypath": _, "cedict": _, "jmdict": _, "skk": _SKK["skk"] + ("2026-09-29",), **_KENG, "hanja": _, "rus": _,
+      **_SPA, "chewing": _CHEWING["chewing"] + ("2026-09-28", "2026-09-29"), "unihan": _, "wordfreq": _, "ucd": _}),
 ]
 
 
@@ -2179,8 +2409,27 @@ def kp1_fixtures(out: Out) -> None:
               "decoded": decode(hero.ciphertext, key)}
     assert markup["decoded"].endswith(MARKUP)
     no_form = kp1_no_form()
+    # docs/10 §2.1, §5: flags bit 0 (inline) on a keyed-only surface, §5's
+    # `t3` key among them: the string reads, but its key fails validate_key
+    inline = []
+    t3 = {"keypath": "1.1", "tables_sha256": EDITION, "source_language": "ja",
+          "segments": [{"language": "ja", "layout": "ja_kana", "route": ["homophone:ja", "keystroke:ja_kana"],
+                        "selector_mode": "inline", "words": [{"units": [{"len": 2}]}]}]}
+    cases = [("the ja_kana chunk t3 as an inline unit (docs/10 §5)", t3)]
+    for text, source, sid in (("你好", "zh", "zh_eten"), ("你好", "zh", "zh_jyutping"), ("welcome home", "en", "ja_kana")):
+        key = copy.deepcopy(py_encode(text, source, sid).key)
+        key["segments"][0]["selector_mode"] = "inline"
+        cases.append((f"{text} on {sid}, inline", key))
+    for why, key in cases:
+        s = kp1_text(kp1_payload(key))
+        try:
+            kp1_unpack(s)
+        except KeyValidationError:
+            inline.append({"why": why, "kp1": s, "keyText": json.dumps(key, ensure_ascii=False, indent=2) + "\n"})
+            continue
+        raise SystemExit(f"kp1 unpacked an inline key on a keyed-only surface: {why}")
     out.json("tests/fixtures/kp1.json", {"accepted": accepted, "rejected": rejected, "refused": refused,
-                                          "markup": markup, "noForm": no_form})
+                                          "markup": markup, "noForm": no_form, "inlineRefused": inline})
     # every key of the other fixtures, once each
     seen: set[str] = set()
     rows = []
@@ -2212,6 +2461,7 @@ def build(root: Path) -> Out:
     zh_data(out)
     hanja_data(out)
     shape = shape_data(out)
+    jyutping_data(out)
     vocab = vocabulary()
     example_words = set(re.findall("[a-z]+", " ".join([HERO[0]] + [c[0] for c in CHIPS if c[1] == "en"])))
     assert example_words <= set(vocab), example_words - set(vocab)

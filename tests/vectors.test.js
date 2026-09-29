@@ -1,4 +1,4 @@
-// Encode/decode parity with keypath 2.3.0 on the generated corpus
+// Encode/decode parity with keypath 2.4.0 on the generated corpus
 // (tests/fixtures/vectors.jsonl.gz, written by tools/build_data.py): the
 // site's examples, the cipher project's round-trip corpora and golden
 // vectors, seeded fuzz strings per live surface, and edge cases.
@@ -10,11 +10,11 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 
 test("the corpus covers every class and live surface", () => {
   const classes = new Set(vectors.map(v => v.class));
-  for (const c of ["site", "golden-shape", "golden-vi", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
+  for (const c of ["site", "golden-shape", "golden-vi", "golden-m16", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
     "corpus-vi", "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "fuzz-vi", "route", "edge"])
     assert.ok(classes.has(c), c);
   const surfaces = new Set(vectors.filter(v => !v.jsRefusal && !v.expect.error).map(v => v.surface));
-  assert.equal(surfaces.size, 12);
+  assert.equal(surfaces.size, 15);
   // Vietnamese: the §6.6 goldens, the corpus, fuzz and edge cases on both keyboards
   for (const sid of ["vi_telex", "vi_vni"])
     for (const c of ["golden-vi", "corpus-vi", "fuzz-vi", "edge"])
@@ -27,6 +27,16 @@ test("the corpus covers every class and live surface", () => {
   for (const sid of ["zh_cangjie", "zh_quick"])
     for (const c of ["corpus-zh", "corpus-en", "fuzz-zh", "fuzz-en-x", "golden-shape"])
       assert.ok(vectors.some(v => v.class === c && v.surface === sid), `${c} on ${sid}`);
+  // ETen and Jyutping: the docs/10 §4.3-§4.4 goldens, the zh corpus and the en one, and fuzz
+  for (const sid of ["zh_eten", "zh_jyutping"])
+    for (const c of ["corpus-zh", "corpus-en", "fuzz-zh", "fuzz-en-x", "golden-m16", "edge"])
+      assert.ok(vectors.some(v => v.class === c && v.surface === sid && !v.jsRefusal), `${c} on ${sid}`);
+  // JIS kana: typed from English on the page; Japanese text (the §5 goldens,
+  // the ja corpus) is Python's alone, which the page refuses to type
+  for (const c of ["corpus-en", "fuzz-en-x", "edge"])
+    assert.ok(vectors.some(v => v.class === c && v.surface === "ja_kana" && !v.jsRefusal), `${c} on ja_kana`);
+  for (const c of ["golden-m16", "corpus-ja"])
+    assert.ok(vectors.some(v => v.class === c && v.surface === "ja_kana" && v.jsRefusal[0] === "jaSource"), `${c} on ja_kana`);
 });
 
 const byClass = new Map();

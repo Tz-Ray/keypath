@@ -17,3 +17,6 @@
 {"list": "surfaces", "ordinal": 9, "id": ["zh", "zh_quick"]}
 {"list": "surfaces", "ordinal": 10, "id": ["vi", "vi_telex"]}
 {"list": "surfaces", "ordinal": 11, "id": ["vi", "vi_vni"]}
+{"list": "surfaces", "ordinal": 12, "id": ["zh", "zh_eten"]}
+{"list": "surfaces", "ordinal": 13, "id": ["zh", "zh_jyutping"]}
+{"list": "surfaces", "ordinal": 14, "id": ["ja", "ja_kana"]}

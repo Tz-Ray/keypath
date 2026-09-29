@@ -279,9 +279,13 @@ await attempt("vietnamese", async () => {
 });
 
 await attempt("typing", async () => {
-  // every live keyboard: the site vectors, the corpora and fuzz strings
+  // every keyboard chip on the page: the site vectors, the corpora and fuzz strings
+  const chips = await b.evaluate(`[...document.querySelectorAll("input[name=kbd]")].map(i => i.value)`);
+  check("typing: every keyboard chip is a live surface of the engine",
+    chips.length >= 12 && chips.every(id => registryJson.siteSurfaces.some(s => s.id === id)), js(chips));
   const bySurface = new Map();
-  const usable = v => v.carried && !v.jsRefusal && v.expect && v.expect.ciphertext !== undefined && Array.from(v.text).length <= 200 && v.text.trim();
+  const usable = v => v.carried && !v.jsRefusal && v.expect && v.expect.ciphertext !== undefined && Array.from(v.text).length <= 200 && v.text.trim()
+    && chips.includes(v.surface);
   for (const cls of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en", "corpus-vi", "fuzz-en-x", "fuzz-zh", "fuzz-es", "fuzz-ru", "fuzz-ko", "fuzz-en-id", "fuzz-vi"]) {
     for (const v of vectors) {
       if (v.class !== cls || !usable(v)) continue;
@@ -292,7 +296,7 @@ await attempt("typing", async () => {
   }
   const picked = [...bySurface.values()].flat();
   const surfaces = new Set(picked.map(v => v.surface));
-  check("typing: vectors cover all 12 keyboards", surfaces.size === 12, [...surfaces]);
+  check("typing: vectors cover every keyboard chip", surfaces.size === chips.length && chips.every(id => surfaces.has(id)), [...surfaces]);
   for (const v of picked) {
     await typeMessage(v.text, v.source, v.surface);
     try {
@@ -304,7 +308,7 @@ await attempt("typing", async () => {
       check(`typed on ${v.surface} (${v.id})`, false, `want ${v.expect.ciphertext}, page shows ${js(got)}`);
     }
   }
-  const oov = vectors.find(v => v.class === "fuzz-en-oov");
+  const oov = vectors.find(v => v.class === "fuzz-en-oov" && chips.includes(v.surface));
   await typeMessage(oov.text, oov.source, oov.surface);
   // (switching the language re-encodes the previous message first, which may be refused too)
   await b.waitFor(`!${q("#enc-refusal")}.hidden && ${js(oov.jsRefusal[1])}.every(w => ${q("#enc-refusal")}.textContent.includes(w))`).catch(() => {});

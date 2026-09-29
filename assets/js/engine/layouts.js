@@ -1,8 +1,9 @@
-// Ports of keypath/layouts/*.py (KeyPath 2.3.0), both directions, built
+// Ports of keypath/layouts/*.py (KeyPath 2.4.0), both directions, built
 // from data/layouts.json.  The keys -> text readers are adapted from
 // cipher-project scripts/build_demo.py (v2.0), MIT.  The Vietnamese
 // layouts (Telex, VNI) are written from KeyPath's specification (docs/10
-// §6): the syllable grammar, the canonical keystrokes and the decode pass.
+// §6): the syllable grammar, the canonical keystrokes and the decode pass;
+// ETen, Jyutping and JIS kana from its §4.3-§5.
 //
 // Every function throws LayoutError on a malformed unit, like Python.  The
 // keys -> text readers throw Python's own messages, values quoted by
@@ -15,40 +16,62 @@ const fail = msg => { throw new LayoutError(msg); };
 const has = (obj, k) => Object.prototype.hasOwnProperty.call(obj, k);
 
 export function makeLayouts(L) {
-  // ------------------------------------------------------------ zh_daqian
-  const dq = L.zh_daqian;
-  const dqKeyToSymbol = new Map(Object.entries(dq.symbolToKey).map(([s, k]) => [k, s]));
-  const dqKeyToTone = new Map(Object.entries(dq.toneToKey).map(([s, k]) => [k, s]));
-
-  /** ㄋㄧˇ -> "su3".  The tone mark (if any) must be final. */
-  function daqianKeys(reading) {
-    const chars = Array.from(reading);
-    let keys = "";
-    chars.forEach((ch, i) => {
-      if (has(dq.symbolToKey, ch)) keys += dq.symbolToKey[ch];
-      else if (has(dq.toneToKey, ch)) {
-        if (i !== chars.length - 1) fail(`tone mark not final in reading ${reading}`);
-        keys += dq.toneToKey[ch];
-      } else fail(`unknown bopomofo symbol ${ch} in reading ${reading}`);
-    });
-    if (!keys || has(dq.toneToKey, chars[0])) fail(`reading ${reading} has no phonetic symbols`);
-    return keys;
+  // ---------------------------------------------------- zh_daqian, zh_eten
+  // Two Bopomofo keyboards over the same 37 symbols and 4 tone marks: a
+  // unit is symbols, then at most one final tone key (tone 1 types nothing).
+  function bopomofo(table, layout) {
+    const keyToSymbol = new Map(Object.entries(table.symbolToKey).map(([s, k]) => [k, s]));
+    const keyToTone = new Map(Object.entries(table.toneToKey).map(([s, k]) => [k, s]));
+    /** ㄋㄧˇ -> "su3" (Dàqiān), "ne3" (ETen).  The tone mark (if any) must be final. */
+    function keys(reading) {
+      const chars = Array.from(reading);
+      let out = "";
+      chars.forEach((ch, i) => {
+        if (has(table.symbolToKey, ch)) out += table.symbolToKey[ch];
+        else if (has(table.toneToKey, ch)) {
+          if (i !== chars.length - 1) fail(`tone mark not final in reading ${R(reading)}`);
+          out += table.toneToKey[ch];
+        } else fail(`unknown bopomofo symbol ${R(ch)} in reading ${R(reading)}`);
+      });
+      if (!out || has(table.toneToKey, chars[0])) fail(`reading ${R(reading)} has no phonetic symbols`);
+      return out;
+    }
+    /** "su3" -> ㄋㄧˇ: symbols, then at most one final tone key (shape only). */
+    function reading(chunk) {
+      if (!chunk) fail("empty keystroke unit");
+      let out = "";
+      for (let i = 0; i < chunk.length; i++) {
+        const k = chunk[i];
+        if (keyToSymbol.has(k)) {
+          if (i > 0 && keyToTone.has(chunk[i - 1])) fail(`symbol after tone mark in unit ${R(chunk)}`);
+          out += keyToSymbol.get(k);
+        } else if (keyToTone.has(k)) {
+          if (i !== chunk.length - 1) fail(`tone key not final in unit ${R(chunk)}`);
+          if (i === 0) fail(`unit ${R(chunk)} is a bare tone key`);
+          out += keyToTone.get(k);
+        } else fail(`key ${R(k)} is not on layout ${layout}`);
+      }
+      return out;
+    }
+    return { keys, reading, keyToSymbol, keyToTone };
   }
-
-  /** "su3" -> ㄋㄧˇ: symbols, then at most one final tone key (shape only). */
-  function daqianReading(chunk) {
-    if (!chunk) fail("empty keystroke unit");
+  const dqBopomofo = bopomofo(L.zh_daqian, "zh_daqian");
+  const etBopomofo = bopomofo(L.zh_eten, "zh_eten");
+  const daqianKeys = dqBopomofo.keys, daqianReading = dqBopomofo.reading;
+  const etenKeys = etBopomofo.keys, etenReading = etBopomofo.reading;
+  // docs/10 §9.7: an ETen row is a Dàqiān row with each key remapped to the
+  // ETen key of the same symbol or tone mark
+  const etenOfDaqian = new Map();
+  for (const [k, sym] of dqBopomofo.keyToSymbol) etenOfDaqian.set(k, L.zh_eten.symbolToKey[sym]);
+  for (const [k, mark] of dqBopomofo.keyToTone) etenOfDaqian.set(k, L.zh_eten.toneToKey[mark]);
+  if ([...etenOfDaqian.values()].some(k => typeof k !== "string") || new Set(etenOfDaqian.values()).size !== etenOfDaqian.size)
+    fail("zh_eten.tsv does not type zh_daqian.tsv's symbols one to one");
+  /** Dàqiān keys -> the ETen keys of the same symbols ("su3" -> "ne3"). */
+  function etenFromDaqian(keys) {
     let out = "";
-    for (let i = 0; i < chunk.length; i++) {
-      const k = chunk[i];
-      if (dqKeyToSymbol.has(k)) {
-        if (i > 0 && dqKeyToTone.has(chunk[i - 1])) fail(`symbol after tone mark in unit ${R(chunk)}`);
-        out += dqKeyToSymbol.get(k);
-      } else if (dqKeyToTone.has(k)) {
-        if (i !== chunk.length - 1) fail(`tone key not final in unit ${R(chunk)}`);
-        if (i === 0) fail(`unit ${R(chunk)} is a bare tone key`);
-        out += dqKeyToTone.get(k);
-      } else fail(`key ${R(k)} is not on layout zh_daqian`);
+    for (const k of keys) {
+      if (!etenOfDaqian.has(k)) fail(`key ${R(k)} is not on layout zh_daqian`);
+      out += etenOfDaqian.get(k);
     }
     return out;
   }
@@ -271,6 +294,107 @@ export function makeLayouts(L) {
     return out.join("");
   }
 
+  // ---------------------------------------------------------- ja_kana
+  // docs/10 §5: JIS kana at US key positions.  A one-key row is a key's own
+  // kana (the shift layer included); a voiced kana is its base key + `[`, a
+  // semi-voiced one its base key + `]`.  The layout types exactly the
+  // readings ja_romaji types: forward(reading) is defined iff kanaToRomaji
+  // is; backward parses left to right, a two-key entry before a one-key one.
+  const SPACING_MARK = { "\u3099": "\u309b", "\u309a": "\u309c" };   // ゛ ゜
+  const kanaKeys = new Map(), kanaByOneKey = new Map(), kanaByTwoKeys = new Map(), kanaMarkByKey = new Map();
+  for (const [kana, keys] of L.ja_kana.keysByKana) {
+    const n = Array.from(keys).length;
+    if (n !== 1 && n !== 2) fail(`ja_kana.tsv: ${kana} has ${n} keys, not 1 or 2`);
+    const target = n === 1 ? kanaByOneKey : kanaByTwoKeys;
+    if (target.has(keys)) fail(`ja_kana.tsv: the keys ${R(keys)} are on more than one row`);
+    target.set(keys, kana);
+    kanaKeys.set(kana, keys);
+  }
+  for (const [keys, kana] of kanaByTwoKeys) {
+    const decomposed = kana.normalize("NFD");
+    const mark = SPACING_MARK[decomposed.slice(1)];
+    if (!mark || kanaKeys.get(decomposed[0]) !== keys[0] || (kanaMarkByKey.has(keys[1]) && kanaMarkByKey.get(keys[1]) !== mark))
+      fail(`ja_kana.tsv: ${kana} = ${R(keys)} is not its base kana's key plus one voicing key`);
+    kanaMarkByKey.set(keys[1], mark);
+  }
+  if ([...kanaMarkByKey.keys()].some(k => kanaByOneKey.has(k))) fail("ja_kana.tsv: a voicing key is also a kana key");
+
+  /** Why ja_romaji's rule cannot type `reading`, in kana: the first kana at which it fails. */
+  function kanaUntypeable(reading) {
+    const cps = Array.from(reading);
+    const token = i => {
+      for (const n of [2, 1]) {
+        const piece = cps.slice(i, i + n);
+        if (piece.length === n && kanaToRomajiMap.has(piece.join(""))) return piece;
+      }
+      return null;
+    };
+    let i = 0;
+    while (i < cps.length) {
+      if (cps[i] === "っ") {
+        const following = token(i + 1);
+        if (following === null)
+          return i + 1 === cps.length ? "っ must come before the kana it doubles" : `っ cannot come before ${cps[i + 1]}`;
+        if ("aiueon".includes(kanaToRomajiMap.get(following.join(""))[0]))
+          return `っ cannot come before ${following.join("")} (no consonant to double)`;
+        i += 1;
+        continue;
+      }
+      const found = token(i);
+      if (found === null) return `${cps[i]} cannot stand here (a small ゃ ゅ ょ follows a kana it combines with)`;
+      i += found.length;
+    }
+    return "the reading cannot be typed";
+  }
+  const romajiTypeable = reading => {
+    try { kanaToRomaji(reading); return true; } catch (e) { if (e instanceof LayoutError) return false; throw e; }
+  };
+  /** とうきょう -> "s4g(4"; defined iff kanaToRomaji(reading) is. */
+  function kanaToKeys(reading) {
+    if (!romajiTypeable(reading)) fail(`reading ${R(reading)} cannot be typed: ${kanaUntypeable(reading)}`);
+    const chars = Array.from(reading);
+    const missing = chars.find(ch => !kanaKeys.has(ch));
+    if (missing !== undefined) fail(`kana ${R(missing)} in reading ${R(reading)} has no key on layout ja_kana`);
+    return chars.map(ch => kanaKeys.get(ch)).join("");
+  }
+  /** "s4g(4" -> とうきょう: left to right, a two-key entry before a one-key entry. */
+  function keysToKana(keys) {
+    if (!keys) fail("empty keystroke unit");
+    const cps = Array.from(keys);
+    let out = "";
+    for (let i = 0; i < cps.length;) {
+      const pair = cps.length - i >= 2 ? cps[i] + cps[i + 1] : null;
+      if (pair !== null && kanaByTwoKeys.has(pair)) { out += kanaByTwoKeys.get(pair); i += 2; continue; }
+      const key = cps[i];
+      if (kanaByOneKey.has(key)) { out += kanaByOneKey.get(key); i += 1; continue; }
+      if (kanaMarkByKey.has(key)) {
+        const before = i ? `after ${R(cps[i - 1])} ` : "at the start ";
+        fail(`key ${R(key)} (${kanaMarkByKey.get(key)}) at position ${i} of unit ${R(keys)} voices no kana ${before}on layout ja_kana`);
+      }
+      fail(`key ${R(key)} is not on layout ja_kana`);
+    }
+    if (!romajiTypeable(out)) fail(`unit ${R(keys)} reads ${R(out)}, which cannot be typed: ${kanaUntypeable(out)}`);
+    return out;
+  }
+
+  // ------------------------------------------------------ zh_jyutping
+  // docs/10 §4.4: a unit is one character's Jyutping reading as written,
+  // 1-6 letters a-z and one tone digit 1-6; whether a well-shaped unit is a
+  // reading of the table is the candidate lists' business.
+  const JY = L.zh_jyutping;
+  function jyutpingReading(chunk) {
+    if (!chunk) fail("empty keystroke unit");
+    const cps = Array.from(chunk);
+    const digit = cps[cps.length - 1], letters = cps.slice(0, -1);
+    if (!JY.toneDigits.includes(digit)) fail(`unit ${R(chunk)} does not end in a tone digit 1-6`);
+    if (!letters.length) fail(`unit ${R(chunk)} is a bare tone digit`);
+    for (const ch of letters)
+      if (!(ch >= "a" && ch <= "z" && ch.length === 1))
+        fail(`key ${R(ch)} in unit ${R(chunk)}: a Jyutping syllable is letters a-z, and one tone digit 1-6 ends the unit`);
+    if (letters.length > JY.maxLetters) fail(`unit ${R(chunk)} has ${letters.length} letters; a Jyutping syllable has 1-${JY.maxLetters}`);
+    return chunk;
+  }
+
   // ---------------------------------------------- zh_cangjie, zh_quick
   // A unit is one character's code, typed as written: 1-5 letters a-y on
   // Cangjie, 1-2 on Quick (z is unused).  Whether a well-shaped unit is a
@@ -443,7 +567,11 @@ export function makeLayouts(L) {
 
   return {
     data: L,
-    daqianKeys, daqianReading, pinyinKeys, pinyinReading,
+    daqianKeys, daqianReading, pinyinKeys, pinyinReading, etenKeys, etenReading, etenFromDaqian,
+    jyutpingReading, jyutpingKeys: jyutpingReading,
+    kanaToKeys, keysToKana,
+    /** The JIS kana legends: {oneKey: Map(key -> kana), marks: Map(voicing key -> ゛ or ゜)}. */
+    kanaLegend: () => ({ oneKey: new Map(kanaByOneKey), marks: new Map(kanaMarkByKey) }),
     shapeCode, quickOf, radicalsOf, radicals,
     viGrammar, viKeys, viLettersKeys, viDecode, viSyllable, viLetters, viLegend,
     /** The Vietnamese letters (a-z, then the 67 others, §3.2) that layout's E types. */

@@ -122,3 +122,9 @@ each processed table, which pins the raw sources.  Regenerate with
   (layout pinned by docs/10-v3-spec.md §6.1 (Telex), not derived from raw data)
 - vi_vni.tsv: b362192aeca9b3bdc38bbcfdfb16ceeefe503177d77104dafc97dafdfab9ced6
   (layout pinned by docs/10-v3-spec.md §6.1 (VNI), not derived from raw data; E over the G of the listed vi_syllables.tsv)
+- zh_eten.tsv: b5d1a34475e0c162cdf009c6c3ea4f46f2470e35ac9ecb693edd64a0720e1c96
+  (layout pinned by docs/10-v3-spec.md §4.3 (ETen), not derived from raw data; cross-checked at build time against libchewing src/editor/zhuyin_layout/et.rs @ 3c4a93aa03d574c7f011ff84e8a2437c2f79b2cf, sha256 c425bf5a8d432086e29f7c3e7cbb22d962a6a41ba6442c19b586e7a9e154da4d, LGPL-2.1-or-later, not a table input)
+- zh_jyutping.tsv: a28cf88d428f5352a5b57d83c1c8c20b95cd603d6030034ebd56354157d62a56
+  (Unihan 18.0.0 kCantonese, as written, for each zh_chars.tsv character that has one; docs/10 §4.4 order: derived_freq desc, then code point)
+- ja_kana.tsv: a520438e86eff1eaa88a9bdf2cdb264bc7358a35fb23c739fbd63b27ab2ec45d
+  (layout pinned by docs/10-v3-spec.md §5 (JIS kana on US key positions), not derived from raw data; cross-checked at build time against Mozc src/data/preedit/mac-kana.tsv (sha256 e0a8535aeef495351deaf45f75806e45b02bf8ec6aa5782189b666ae6689b0fe) and src/data/preedit/kana.tsv (sha256 4116a66ff0eecac7f1c9a65e561b5b674828818ac1b304df271e71fcef587892) @ b9c3fcbd6d76b19649ef572324fa9da2559bc18e, BSD-3-Clause, not table inputs)
