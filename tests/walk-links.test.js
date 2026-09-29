@@ -60,10 +60,10 @@ test("anything else is a malformed fragment, and ignored", () => {
 
 test("the link control: kp1 in k, never truncated; too long with j for the long zh_pinyin vector", async () => {
   const e = await engine();
-  // site vector edge-7413 of docs/10 (now numbered edge-10398): the 200-character zh_pinyin edge message
+  // site vector edge-7413 of docs/10 (now numbered edge-11275): the 200-character zh_pinyin edge message
   const v = readJsonl("tests/fixtures/vectors.jsonl.gz")
     .find(r => r.class === "edge" && r.surface === "zh_pinyin" && Array.from(r.text).length === 200);
-  assert.equal(v.id, "edge-10398");
+  assert.equal(v.id, "edge-11275");
   const key = JSON.parse(v.expect.keyText);
   const j = walkBody(v.expect.ciphertext, { j: JSON.stringify(key) });
   assert.equal(j.ok, false);

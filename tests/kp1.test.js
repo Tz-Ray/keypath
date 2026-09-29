@@ -234,8 +234,9 @@ test("a markup hint and literal stay text: the key packs, unpacks and decodes to
 });
 
 test("the registry's ordinal lists are the ones the codec reads", () => {
-  assert.deepEqual(R.kp1Languages, ["zh", "ja", "es", "en", "ko", "ru"]);
-  assert.equal(R.kp1Surfaces.length, 10);
+  assert.deepEqual(R.kp1Languages, ["zh", "ja", "es", "en", "ko", "ru", "vi"]);
+  assert.equal(R.kp1Surfaces.length, 12);
+  assert.deepEqual(R.kp1Surfaces.slice(10), [["vi", "vi_telex"], ["vi", "vi_vni"]]);
   // integer arithmetic (docs/10 §2.2): no shift or bitwise and/or in the codec
   const src = readFileSync(join(ROOT, "assets/js/engine/kp1.js"), "utf8").replace(/\/\/[^\n]*/g, "");
   assert.doesNotMatch(src, /<<|>>|[\w)\]]\s*[|&](?![|&=])\s*[\w(]/);

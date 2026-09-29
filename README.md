@@ -2,19 +2,19 @@
 
 The web page for KeyPath, a
 puzzle cipher that hides a message in the keystrokes you would type for it
-on a Chinese, Japanese, Korean or Russian keyboard (or in a Spanish
-accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
+on a Chinese, Japanese, Korean, Russian or Vietnamese keyboard (or in a
+Spanish accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
-KeyPath's Python reference implementation (keypath 2.2.0, not published)
+KeyPath's Python reference implementation (keypath 2.3.0, not published)
 produces; the parity tests check this. Its workbench, for solving by hand,
 looks up keys and types text on a keyboard the visitor names, never
 guessing one, and prints exactly what KeyPath's own `lookup` and `type`
 tools print.
 KeyPath is a puzzle, not encryption.
 
-The data under `data/` is derived from the tables of keypath 2.2.0 (its tag
-`v2.2`, tables edition `be6aa047…8732`, the edition of `v2.1`); its sources and licenses are listed in
+The data under `data/` is derived from the tables of keypath 2.3.0 (its tag
+`v2.3`, tables edition `ea386152…81af`); its sources and licenses are listed in
 [DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
 [`LICENSES/`](LICENSES).
 
@@ -42,13 +42,13 @@ The data under `data/` is derived from the tables of keypath 2.2.0 (its tag
 ## Rebuilding the data
 
 The build reads a checkout of KeyPath's Python implementation at tag
-`v2.2` (its repository is not published), given by `KEYPATH_PROJECT`
+`v2.3` (its repository is not published), given by `KEYPATH_PROJECT`
 (default: `../cipher-project`, next to this repository), as files and uses
 its `keypath` package, installed into a local virtual environment:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.2
+uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.3
 uv pip install --python .venv/bin/python -r tools/requirements.txt
 .venv/bin/python tools/build_data.py            # data/ and tests/fixtures/
 .venv/bin/python tools/copy_docs.py            # puzzles/ and docs/
@@ -56,7 +56,7 @@ uv pip install --python .venv/bin/python -r tools/requirements.txt
 ```
 
 `tools/copy_docs.py` reads git tags of that checkout: the puzzles from
-`v2.0`, where they were set, and the analysis and `VERSIONS.md` from `v2.1`.
+`v2.0`, where they were set, and the analysis and `VERSIONS.md` from `v2.3`.
 The scripts are deterministic; `--check` rebuilds into a temporary
 directory and fails if anything differs from the committed files.
 
@@ -78,15 +78,20 @@ node tools/check_links.mjs         # needs the network: every external link reso
 ```
 
 The engine suites compare the JavaScript engine with fixtures the Python
-implementation generated: about 10,400 encode/decode vectors over every live
+implementation generated: about 11,300 encode/decode vectors over every live
 route (KeyPath's test corpora and golden vectors, seeded fuzz strings,
-edge cases), 423 walk traces, 195 tampered keys, and exhaustive digests of
+edge cases), 426 walk traces, 228 tampered keys, and exhaustive digests of
 every Chinese phrase and character on all five Chinese keyboards, every
 reading, every Cangjie and Quick code, every Korean syllable, every hanja
-reading and every English row (the Quick rows, which the page derives from
+reading, every Vietnamese syllable (all 111,003, with their Telex and VNI
+keys) and every English row (the Quick rows, which the page derives from
 the Cangjie rows, included). The build itself asserts that each derived
 Quick row equals the row KeyPath's own encoder gives, for every word of the
-English list.
+English list. The Vietnamese keyboards are written from KeyPath's
+specification (the syllable grammar, the keys that type each syllable and
+the one pass that reads keys back); their verdict on every string of up to
+four Telex keys or three VNI keys, and on about 14,000 longer strings near
+real syllables, must equal the Python reference's.
 The short keys (kp1, one line starting `kp1.`) have their own codec in
 `assets/js/engine/kp1.js`, written from KeyPath's kp1 specification: it
 packs every key in the fixtures to the same string as the Python reference
@@ -94,9 +99,9 @@ packs every key in the fixtures to the same string as the Python reference
 keys, and refuses every one of its reject vectors.
 
 The workbench has its own fixtures, printed by KeyPath's `lookup` and
-`type` commands themselves: about 600 lookups (half of them keys that do
+`type` commands themselves: about 750 lookups (half of them keys that do
 not read, reaching every rule a unit can break on every workbench
-keyboard, with keys holding quotes and backslashes) and about 400 typed
+keyboard, with keys holding quotes and backslashes) and about 500 typed
 texts, all of which the page must print byte for byte; Python's `repr`,
 which those messages quote with, is checked against Python on every value
 they quote. `tests/no-solver.test.js` holds the engine to the public
@@ -116,6 +121,8 @@ examples, reveals every challenge, walks tampered keys, checks keyboard
 navigation, IME composition, share links, reduced motion, offline reload,
 horizontal overflow from 360 px up (long literals, long words and error
 paths included), the Cangjie radicals on the keyboard picture and the walk,
+the Vietnamese goldens typed on the Telex and VNI keyboards, detection of
+Vietnamese, the Telex and VNI legends and each letter over its keys,
 touch-target sizes, focus after popovers and reveals, the workbench (no
 keyboard picked for the visitor, lookups and typing on every keyboard
 against the fixtures, refused keys, long answers at 360 px),

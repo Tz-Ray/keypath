@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.1 (tag `v2.1`). The scripts, tests and design documents
+> From KeyPath 2.3 (tag `v2.3`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -104,6 +104,8 @@ rewrites the blocks. With no flag the script prints them.
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en on (en, en_identity) | 25 | 483 |
 | ko vectors | `test_ko: GOLDEN plaintexts` | ko on (ko, ko_dubeolsik) | 4 | 14 |
 | ru vectors | `test_ru: GOLDEN plaintexts` | ru on (ru, ru_jcuken) | 3 | 16 |
+| vi round-trip | `test_walk_roundtrip_vi: CORPUS` | vi on (vi, vi_telex) | 18 | 445 |
+| vi round-trip | `test_walk_roundtrip_vi: CORPUS` | vi on (vi, vi_vni) | 18 | 445 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en → zh (lexicon) on (zh, zh_daqian) | 25 | 483 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en → zh (free) on (zh, zh_daqian) | 25 | 483 |
 | ko routes | `test_ko: ROUTES` | each row's route, default layout | 8 | 153 |
@@ -129,6 +131,8 @@ encoded by the surface and parsed back to exactly one candidate:
 | (en, en_identity) | a-z | 26 | 26 | 1 |
 | (ko, ko_dubeolsik) | syllables and jamo | 11,223 | 11,223 | 1 |
 | (ru, ru_jcuken) | ru_jcuken.tsv letters | 33 | 33 | 1 |
+| (vi, vi_telex) | G, the syllables of vi_syllables.tsv | 111,003 | 111,003 | 1 |
+| (vi, vi_vni) | G, the syllables of vi_syllables.tsv | 111,003 | 111,003 | 1 |
 <!-- END GENERATED: bijective -->
 
 The other surfaces are homophone layers, or shape layers: Cangjie and
@@ -272,6 +276,8 @@ and the tables show how far each one does:
 | en round-trip | en on (en, en_identity) | (en, en_identity) | 0 | 0 | — | — | — | — |
 | ko vectors | ko on (ko, ko_dubeolsik) | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
 | ru vectors | ru on (ru, ru_jcuken) | (ru, ru_jcuken) | 0 | 0 | — | — | — | — |
+| vi round-trip | vi on (vi, vi_telex) | (vi, vi_telex) | 0 | 0 | — | — | — | — |
+| vi round-trip | vi on (vi, vi_vni) | (vi, vi_vni) | 0 | 0 | — | — | — | — |
 | en round-trip | en → zh (lexicon) on (zh, zh_daqian) | (zh, zh_daqian) | 97 | 96 | 63.9% | 63.5% | 1.04 | 19 |
 | en round-trip | en → zh (free) on (zh, zh_daqian) | (zh, zh_daqian) | 123 | 122 | 61.0% | 60.7% | 1.03 | 19 |
 | ko routes | each row's route, default layout | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
@@ -367,6 +373,8 @@ apart from the key size, the unit-boundary bits per character:
 | en round-trip | en on (en, en_identity) | 24 | 6.67 | 0 | 72 | 0.33 | 100.0% | 0.79 |
 | ko vectors | ko on (ko, ko_dubeolsik) | 4 | 0.00 | 0 | 0 | 0.00 | — | 1.04 |
 | ru vectors | ru on (ru, ru_jcuken) | 3 | 0.00 | 0 | 0 | 0.00 | — | 0.81 |
+| vi round-trip | vi on (vi, vi_telex) | 18 | 29.33 | 8 | 176 | 1.19 | 100.0% | 0.19 |
+| vi round-trip | vi on (vi, vi_vni) | 18 | 29.33 | 8 | 176 | 1.19 | 100.0% | 0.13 |
 | en round-trip | en → zh (lexicon) on (zh, zh_daqian) | 24 | 71.43 | 54.34 | 198.00 | 3.55 | 65.8% | 0.17 |
 | en round-trip | en → zh (free) on (zh, zh_daqian) | 24 | 80.84 | 80.06 | 287.09 | 4.02 | 71.3% | 0.23 |
 | ko routes | each row's route, default layout | 8 | 37.93 | 32.46 | 133.88 | 1.98 | 39.5% | 0.77 |

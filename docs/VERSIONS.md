@@ -116,3 +116,9 @@ each processed table, which pins the raw sources.  Regenerate with
   (Zipf(ru) millis and the ru→en order baked with wordfreq==3.1.1; the en→ru order is derived at load)
 - zh_cangjie.tsv: ac78acbb07f87d69cff72fc4660805b496df9b6acf18671aaab961f7fd831ed8
   (Unihan 18.0.0 kCangjie, lowercased, for each zh_chars.tsv character that has one; docs/10 §4.1 order: derived_freq desc, then code point)
+- vi_syllables.tsv: 386294d536c32b10b38f48a78ba1a9c55cada5d82043488134b9148a886f1897
+  (authored here: the Vietnamese syllable grammar G pinned by docs/10-v3-spec.md §6.2, 28 onsets, 55 nuclei, 9 codas; |G| = 111,003)
+- vi_telex.tsv: 56df6117cbcd5060edaa2aadcdaf2ae5c3951f6bc4f51e82087ac91b330dd17e
+  (layout pinned by docs/10-v3-spec.md §6.1 (Telex), not derived from raw data)
+- vi_vni.tsv: b362192aeca9b3bdc38bbcfdfb16ceeefe503177d77104dafc97dafdfab9ced6
+  (layout pinned by docs/10-v3-spec.md §6.1 (VNI), not derived from raw data; E over the G of the listed vi_syllables.tsv)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the site's data/ and tests/fixtures/ from keypath 2.2.0.
+"""Generate the site's data/ and tests/fixtures/ from keypath 2.3.0.
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v2.2); the cipher project
+site's own venv (from the cipher project at tag v2.3); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
 docs/09) and never imported from, executed or written to.  The walks the
 page draws come from keypath.trace (trace/1), mapped to the site's surface
@@ -53,6 +53,8 @@ from keypath.keyspec import (  # noqa: E402
 from keypath.errors import KeyValidationError, KeypathError  # noqa: E402
 from keypath.keycodec import pack as kp1_pack, unpack as kp1_unpack  # noqa: E402
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
+from keypath.layouts import vi_telex as vi_telex_layout  # noqa: E402
+from keypath.layouts import vi_vni as vi_vni_layout  # noqa: E402
 from keypath.layouts import zh_cangjie as cangjie_layout  # noqa: E402
 from keypath.layouts import zh_quick as quick_layout  # noqa: E402
 from keypath.layouts import ko_dubeolsik as ko_layout  # noqa: E402
@@ -63,18 +65,19 @@ from keypath.surfaces import zh as zh_surface  # noqa: E402
 from keypath.surfaces import zh_ko_hanja  # noqa: E402
 from keypath.surfaces.base import SPACED  # noqa: E402
 from keypath.tables import (  # noqa: E402
-    es_accent, es_en, ja_romaji, ko_dubeolsik, ko_hanja, ko_hanja_readings, ru_en, ru_jcuken,
-    tables_sha256, zh_cangjie, zh_chars, zh_daqian, zh_phrases, zh_pinyin, zh_quick,
+    VI_CHECKED_TONES, VI_STOP_CODAS, VI_TONE_MARKS, es_accent, es_en, ja_romaji, ko_dubeolsik, ko_hanja, ko_hanja_readings,
+    ru_en, ru_jcuken, tables_sha256, vi_syllables, vi_telex, vi_vni, zh_cangjie, zh_chars, zh_daqian,
+    zh_phrases, zh_pinyin, zh_quick,
 )
 from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v2.2; by default next to this repository
+# a checkout of the cipher project at tag v2.3; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-VERSION = "2.2.0"
-TAG = "v2.2"
-EDITION = "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732"
+VERSION = "2.3.0"
+TAG = "v2.3"
+EDITION = "ea386152bead693068cebb19c3d09244f19f299afaf9a650846fff2a6f8181af"
 VOCAB_SIZE = 10_000
 SEED = 20260924
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
@@ -92,6 +95,8 @@ SURFACES: dict[str, tuple[str, str]] = {
     "ko_dubeolsik": ("ko", "ko_dubeolsik"),
     "ru_jcuken": ("ru", "ru_jcuken"),
     "es_accent": ("es", "es_accent"),
+    "vi_telex": ("vi", "vi_telex"),
+    "vi_vni": ("vi", "vi_vni"),
     "en_identity": ("en", "en_identity"),
 }
 SURFACE_LABELS = {
@@ -104,26 +109,34 @@ SURFACE_LABELS = {
     "ko_dubeolsik": ("한", "Korean", "a Korean (Dubeolsik) keyboard"),
     "ru_jcuken": ("Й", "Russian ЙЦУКЕН", "a Russian ЙЦУКЕН keyboard"),
     "es_accent": ("ñ", "Spanish accents", "a Spanish accent-digit keyboard"),
+    "vi_telex": ("ư", "Vietnamese Telex", "a Vietnamese Telex keyboard"),
+    "vi_vni": ("ơ", "Vietnamese VNI", "a Vietnamese VNI keyboard"),
     "en_identity": ("a", "Plain English", "a plain English keyboard"),
 }
 SITE_ID = {pair: sid for sid, pair in SURFACES.items()}
-EN_X = [sid for sid in SURFACES if sid != "en_identity"]
+# Languages no hop leaves or reaches (docs/10 §6.5: vi is native-only): their
+# surfaces take only their own language, and no other source reaches them.
+NATIVE_ONLY = {"vi"}
+VI = [sid for sid, (lang, _layout) in SURFACES.items() if lang == "vi"]
+EN_X = [sid for sid, (lang, _layout) in SURFACES.items() if sid != "en_identity" and lang not in NATIVE_ONLY]
 # Surfaces whose English rows the page derives from another surface's rows
 # instead of loading files (docs/10 §9.7): Quick rows are the Cangjie rows
 # with each unit recoded to its Quick code and re-indexed in the Quick list.
 DERIVED_ROWS = {"zh_quick": "zh_cangjie"}
 ALLOWED = {
-    "en": list(SURFACES),
+    "en": [sid for sid, (lang, _layout) in SURFACES.items() if lang not in NATIVE_ONLY],
     "zh": ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "zh_hanja"],
     "ko": ["ko_dubeolsik"],
     "ru": ["ru_jcuken"],
     "es": ["es_accent"],
+    "vi": VI,
 }
 # The workbench's keyboards (docs/10 §9.7, M14): lookup and type answer for
 # the one layout the visitor names, over every surface typed on it (both of
 # ko_dubeolsik's: Korean and hanja).  No Japanese.
+# M15 adds Vietnamese Telex and VNI.
 WORKBENCH_LAYOUTS = ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik",
-                     "ru_jcuken", "es_accent", "en_identity"]
+                     "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni"]
 
 # Examples used by the page (§6); every one is re-encoded and asserted.
 HERO = ("welcome home", "en", "zh_daqian", "cj0u/6ru8")
@@ -134,6 +147,7 @@ CHIPS = [
     ("한국어", "ko", "ko_dubeolsik", "gksrnrdj"),
     ("ёжик", "ru", "ru_jcuken", "`;br"),
     ("mañana", "es", "es_accent", "man1ana"),
+    ("tiếng việt", "vi", "vi_telex", "tieesngvieejt"),
 ]
 HERO_ALL = {
     "zh_daqian": "cj0u/6ru8", "zh_pinyin": "huan1ying2jia1", "zh_hanja": "ghksdudrk",
@@ -156,7 +170,17 @@ MIXED = [
                         {"length": 2, "route": "zh", "layout": "zh_quick"}]),
     ("welcome home, thank you", "en", [{"length": 13, "route": "zh", "layout": "zh_cangjie"},
                                        {"length": 10, "route": "zh", "layout": "zh_quick"}]),
+    # docs/10 §10 M15: Telex and VNI segments alternating
+    ("tôi yêu việt nam", "vi", [{"length": 4, "route": "vi", "layout": "vi_telex"},
+                                {"length": 4, "route": "vi", "layout": "vi_vni"},
+                                {"length": 8, "route": "vi", "layout": "vi_telex"}]),
+    ("chúc mừng năm mới", "vi", [{"length": 5, "route": "vi", "layout": "vi_vni"},
+                                 {"length": 5, "route": "vi", "layout": "vi_telex"},
+                                 {"length": 4, "route": "vi", "layout": "vi_vni"},
+                                 {"length": 3, "route": "vi", "layout": "vi_telex"}]),
 ]
+# the tables edition of KeyPath 2.1 and 2.2, which lists no Vietnamese table
+EDITION_V2_2 = "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732"
 
 CHALLENGE_COPY = {
     1: ("Warm-up", "Type it like a local", "Two characters of very common courtesy. 🇹🇼⌨️", None),
@@ -342,7 +366,27 @@ def layouts_data() -> dict[str, Any]:
         "en_identity": {},
         "zh_cangjie": {"radicals": dict(cangjie_layout.RADICALS), "maxLetters": cangjie_layout.MAX_LETTERS},
         "zh_quick": {"maxLetters": quick_layout.MAX_LETTERS},
+        **vi_layouts_data(),
     }
+
+
+def vi_layouts_data() -> dict[str, Any]:
+    """docs/10 §6.1-§6.2: the syllable grammar's inventories (vi_syllables.tsv,
+    "-" = empty), the rule for stop codas, and each key table: the seven
+    modified letters with their keys, and the five tones by name with their
+    combining marks and keys.  The page builds G, E and D from these."""
+    syl = vi_syllables()
+    out: dict[str, Any] = {"vi_syllables": {
+        "onsets": list(syl.onsets), "nuclei": list(syl.nuclei), "codas": list(syl.codas),
+        "tones": [[name, mark] for name, mark in VI_TONE_MARKS.items()],
+        "stopCodas": sorted(VI_STOP_CODAS),
+        "checkedTones": [name for name, mark in VI_TONE_MARKS.items() if mark in VI_CHECKED_TONES],
+    }}
+    for layout, table in (("vi_telex", vi_telex()), ("vi_vni", vi_vni())):
+        assert list(table.keys_by_name) == [*table.letter_keys, *VI_TONE_MARKS]
+        out[layout] = {"letters": [[letter, table.keys_by_name[letter]] for letter in table.letter_keys],
+                       "tones": [[name, table.keys_by_name[name]] for name in VI_TONE_MARKS]}
+    return out
 
 
 def unicode14_ranges() -> list[list[int]]:
@@ -669,17 +713,19 @@ def hero_data(out: Out) -> dict[str, Any]:
 # ================================================================ fixtures
 
 def load_corpora() -> dict[str, list[str]]:
-    wanted = {"test_walk_roundtrip_zh.py": ("CURATED", "OOV_CASES"),
-              "test_walk_roundtrip_en.py": ("CORPUS",),
-              "test_walk_roundtrip_ja_es.py": ("ES_CORPUS", "JA_CORPUS")}
+    # file -> {list literal: the name it is kept under}
+    wanted = {"test_walk_roundtrip_zh.py": {"CURATED": "CURATED", "OOV_CASES": "OOV_CASES"},
+              "test_walk_roundtrip_en.py": {"CORPUS": "CORPUS"},
+              "test_walk_roundtrip_ja_es.py": {"ES_CORPUS": "ES_CORPUS", "JA_CORPUS": "JA_CORPUS"},
+              "test_walk_roundtrip_vi.py": {"CORPUS": "VI_CORPUS"}}
     found: dict[str, list[str]] = {}
     for file, names in wanted.items():
         tree = ast.parse((PROJECT / "tests" / file).read_text(encoding="utf-8"))
         for node in tree.body:
             if isinstance(node, ast.Assign) and len(node.targets) == 1 \
                     and isinstance(node.targets[0], ast.Name) and node.targets[0].id in names:
-                found[node.targets[0].id] = ast.literal_eval(node.value)
-    for name in ("CURATED", "OOV_CASES", "CORPUS", "ES_CORPUS", "JA_CORPUS"):
+                found[names[node.targets[0].id]] = ast.literal_eval(node.value)
+    for name in ("CURATED", "OOV_CASES", "CORPUS", "ES_CORPUS", "JA_CORPUS", "VI_CORPUS"):
         assert name in found, name
     golden = {}
     for name in ("vectors_zh", "vectors_zh_pinyin", "vectors_ko_hanja", "vectors_zh_cangjie", "vectors_ko", "vectors_ru"):
@@ -884,7 +930,39 @@ def fuzz_strings(rng: random.Random, vocab: list[str], rows: dict[str, dict[str,
         return " ".join(words)
 
     foov = [oov_sentence() for _ in range(50)]
-    return {"zh": fz, "ko": fko, "ru": fru, "es": fes, "en": fen, "enx": fx, "oov": foov}
+
+    # Vietnamese (docs/10 §3.2, §6.5): syllables of G (capitalized, upper,
+    # decomposed), English words in and out of G (the Telex/English seam),
+    # the double-o rhymes and toneless checked syllables G leaves out,
+    # letters that are not Vietnamese, a mark NFC cannot compose, digits
+    # and punctuation
+    grammar = sorted(vi_syllables().grammar)
+    seam = ["xoong", "boong", "voọc", "moóc", "coong", "is", "of", "cat", "it", "top", "đắk", "viêt", "hồc",
+            "the", "man", "can", "sing", "thing", "long"]
+
+    def vi_token() -> str:
+        kind = rng.randrange(12)
+        if kind < 4:
+            return rng.choice(grammar)
+        if kind == 4:
+            return rng.choice(grammar).capitalize()
+        if kind == 5:
+            return rng.choice(grammar).upper()
+        if kind == 6:
+            return unicodedata.normalize("NFD", rng.choice(grammar))
+        if kind == 7:
+            return rng.choice(seam)
+        if kind == 8:
+            return rng.choice(vocab)
+        if kind == 9:
+            return rng.choice(["ñ", "ç", "ö", "ÿ", "x\u0301", "a\u0301\u0301", "Đ", "ĐƯỜNG", "ﬁ", "ǆ"])
+        if kind == 10:
+            return rng.choice([",", ".", "!", "?", "2024", "—", "(", ")", "…", "'", "-"])
+        return " " * rng.randint(1, 3)
+
+    fvi = ["".join(vi_token() + (" " if rng.random() < 0.7 else "") for _ in range(rng.randint(1, 7))).rstrip()
+           for _ in range(400)]
+    return {"zh": fz, "ko": fko, "ru": fru, "es": fes, "en": fen, "enx": fx, "oov": foov, "vi": fvi}
 
 
 EDGE_CASES = [
@@ -895,6 +973,8 @@ EDGE_CASES = [
     ("\t", "zh"), ("𠀀𠀁𠀂", "zh"), ("𪚲", "zh"), ("豈更", "zh"), ("你好\n世界", "zh"),
     ("각", "ko"), ("ㅋㅋㅋ", "ko"), ("   ", "ko"), ("ㅤ", "ko"),
     ("\U00031350", "zh"), ("hello \U00031350", "en"), ("\ud800", "en"), ("a\udc00b", "zh"),
+    ("", "vi"), (" ", "vi"), ("   ", "vi"), ("\t", "vi"), ("VIỆT NAM", "vi"), ("vie\u0323\u0302t", "vi"),
+    ("x\u0301", "vi"), ("Đ", "vi"), ("12 34", "vi"), ("ΣΑΣ việt", "vi"), ("việt \U00031350", "vi"),
 ]
 
 
@@ -911,6 +991,21 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
             vec.add("golden-shape", golden["plaintext"], "zh", sid)
             rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (golden["plaintext"], "zh", sid))
             assert rec["expect"]["ciphertext"] == golden[sid]["ciphertext"], (golden, rec["expect"])
+    # Vietnamese (docs/10 §6.6): the goldens on both keyboards, and the
+    # Telex/English seam goldens with their words and leakage
+    for sid in VI:
+        golden = json.loads((PROJECT / "tests" / "golden" / f"vectors_{sid}.json").read_text(encoding="utf-8"))
+        for g in golden["vectors"] + golden.get("seam", []):
+            vec.add("golden-vi", g["plaintext"], "vi", sid)
+            rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (g["plaintext"], "vi", sid))
+            assert rec["expect"]["ciphertext"] == g["ciphertext"], (sid, g, rec["expect"])
+            key = json.loads(rec["expect"]["keyText"])
+            if "unit_lens" in g:
+                lens = [u["len"] for w in key["segments"][0]["words"] for u in w.get("units", [])]
+                assert lens == g["unit_lens"], (sid, g, lens)
+            else:
+                assert key["segments"][0]["words"] == g["words"], (sid, g)
+                assert rec["expect"]["leak"] == [g["leaked"], g["chars"]], (sid, g)
     for text, source, sid, cipher in CHIPS:
         vec.add("site", text, source, sid)
         rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (text, source, sid))
@@ -928,13 +1023,21 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for t in corpora["ES_CORPUS"]:
         vec.add("corpus-es", t, "es", "es_accent")
     for t in corpora["CORPUS"]:
-        for sid in SURFACES:
+        for sid in ALLOWED["en"]:
             vec.add("corpus-en", t, "en", sid)
+    for t in corpora["VI_CORPUS"]:
+        for sid in VI:
+            vec.add("corpus-vi", t, "vi", sid)
     for t in corpora["JA_CORPUS"]:
         vec.add("corpus-ja", t, "ja", "ja_romaji")
     # routes the page refuses
     vec.add("route", "你好", "zh", "ru_jcuken")
     vec.add("route", "привет", "ru", "zh_daqian")
+    # vi is native-only (docs/10 §6.5): no route leaves or reaches it
+    vec.add("route", "xin chào", "vi", "zh_daqian")
+    vec.add("route", "xin chào", "vi", "en_identity")
+    vec.add("route", "welcome home", "en", "vi_telex")
+    vec.add("route", "привет", "ru", "vi_vni")
     # fuzz
     fz = fuzz_strings(rng, vocab, rows)
     for t in fz["zh"]:
@@ -953,6 +1056,9 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
             vec.add("fuzz-en-x", t, "en", sid)
     for t in fz["oov"]:
         vec.add("fuzz-en-oov", t, "en", rng.choice(EN_X))
+    for t in fz["vi"]:
+        for sid in VI:
+            vec.add("fuzz-vi", t, "vi", sid)
     for text, source in EDGE_CASES:
         for sid in ALLOWED[source] if source != "en" else ["en_identity", "zh_daqian", "ja_romaji"]:
             vec.add("edge", text, source, sid)
@@ -960,8 +1066,12 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for sid in ALLOWED["zh"]:
         vec.add("edge", long_zh, "zh", sid)
     long_en = " ".join(rng.choice(vocab) for _ in range(60))[:200].rstrip()
-    for sid in SURFACES:
+    for sid in ALLOWED["en"]:
         vec.add("edge", long_en, "en", sid)
+    grammar = sorted(vi_syllables().grammar)
+    long_vi = " ".join(rng.choice(grammar) for _ in range(60))[:200].rstrip()
+    for sid in VI:
+        vec.add("edge", long_vi, "vi", sid)
     out.jsonl_gz("tests/fixtures/vectors.jsonl.gz", vec.records)
 
     # traces: site, challenges, sample
@@ -1204,6 +1314,39 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
                     w["translation"]["index"] = 999
                     break
         add("challenge-hop-range", ch[n]["ciphertext"], k2)
+    # Vietnamese (docs/10 §6.5, §2.1): keyed only, no homophone_index, the
+    # v2.2 edition lists no Vietnamese table, the other scheme's route tail,
+    # and a unit's chunk swapped for keys of the same length that are no
+    # unit (a VNI digit with no letter before it, a non-canonical order)
+    vi_keys = pick(lambda r: r["surface"] in VI and r["source"] == "vi" and has_units(r, False), 30)
+
+    def vi_bad_chunk(layout: str, chunk: str, digit_first: bool) -> str:
+        s = registry.surface("vi", layout)
+        cands = (["5" + chunk[1:]] if digit_first else []) + [chunk[::-1]]
+        cands += [chunk[:i] + ch + chunk[i + 1:] for i in range(len(chunk)) for ch in sorted(s.alphabet)]
+        return next(x for x in cands if x != chunk and not toolkit.lookup_unit(s, x, top=0)["well_formed"])
+
+    assert len(vi_keys) == 30
+    for i, (c, k) in enumerate(vi_keys):
+        k2 = copy.deepcopy(k)
+        seg = k2["segments"][0]
+        choice = i % 6
+        if choice == 0:
+            seg["selector_mode"] = "inline"
+            add("vi-inline", c, k2)
+        elif choice == 1:
+            first_unit(k2, False)["homophone_index"] = 0
+            add("vi-index", c, k2)
+        elif choice == 2:
+            k2["tables_sha256"] = EDITION_V2_2
+            add("vi-old-edition", c, k2)
+        elif choice == 3:
+            seg["route"] = ["keystroke:vi_vni" if seg["layout"] == "vi_telex" else "keystroke:vi_telex"]
+            add("vi-route-tail", c, k2)
+        else:
+            # literals take no keys, so the first unit's chunk starts the ciphertext
+            n = first_unit(k2, False)["len"]
+            add("vi-not-a-unit", vi_bad_chunk(seg["layout"], c[:n], choice == 4 and seg["layout"] == "vi_vni") + c[n:], k2)
     # docs/10 §2.1 decode-error parity: a zh_cangjie (and a zh_quick) key
     # with selector_mode inline, which both decoders refuse
     for layout in ("zh_cangjie", "zh_quick"):
@@ -1271,6 +1414,7 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
             lines.append(f"{char}\t{keys}\t{units[0]['homophone_index']}\n")
         result[name] = sha("".join(sorted(lines)))
         result[f"{name}Count"] = len(lines)
+    vi_digests(result)
     result["readings"] = sha("".join(
         f"{r}\t{daqian_layout.keys_for_reading(r)}\t{pinyin_layout.keys_for_reading(r)}\n"
         for r in sorted(chars.candidates_by_reading)))
@@ -1285,6 +1429,76 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
             lines.append(f"{w}\t{'-' if entry is None else jdump(entry)}\t{cipher if entry else '-'}\n")
         result["rows"][sid] = sha("".join(lines))
     out.json("tests/fixtures/digests.json", result)
+
+
+# docs/10 §9.7: exhaustive verdicts of every chunk up to these lengths (the
+# workbench's and the decoder's reading of a unit), per Vietnamese keyboard
+VI_CHUNK_MAX = {"vi_telex": 4, "vi_vni": 3}
+
+
+def vi_verdict(surface: Any, chunk: str) -> str:
+    """`=` and the syllable a chunk reads as, or `!` and lookup's violated rule."""
+    entry = toolkit.lookup_unit(surface, chunk, top=0)
+    return f"={entry['reading']}" if entry["well_formed"] else f"!{entry['error']}"
+
+
+def vi_digests(result: dict[str, Any]) -> None:
+    """docs/10 §9.7 `vi`: syllable<TAB>telex<TAB>vni over G, lines sorted by
+    code point, each keys string from the surface's own encoder; and
+    `viChunks`: every chunk over each scheme's alphabet, of length 1 to
+    VI_CHUNK_MAX, in length then alphabet order, as chunk<TAB>verdict."""
+    import itertools
+
+    grammar = vi_syllables().grammar
+    surfaces = [surface_of(sid) for sid in VI]
+    lines = []
+    for syllable in grammar:
+        keys = []
+        for s in surfaces:
+            units, k = s.encode_word(syllable, "keyed")
+            assert units == [{"len": len(k)}] and s.decode_unit(k, units[0], "keyed") == syllable, (s.name, syllable)
+            keys.append(k)
+        lines.append("\t".join([syllable, *keys]) + "\n")
+    for i, sid in enumerate(VI):
+        assert len({line.split("\t")[i + 1] for line in lines}) == len(grammar), f"E is not injective on {sid}"
+    result["vi"] = sha("".join(sorted(lines)))
+    result["viCount"] = len(grammar)
+    result["viChunks"] = {}
+    for sid, s in zip(VI, surfaces):
+        alphabet = sorted(s.alphabet)
+        body, count = [], 0
+        for n in range(1, VI_CHUNK_MAX[sid] + 1):
+            for letters in itertools.product(alphabet, repeat=n):
+                chunk = "".join(letters)
+                body.append(f"{chunk}\t{vi_verdict(s, chunk)}\n")
+                count += 1
+        result["viChunks"][sid] = {"maxLen": VI_CHUNK_MAX[sid], "count": count, "sha256": sha("".join(body)),
+                                   "wellFormed": sum(line.split("\t")[1].startswith("=") for line in body)}
+
+
+def vi_chunk_fixture(out: Out) -> None:
+    """tests/fixtures/vi-chunks.jsonl.gz: longer chunks near the syllables of
+    G, with each one's verdict (vi_verdict): a syllable's keys, and the keys
+    with one key inserted, deleted, doubled or swapped with its neighbour,
+    or followed by another syllable's keys."""
+    rng = random.Random(SEED + 15)
+    grammar = sorted(vi_syllables().grammar)
+    records, seen = [], set()
+    for sid in VI:
+        s = surface_of(sid)
+        alphabet = sorted(s.alphabet)
+        for syllable in rng.sample(grammar, 1200):
+            keys = s.encode_word(syllable, "keyed")[1]
+            i = rng.randrange(len(keys))
+            other = s.encode_word(rng.choice(grammar), "keyed")[1]
+            for chunk in (keys, keys[:i] + rng.choice(alphabet) + keys[i:], keys[:i] + keys[i + 1:],
+                          keys[:i] + keys[i] + keys[i:], keys[:i] + keys[i + 1:i + 2] + keys[i] + keys[i + 2:],
+                          keys + other):
+                if chunk and (sid, chunk) not in seen:
+                    seen.add((sid, chunk))
+                    records.append({"layout": sid, "chunk": chunk, "verdict": vi_verdict(s, chunk)})
+    out.jsonl_gz("tests/fixtures/vi-chunks.jsonl.gz", records)
+    print(f"[vi] {len(records)} chunks near G, {sum(r['verdict'][0] == '=' for r in records)} of them units")
 
 
 def unicode_fixture(out: Out) -> None:
@@ -1373,7 +1587,7 @@ _LIT = r"""('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""
 WB_RULES: dict[str, str] = {
     "alphabet": r"unit LIT contains LIT, which is outside the [a-z_]+ alphabet",
     "empty": r"empty keystroke unit",
-    "empty-unit": r"empty unit for (?:ru_jcuken|es_accent)",
+    "empty-unit": r"empty unit for (?:ru_jcuken|es_accent|vi_telex|vi_vni)",
     "tone-not-final": r"tone key not final in unit LIT",
     "bare-tone": r"unit LIT is a bare tone key",
     "not-syllable": r"unit LIT maps to LIT, which is not a syllable in the reading table",
@@ -1388,6 +1602,10 @@ WB_RULES: dict[str, str] = {
     "no-base": r"digit LIT has no base letter in unit LIT",
     "no-variant": r"no variant LIT for base LIT in unit LIT",
     "not-word": r"unit LIT is not well-formed for en_identity",
+    # docs/10 §8.2 (a) and (b); (c) cannot fire
+    "vi-undefined": r"key LIT at position \d+ cannot follow LIT \(VNI: a digit must follow the letter it marks\)",
+    "vi-not-g": r"D\([a-z0-9]+\) = [^ ]+ is not a syllable of G; canonical (?:Telex|VNI) types a vowel's tone key "
+                r"right after that vowel and its modifier key \(e\.g\. việt = (?:vieejt|vie65t)\)",
 }
 WB_RULE_RE = {name: re.compile("^" + pattern.replace("LIT", _LIT) + "$") for name, pattern in WB_RULES.items()}
 WB_SURFACE_RULES: dict[str, list[str]] = {
@@ -1401,6 +1619,8 @@ WB_SURFACE_RULES: dict[str, list[str]] = {
     "(ru, ru_jcuken)": ["alphabet", "empty-unit"],
     "(es, es_accent)": ["alphabet", "empty-unit", "no-base", "no-variant"],
     "(en, en_identity)": ["alphabet", "not-word"],
+    "(vi, vi_telex)": ["alphabet", "empty-unit", "vi-not-g"],
+    "(vi, vi_vni)": ["alphabet", "empty-unit", "vi-undefined", "vi-not-g"],
 }
 # chunks with ', ", both, and \ (docs/10 §9.7), per surface
 QUOTE_CLASSES = {"single": lambda c: "'" in c and '"' not in c, "double": lambda c: '"' in c and "'" not in c,
@@ -1452,6 +1672,10 @@ def wb_units(layout: str) -> list[str]:
         return sorted(zh_quick().candidates_by_code)
     if layout == "ko_dubeolsik":
         return sorted({ko_layout.keys_for_unit(u) for u in ko_layout.units()})
+    if layout in VI:
+        # every 20th syllable of G, typed (G has 111,003)
+        table = vi_telex() if layout == "vi_telex" else vi_vni()
+        return sorted(keys for i, keys in enumerate(table.keys_by_syllable.values()) if i % 20 == 0)
     lang = {"ru_jcuken": "ru", "es_accent": "es", "en_identity": "en"}[layout]
     if lang == "ru":
         words = sorted(ru_en().translations_by_ru)
@@ -1512,6 +1736,10 @@ def wb_lookup_fixtures(rng: random.Random) -> tuple[list[dict[str, Any]], dict[s
         "ru_jcuken": [["ghbdtn"], ["'nj"], ["`;br"], ["[kt,"]],
         "es_accent": [["man1ana"], ["pingu4ino"], ["an1o"], ["can1cio1n"]],
         "en_identity": [["welcome", "home"], ["hello"]],
+        "vi_telex": [["vieejt"], ["vieetj"], ["nguwowfi", "dduwowfng"], ["hofa", "hoaf"], ["xoong"],
+                     ["tooi", "cos", "gif"], ["the", "cat"]],
+        "vi_vni": [["vie65t"], ["vie55"], ["ngu7o72i", "d9u7o72ng"], ["ho2a", "hoa2"], ["xoong"],
+                   ["to6i", "co1", "gi2"], ["5a"]],
     }
     stats: dict[str, Any] = {}
     for layout in WORKBENCH_LAYOUTS:
@@ -1614,6 +1842,10 @@ def wb_type_texts(rng: random.Random, corpora: dict[str, list[str]]) -> dict[str
             own += some(corpora["ES_CORPUS"], 10)
         if layout == "en_identity":
             own += some(corpora["CORPUS"], 10)
+        if layout in VI:
+            own += some(corpora["VI_CORPUS"], 10) + [
+                "việt", "Việt Nam", "tôi có gì", "hòa hoà thủy thuỷ", "the man can sing", "the cat sat on the mat",
+                "xoong is of", "VIỆT NAM", "vie\u0323\u0302t", "đường về nhà", "x\u0301 ñ ç"]
         texts[layout] = own
     return texts
 
@@ -1661,6 +1893,12 @@ def workbench_fixtures(out: Out, corpora: dict[str, list[str]]) -> None:
     assert typed[("zh_cangjie", "明天")] == "(zh, zh_cangjie)\n明 ab 0/1\n天 mk 0/1"
     assert typed[("zh_quick", "明天")] == "(zh, zh_quick)\n明 ab 0/14\n天 mk 1/60"
     assert typed[("zh_cangjie", "歡迎家")].split("\n")[1] == "歡 tgno 0/3"
+    assert "  violated rule: D(vieetj) = viêtj is not a syllable of G; canonical Telex types a vowel's tone key " \
+        "right after that vowel and its modifier key (e.g. việt = vieejt)" in one("vi_telex", ["vieetj"])
+    assert "  violated rule: key '5' at position 4 cannot follow 'vie5' (VNI: a digit must follow the letter it " \
+        "marks)" in one("vi_vni", ["vie55"])
+    assert typed[("vi_telex", "tôi có gì")] == "(vi, vi_telex)\ntôi tooi -\ncó cos -\ngì gif -"
+    assert typed[("vi_vni", "tôi có gì")] == "(vi, vi_vni)\ntôi to6i -\ncó co1 -\ngì gi2 -"
 
     # coverage: every template of every surface, and each quote class, in a
     # violated rule; every quoted value is repr == pyrepr
@@ -1826,14 +2064,19 @@ def notices(out: Out) -> None:
 
 
 def kp1_ordinals(out: Out) -> None:
-    """kp1's ordinal lists (docs/10 §2.2) in the golden's own format; the
-    cipher project's tests/golden/kp1-ordinals.jsonl must be the same bytes."""
+    """kp1's ordinal lists (docs/10 §2.2) in the golden's own format, written
+    from the registry (languages, then surfaces).  The cipher project's
+    tests/golden/kp1-ordinals.jsonl is append-only, so it holds the same
+    lines in landing order (M15 appended language vi after the surfaces):
+    it must hold exactly these lines, each list in ordinal order."""
     lines = [{"list": "languages", "ordinal": i, "id": lang} for i, lang in enumerate(registry.LANGUAGES)]
     lines += [{"list": "surfaces", "ordinal": i, "id": list(pair)} for i, pair in enumerate(registry.SURFACES)]
-    text = "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines)
-    golden = (PROJECT / "tests" / "golden" / "kp1-ordinals.jsonl").read_text(encoding="utf-8")
-    assert text == golden, "the registry's ordinals differ from kp1-ordinals.jsonl"
-    out.write("tests/fixtures/kp1-ordinals.jsonl", text)
+    text = [json.dumps(line, ensure_ascii=False) + "\n" for line in lines]
+    golden = (PROJECT / "tests" / "golden" / "kp1-ordinals.jsonl").read_text(encoding="utf-8").splitlines(keepends=True)
+    assert sorted(golden) == sorted(text), "the registry's ordinals differ from kp1-ordinals.jsonl"
+    for name in ("languages", "surfaces"):
+        assert [g for g in golden if json.loads(g)["list"] == name] == [t for t in text if json.loads(t)["list"] == name]
+    out.write("tests/fixtures/kp1-ordinals.jsonl", "".join(text))
 
 
 # docs/10 §2.2 "Accepted but refused": each unpacks and packs back to itself,
@@ -1979,6 +2222,7 @@ def build(root: Path) -> Out:
     build_fixtures(out, vocab, rows, corpora, shipped)
     workbench_fixtures(out, corpora)
     digests(out, vocab, rows)
+    vi_chunk_fixture(out)
     unicode_fixture(out)
     static_fixture(out, hero, rows)
     kp1_ordinals(out)

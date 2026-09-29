@@ -97,3 +97,18 @@ test("DATA-LICENSES lists every file's path, and what changed for each copyleft 
     }
   }
 });
+
+// docs/10 §9.2: the Vietnamese tables are authored in KeyPath (MIT); the page
+// carries their inventories and key tables in data/layouts.json, so that
+// file's row credits them, and they add no copyleft source to anything
+test("the Vietnamese tables are credited as authored, MIT, and add no copyleft source", () => {
+  const layouts = JSON.parse(readFileSync(join(ROOT, "data/layouts.json"), "utf8"));
+  assert.ok(["vi_syllables", "vi_telex", "vi_vni"].every(k => k in layouts));
+  const row = md.split("\n").find(l => l.startsWith("| `data/layouts.json`"));
+  for (const table of ["vi_syllables.tsv", "vi_telex.tsv", "vi_vni.tsv"]) {
+    assert.ok(row.includes(`\`${table}\``), `DATA-LICENSES data/layouts.json row: ${table}`);
+    assert.ok(section("Sources").includes(`\`${table}\``), `DATA-LICENSES KeyPath section: ${table}`);
+  }
+  assert.match(row, /authored in KeyPath \(MIT\)/);
+  assert.deepEqual(copyleft(entryOf("data/layouts.json")), ["chewing"], "only the Pinyin spellings are LGPL-derived");
+});

@@ -34,6 +34,8 @@ const hero = readJson("data/hero.json");
 const S = readJson("tests/fixtures/static.json");
 const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 const decodeErrors = readJsonl("tests/fixtures/decode-errors.jsonl.gz");
+const traces = readJsonl("tests/fixtures/traces.jsonl.gz");
+const layoutsJson = readJson("data/layouts.json");
 const challenges = [1, 2, 3, 4, 5, 6].map(n => readJson(`data/challenges/0${n}.json`));
 const kp1Fixtures = readJson("tests/fixtures/kp1.json");
 const wbLookups = readJsonl("tests/fixtures/workbench-lookup.jsonl.gz");
@@ -124,7 +126,7 @@ await attempt("hero", async () => {
 
 await attempt("example chips", async () => {
   const chips = await b.evaluate("[...document.querySelectorAll('#examples button')].map(b => b.dataset.text)");
-  check("chips: six examples", chips.length === 6 && chips.every((t, i) => t === S.chips[i].text), chips);
+  check("chips: seven examples", chips.length === 7 && S.chips.length === 7 && chips.every((t, i) => t === S.chips[i].text), chips);
   for (const [i, c] of S.chips.entries()) {
     await b.evaluate(`document.querySelectorAll('#examples button')[${i}].click()`);
     await b.waitFor(cipherIs(c.ciphertext));
@@ -184,11 +186,99 @@ await attempt("shape keyboards", async () => {
   check("Quick: 中國 typed as lwm", guoQ === "lwm", guoQ);
 });
 
+await attempt("vietnamese", async () => {
+  // docs/10 §6.6: every golden, typed on the Telex and the VNI chip, shows Python's ciphertext and key
+  const goldens = vectors.filter(v => v.class === "golden-vi");
+  check("Vietnamese: the goldens are on both keyboards", ["vi_telex", "vi_vni"].every(s => goldens.filter(v => v.surface === s).length >= 17), goldens.length);
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    for (const v of w === 1280 ? goldens : goldens.filter((_, i) => i % 3 === 0)) {
+      await typeMessage(v.text, "vi", v.surface);
+      try {
+        await b.waitFor(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)}`, 15000);
+        await settle();
+        check(`${v.surface} at ${w}px: "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`, await b.evaluate(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)}`));
+      } catch {
+        const got = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#enc-refusal")}.textContent]`);
+        check(`${v.surface} at ${w}px: "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`, false, js(got));
+      }
+    }
+    check(`Vietnamese at ${w}px: no horizontal scroll`, await noHScroll(w), await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+    // a long message, with the keyboard legend open
+    const long = vectors.find(v => v.class === "edge" && v.source === "vi" && v.surface === "vi_vni" && Array.from(v.text).length >= 190);
+    await typeMessage(long.text, "vi", "vi_vni");
+    await b.waitFor(`${cipherIs(long.expect.ciphertext)} && ${keyIs(long.expect.keyText)}`, 15000);
+    await b.evaluate(`${q("#kbd-panel")}.open = true`);
+    await sleep(150);
+    check(`Vietnamese at ${w}px: a 200-character message and the keyboard legend, no horizontal scroll`, await noHScroll(w),
+      await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+  }
+
+  // detection (docs/10 §9.7): a letter Spanish does not share makes the message Vietnamese
+  await open(1280, 800);
+  const typeFresh = async text => {
+    await b.evaluate(`(() => { const t = ${q("#msg")}; t.value = ""; t.dispatchEvent(new Event("input")); t.focus(); })()`);
+    await b.send("Input.insertText", { text });
+  };
+  await typeFresh("tôi có gì");
+  await b.waitFor(cipherIs("tooicosgif"));
+  await settle();
+  check("detect: “tôi có gì” is Vietnamese, typed on Telex",
+    await b.evaluate(`${q("#lang")}.value === "vi" && ${q("#lang-mode")}.textContent === "detected" && ${q("input[name=kbd][value=vi_telex]")}.checked`));
+  // the walk: one unit per syllable, each letter over its keys, the modifier and tone keys marked
+  const pairs = await b.evaluate(`[...document.querySelectorAll("#walk .unit")].map(u => [...u.querySelectorAll(".pair")].map(p =>
+    [p.querySelector(".lcell").textContent, [...p.querySelectorAll("kbd")].map(k => k.querySelector(".main").textContent + (k.querySelector(".leg") ? k.querySelector(".leg").textContent : ""))]))`);
+  check("walk: tôi có gì, each letter over its keys", js(pairs) === js([[["t", ["t"]], ["ô", ["o", "oô"]], ["i", ["i"]]],
+    [["c", ["c"]], ["ó", ["o", "só"]]], [["g", ["g"]], ["ì", ["i", "fì"]]]]), js(pairs));
+  check("walk: the band is labelled Letters", await b.evaluate(`[...document.querySelectorAll("#walk .walk-gutter span")].some(s => s.textContent === "Letters") && !document.querySelector("#walk .b-sound")`));
+  // walk back animates, unit by unit, and reads the message back
+  await b.evaluate(`window.__litVi = []; window.__obsVi = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litVi.push(performance.now()); });
+    window.__obsVi.observe(${q("#walk")}, { subtree: true, attributes: true, attributeFilter: ["class"] });`);
+  await b.evaluate(`${q("#walk-back")}.click()`);
+  await b.waitFor(`!${q("#walked")}.hidden`);
+  const lit = await b.evaluate("window.__obsVi.disconnect(), window.__litVi");
+  check("walk back on Telex animates, unit by unit", lit.length >= 6 && lit[lit.length - 1] - lit[0] >= 500, lit.length);
+  check("walk back on Telex reads the message back",
+    await b.evaluate(`${q("#walked")}.textContent === "Walked back: “tôi có gì”, identical to your message."`), await b.evaluate(`${q("#walked")}.textContent`));
+  // the keyboard picture: the modifier and tone legend, read from the table
+  await b.evaluate(`${q("#kbd-panel")}.open = true`);
+  const legend = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-vi")].map(ul => [...ul.children].map(li => [li.textContent, li.classList.contains("used")]))`);
+  const telex = layoutsJson.vi_telex;
+  const example = name => `a${layoutsJson.vi_syllables.tones.find(t => t[0] === name)[1]}`.normalize("NFC");
+  check("Telex keyboard: the modifier and tone keys are the table's, those the message uses marked",
+    js(legend) === js([telex.letters.map(([l, k]) => [`${k} ${l}`, l === "ô"]), telex.tones.map(([n, k]) => [`${k} ${n} (${example(n)})`, ["sắc", "huyền"].includes(n)])]), js(legend));
+  const placement = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note")].map(n => n.textContent)`);
+  check("Telex keyboard: the keys record where the tone sits", placement.includes("The keys record where the tone mark sits: hòa is hofa, hoà is hoaf."), js(placement));
+  // VNI: the digits carry the misdirection dot and name the letter they make
+  await b.evaluate(`${q("input[name=kbd][value=vi_vni]")}.click()`);
+  await b.waitFor(cipherIs("to6ico1gi2"));
+  await settle();
+  const digits = await b.evaluate(`[...document.querySelectorAll("#walk kbd.mis")].map(k => [k.querySelector(".main").textContent, k.querySelector(".leg").textContent, k.title])`);
+  check("VNI: each digit carries its letter and the misdirection dot", js(digits) === js([["6", "ô", 'On this keyboard "6" types ô.'], ["1", "ó", 'On this keyboard "1" types ó.'], ["2", "ì", 'On this keyboard "2" types ì.']]), js(digits));
+  const vni = layoutsJson.vi_vni;
+  const legendV = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-vi")].map(ul => [...ul.children].map(li => li.textContent))`);
+  check("VNI keyboard: the modifier and tone digits are the table's",
+    js(legendV) === js([vni.letters.map(([l, k]) => `${k} ${l}`), vni.tones.map(([n, k]) => `${k} ${n} (${example(n)})`)]), js(legendV));
+  // "có" alone stays Spanish (the writer can pick Vietnamese by hand)
+  await typeFresh("có");
+  await b.waitFor(`${q("#lang")}.value === "es" && !${q("#enc-result")}.hidden`);
+  check("detect: “có” alone stays Spanish", await b.evaluate(`${q("#lang-mode")}.textContent === "detected" && ${q("input[name=kbd][value=es_accent]")}.checked`));
+  // Telex and VNI segments alternating in one key, walked back
+  const mixed = traces.find(t => t.id === "mixed-3");
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(mixed.ciphertext)}; ${q("#dec-key")}.value = ${js(mixed.keyText)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`);
+  const badges = await b.evaluate(`[${q("#dec-text")}.textContent, [...document.querySelectorAll("#dec-walk .seg-badge")].map(x => x.textContent)]`);
+  check("walk one back: Telex and VNI segments, each under its badge", badges[0] === mixed.trace.text
+    && js(badges[1]) === js(mixed.trace.segments.map(s => (s.layout === "vi_telex" ? "Telex" : "VNI") + " · Vietnamese")), js(badges));
+  await b.evaluate(`${q("#tab-enc")}.click()`);
+});
+
 await attempt("typing", async () => {
   // every live keyboard: the site vectors, the corpora and fuzz strings
   const bySurface = new Map();
   const usable = v => v.carried && !v.jsRefusal && v.expect && v.expect.ciphertext !== undefined && Array.from(v.text).length <= 200 && v.text.trim();
-  for (const cls of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en", "fuzz-en-x", "fuzz-zh", "fuzz-es", "fuzz-ru", "fuzz-ko", "fuzz-en-id"]) {
+  for (const cls of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en", "corpus-vi", "fuzz-en-x", "fuzz-zh", "fuzz-es", "fuzz-ru", "fuzz-ko", "fuzz-en-id", "fuzz-vi"]) {
     for (const v of vectors) {
       if (v.class !== cls || !usable(v)) continue;
       const k = `${v.source}/${v.surface}`;
@@ -198,7 +288,7 @@ await attempt("typing", async () => {
   }
   const picked = [...bySurface.values()].flat();
   const surfaces = new Set(picked.map(v => v.surface));
-  check("typing: vectors cover all 10 keyboards", surfaces.size === 10, [...surfaces]);
+  check("typing: vectors cover all 12 keyboards", surfaces.size === 12, [...surfaces]);
   for (const v of picked) {
     await typeMessage(v.text, v.source, v.surface);
     try {
@@ -212,7 +302,8 @@ await attempt("typing", async () => {
   }
   const oov = vectors.find(v => v.class === "fuzz-en-oov");
   await typeMessage(oov.text, oov.source, oov.surface);
-  await b.waitFor(`!${q("#enc-refusal")}.hidden`);
+  // (switching the language re-encodes the previous message first, which may be refused too)
+  await b.waitFor(`!${q("#enc-refusal")}.hidden && ${js(oov.jsRefusal[1])}.every(w => ${q("#enc-refusal")}.textContent.includes(w))`).catch(() => {});
   const msg = await b.evaluate(`${q("#enc-refusal")}.textContent`);
   check("typing: words outside the list are refused, naming them",
     msg.startsWith("Not in this page's 10,000-word English list: ") && oov.jsRefusal[1].every(w => msg.includes(w)), msg);
@@ -373,7 +464,8 @@ await attempt("share links", async () => {
   check("share: and the English", (await answer("Thank you!")) === "Solved.");
 
   // #try= keeps a language chosen by hand (not what detection would pick)
-  for (const [text, source, surface] of [["hola amigo", "es", "es_accent"], ["ok 좋아", "en", "ko_dubeolsik"], ["привет world", "en", "ru_jcuken"]]) {
+  for (const [text, source, surface] of [["hola amigo", "es", "es_accent"], ["ok 좋아", "en", "ko_dubeolsik"], ["привет world", "en", "ru_jcuken"],
+    ["xin chao ban", "vi", "vi_vni"]]) {
     await open(1280, 800);
     await typeAndWait(text, source, surface);
     const sent = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#key-pre")}.textContent, ${q("#enc-result")}.hidden]`);
@@ -828,6 +920,13 @@ if (SHOTS) {
           await b.evaluate(`${q("#kbd-panel")}.open = true`);
           await sleep(1500);
           await shotOf(`cangjie-${tag}`, ".enc-out");
+          // Vietnamese: the letters over their keys, and the VNI legend
+          await typeAndWait("Việt Nam đẹp lắm", "vi", "vi_vni");
+          await sleep(1500);
+          await shotOf(`vi-vni-${tag}`, ".enc-out");
+          await typeAndWait("Việt Nam đẹp lắm", "vi", "vi_telex");
+          await sleep(1500);
+          await shotOf(`vi-telex-${tag}`, ".enc-out");
           // the workbench, both tools answered on Bopomofo
           await b.evaluate(`(() => { ${q("#wb-kbd input[value=zh_daqian]")}.click(); ${q("#wb-keys")}.value = "cj0 u/6 ru8 zz'";
             ${q("#wb-look")}.requestSubmit(); ${q("#wb-text")}.value = "歡迎回家, hello"; ${q("#wb-type")}.requestSubmit(); })()`);

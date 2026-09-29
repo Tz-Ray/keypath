@@ -16,9 +16,9 @@ const dataFiles = files(join(ROOT, "data")).map(p => relative(ROOT, p).split("\\
 const manifest = readJson("data/manifest.json");
 
 test("data/manifest.json lists every data file with its size and sha256", () => {
-  assert.equal(manifest.keypath, "2.2.0");
-  assert.equal(manifest.tag, "v2.2");
-  assert.equal(manifest.edition, "be6aa0474bc67cec820d7ecf484678918415df21140ec57977883b7b40658732");
+  assert.equal(manifest.keypath, "2.3.0");
+  assert.equal(manifest.tag, "v2.3");
+  assert.equal(manifest.edition, "ea386152bead693068cebb19c3d09244f19f299afaf9a650846fff2a6f8181af");
   assert.deepEqual(Object.keys(manifest.files).sort(), dataFiles.filter(f => f !== "data/manifest.json"));
   for (const [path, { bytes, sha256 }] of Object.entries(manifest.files)) {
     const buf = readFileSync(join(ROOT, path));
@@ -91,5 +91,10 @@ test("registry: kp1's ordinal lists equal kp1-ordinals.jsonl (docs/10 §2.2, §9
   assert.equal(reg.strictSelectorOrdinal, 8);
   for (const [l, y] of reg.kp1Surfaces.slice(reg.strictSelectorOrdinal))
     assert.deepEqual(reg.surfaces[l][y].selectorModes, ["keyed"], `${l}/${y}`);
-  assert.deepEqual(reg.kp1Surfaces.slice(8), [["zh", "zh_cangjie"], ["zh", "zh_quick"]]);
+  assert.deepEqual(reg.kp1Surfaces.slice(8), [["zh", "zh_cangjie"], ["zh", "zh_quick"], ["vi", "vi_telex"], ["vi", "vi_vni"]]);
+  // vi is native-only (docs/10 §6.5): no English rows, no other source reaches it
+  assert.deepEqual(reg.allowed.vi, ["vi_telex", "vi_vni"]);
+  for (const [lang, sids] of Object.entries(reg.allowed))
+    if (lang !== "vi") assert.ok(sids.every(s => !s.startsWith("vi_")), lang);
+  assert.ok(!reg.hops.some(h => h.split(">").includes("vi")));
 });

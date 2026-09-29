@@ -44,6 +44,8 @@
   --seg-ko_dubeolsik: #4338CA;
   --seg-ru_jcuken: #B42318;
   --seg-es_accent: #9A5B00;
+  --seg-vi_telex: #1D4ED8;
+  --seg-vi_vni: #9D174D;
   --seg-en_identity: #475467;
 
   --shadow-card: 0 1px 2px rgb(0 0 0 / .06);
@@ -92,6 +94,8 @@
     --seg-ko_dubeolsik: #A5B4FC;
     --seg-ru_jcuken: #FF8A80;
     --seg-es_accent: #F4B860;
+    --seg-vi_telex: #8FB8FF;
+    --seg-vi_vni: #FDA4CF;
     --seg-en_identity: #B8C1CF;
     --shadow-card: 0 1px 2px rgb(0 0 0 / .3);
     --shadow-pop: 0 14px 36px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .3);
@@ -123,6 +127,8 @@
   --seg-ko_dubeolsik: #A5B4FC;
   --seg-ru_jcuken: #FF8A80;
   --seg-es_accent: #F4B860;
+  --seg-vi_telex: #8FB8FF;
+  --seg-vi_vni: #FDA4CF;
   --seg-en_identity: #B8C1CF;
   --shadow-card: 0 1px 2px rgb(0 0 0 / .3);
   --shadow-pop: 0 14px 36px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .3);
@@ -542,6 +548,8 @@ select {
 .seg[data-surface="ko_dubeolsik"] { --seg: var(--seg-ko_dubeolsik); }
 .seg[data-surface="ru_jcuken"] { --seg: var(--seg-ru_jcuken); }
 .seg[data-surface="es_accent"] { --seg: var(--seg-es_accent); }
+.seg[data-surface="vi_telex"] { --seg: var(--seg-vi_telex); }
+.seg[data-surface="vi_vni"] { --seg: var(--seg-vi_vni); }
 .cipher .cu[data-surface="zh_daqian"] { --seg: var(--seg-zh_daqian); }
 .cipher .cu[data-surface="zh_pinyin"] { --seg: var(--seg-zh_pinyin); }
 .cipher .cu[data-surface="zh_cangjie"] { --seg: var(--seg-zh_cangjie); }
@@ -551,6 +559,8 @@ select {
 .cipher .cu[data-surface="ko_dubeolsik"] { --seg: var(--seg-ko_dubeolsik); }
 .cipher .cu[data-surface="ru_jcuken"] { --seg: var(--seg-ru_jcuken); }
 .cipher .cu[data-surface="es_accent"] { --seg: var(--seg-es_accent); }
+.cipher .cu[data-surface="vi_telex"] { --seg: var(--seg-vi_telex); }
+.cipher .cu[data-surface="vi_vni"] { --seg: var(--seg-vi_vni); }
 .cipher .cu[data-surface="en_identity"] { --seg: var(--seg-en_identity); }
 .seg-badge { height: var(--seg-head); display: flex; align-items: flex-start; }
 .seg-badge span {

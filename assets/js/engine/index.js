@@ -1,5 +1,5 @@
 // The in-browser KeyPath engine: encodes the site's live routes exactly like
-// keypath 2.2.0 and decodes keys, returning the Trace the page draws.
+// keypath 2.3.0 and decodes keys, returning the Trace the page draws.
 //
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })
@@ -75,6 +75,11 @@ export async function createEngine({ fetchText } = {}) {
   }
 
   // ------------------------------------------------------------ detect
+  // The language of the plaintext a visitor types (never of a ciphertext).
+  // Vietnamese: any of its 62 letters that Spanish does not share (the 67
+  // non-ASCII letters of docs/10 §3.2 but á é í ó ú), in either case, before
+  // the Spanish test: "tôi có gì" is Vietnamese, "có" alone stays Spanish.
+  const VI_ONLY = new Set(layouts.viLetterSet("vi_telex").filter(ch => ch > "\x7f" && !"áéíóú".includes(ch)));
   function detect(text) {
     const t = text.normalize("NFC");
     // kana letters only: the katakana middle dot and the long-vowel mark
@@ -83,6 +88,7 @@ export async function createEngine({ fetchText } = {}) {
     if (/\p{Script=Han}/u.test(t)) return "zh";
     if (/\p{Script=Hangul}/u.test(t)) return "ko";
     if (/\p{Script=Cyrillic}/u.test(t)) return "ru";
+    for (const ch of t.toLowerCase()) if (VI_ONLY.has(ch)) return "vi";
     if (/[ñáéíóúü¿¡]/iu.test(t)) return "es";
     if (/\p{Script=Latin}/u.test(t)) return "en";
     return null;

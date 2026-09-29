@@ -4,6 +4,7 @@
 {"list": "languages", "ordinal": 3, "id": "en"}
 {"list": "languages", "ordinal": 4, "id": "ko"}
 {"list": "languages", "ordinal": 5, "id": "ru"}
+{"list": "languages", "ordinal": 6, "id": "vi"}
 {"list": "surfaces", "ordinal": 0, "id": ["zh", "zh_daqian"]}
 {"list": "surfaces", "ordinal": 1, "id": ["zh", "zh_pinyin"]}
 {"list": "surfaces", "ordinal": 2, "id": ["ja", "ja_romaji"]}
@@ -14,3 +15,5 @@
 {"list": "surfaces", "ordinal": 7, "id": ["ru", "ru_jcuken"]}
 {"list": "surfaces", "ordinal": 8, "id": ["zh", "zh_cangjie"]}
 {"list": "surfaces", "ordinal": 9, "id": ["zh", "zh_quick"]}
+{"list": "surfaces", "ordinal": 10, "id": ["vi", "vi_telex"]}
+{"list": "surfaces", "ordinal": 11, "id": ["vi", "vi_vni"]}

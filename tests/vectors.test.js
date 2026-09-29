@@ -1,4 +1,4 @@
-// Encode/decode parity with keypath 2.2.0 on the generated corpus
+// Encode/decode parity with keypath 2.3.0 on the generated corpus
 // (tests/fixtures/vectors.jsonl.gz, written by tools/build_data.py): the
 // site's examples, the cipher project's round-trip corpora and golden
 // vectors, seeded fuzz strings per live surface, and edge cases.
@@ -10,11 +10,18 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 
 test("the corpus covers every class and live surface", () => {
   const classes = new Set(vectors.map(v => v.class));
-  for (const c of ["site", "golden-shape", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
-    "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "edge"])
+  for (const c of ["site", "golden-shape", "golden-vi", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
+    "corpus-vi", "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "fuzz-vi", "route", "edge"])
     assert.ok(classes.has(c), c);
   const surfaces = new Set(vectors.filter(v => !v.jsRefusal && !v.expect.error).map(v => v.surface));
-  assert.equal(surfaces.size, 10);
+  assert.equal(surfaces.size, 12);
+  // Vietnamese: the §6.6 goldens, the corpus, fuzz and edge cases on both keyboards
+  for (const sid of ["vi_telex", "vi_vni"])
+    for (const c of ["golden-vi", "corpus-vi", "fuzz-vi", "edge"])
+      assert.ok(vectors.some(v => v.class === c && v.surface === sid && v.source === "vi" && !v.jsRefusal), `${c} on ${sid}`);
+  // vi is native-only (docs/10 §6.5): Python raises for a route to or from it, the page refuses it
+  const routes = vectors.filter(v => v.class === "route" && (v.source === "vi") !== v.surface.startsWith("vi_"));
+  assert.ok(routes.length >= 4 && routes.every(v => v.expect.error === "EncodeError" && v.jsRefusal[0] === "routeOff"));
   assert.ok(vectors.length > 10000, `${vectors.length} vectors`);
   // every live surface has fuzz, and Cangjie and Quick the zh corpus and the en one
   for (const sid of ["zh_cangjie", "zh_quick"])

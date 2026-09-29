@@ -37,7 +37,9 @@ function blocks(text) {
 
 test("the workbench keyboards are docs/10 §9.7's, each with its surfaces in registry order", () => {
   assert.deepEqual(registry.workbench.map(w => w.layout), rules.layouts);
-  assert.deepEqual(rules.layouts, ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity"]);
+  // M14's keyboards, then Vietnamese Telex and VNI (M15)
+  assert.deepEqual(rules.layouts, ["zh_daqian", "zh_pinyin", "zh_cangjie", "zh_quick", "ko_dubeolsik", "ru_jcuken", "es_accent", "en_identity",
+    "vi_telex", "vi_vni"]);
   for (const { layout, surfaces } of registry.workbench) {
     assert.deepEqual(surfaces, registry.kp1Surfaces.filter(([, l]) => l === layout), layout);
     assert.ok(surfaces.every(([language]) => language !== "ja"), layout);

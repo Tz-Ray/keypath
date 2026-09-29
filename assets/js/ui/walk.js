@@ -12,6 +12,10 @@ const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
 const UNIT_LIMIT = 60;
 /** Layouts whose units are shape codes: their band under the characters shows radicals. */
 export const SHAPE_LAYOUTS = new Set(["zh_cangjie", "zh_quick"]);
+/** Vietnamese layouts: a letter's keys are its base, then a modifier key, then a tone key (docs/10 §6.3). */
+export const VI_LAYOUTS = new Set(["vi_telex", "vi_vni"]);
+/** The lang tag of a key's legend on each layout. */
+const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", es_accent: "es", vi_telex: "vi", vi_vni: "vi" };
 const FAN_MAX = 10;
 
 // ------------------------------------------------------------ legends
@@ -31,6 +35,7 @@ export function makeLegends(layouts) {
 
   /** keys (string) on a layout -> [{key, legend, mis, shift}] */
   function legends(layout, keys) {
+    if (VI_LAYOUTS.has(layout)) return viLegends(layout, keys);
     const ks = cps(keys);
     return ks.map((key, i) => {
       let legend = "", mis = false, shift = false;
@@ -42,6 +47,16 @@ export function makeLegends(layouts) {
       else if (SHAPE_LAYOUTS.has(layout)) legend = shape.get(key) || "";
       return { key, legend, mis, shift };
     });
+  }
+  /**
+   * A Vietnamese unit's keys: a modifier or tone key shows the letter as it
+   * stands after it (e e j: ê, then ệ); a VNI digit types a mark, not a
+   * digit, so it carries the misdirection dot.  Keys that are no unit get no legend.
+   */
+  function viLegends(layout, keys) {
+    let letters;
+    try { letters = layouts.viLetters(layout, keys); } catch { return cps(keys).map(key => ({ key, legend: "", mis: false, shift: false })); }
+    return letters.flatMap(l => l.keys.map(k => ({ key: k.key, legend: k.shows, mis: k.role !== "letter" && k.key >= "0" && k.key <= "9", shift: false })));
   }
   return { legends, dq, ko, ru, es, shape, layouts };
 }
@@ -130,7 +145,7 @@ function keycaps(legend, layout) {
     return h("span.kc", h("kbd", { lang: "en", translate: "no", title, class: mis ? "mis" : null },
       shift ? h("span.shift", { "aria-hidden": "true" }, "⇧") : null,
       h("span.main", shift ? key : key),
-      leg ? h("span.leg", { lang: layout === "ru_jcuken" ? "ru" : layout === "ko_dubeolsik" ? "ko" : layout === "es_accent" ? "es" : "zh-Hant", "aria-hidden": "true" }, leg) : null,
+      leg ? h("span.leg", { lang: LEGEND_LANG[layout] || "zh-Hant", "aria-hidden": "true" }, leg) : null,
       mis ? h("span.dot", { "aria-hidden": "true" }) : null));
   });
   return h("span.keyrow", { style: { "--n": String(legend.length) } }, caps);
@@ -322,11 +337,14 @@ export function renderWalk(host, trace, ctx) {
       li.setAttribute("aria-label", `${unit.out}, keys ${keysText}`);
       if (hasHomophone) li.append(h("div.band.b-upper-rest", { style: { "--bi": String(bandIndex.get("char")) } }));
       // one pair per letter: the letter over its key(s), wrapping together
+      // (a Vietnamese letter over its base, modifier and tone keys)
       const letters = cps(unit.out);
+      const viKeyCounts = VI_LAYOUTS.has(layout) ? ctx.layouts.viLetters(layout, unit.keys).map(l => l.keys.length) : null;
       const pairs = h("div.pairs", { style: { "--bi": String(bandIndex.get(hasHomophone ? "sound" : "letters")) } });
       let k = 0;
-      for (const letter of letters) {
-        const n = layout === "es_accent" && k + 1 < legend.length && /[0-9]/.test(legend[k + 1].key) ? 2 : 1;
+      for (const [li, letter] of letters.entries()) {
+        const n = viKeyCounts ? viKeyCounts[li]
+          : layout === "es_accent" && k + 1 < legend.length && /[0-9]/.test(legend[k + 1].key) ? 2 : 1;
         const caps = legend.slice(k, k + n);
         k += n;
         // a cell over two keys (an accent digit) gets one edge to each

@@ -1,8 +1,11 @@
-// Hop-free encoders, ported from keypath 2.2.0:
+// Hop-free encoders, ported from keypath 2.3.0:
 //   zh on Dàqiān / Pinyin  - zh.greedy_segment + make_surface.encode_native + word_units
 //   zh on Cangjie / Quick   - the same segmentation + zh_coded.make_surface's encode_word
 //   zh on Dubeolsik (hanja) - zh_ko_hanja.encode_native / encode_word
 //   ko, ru, es, en          - tokenized_native_encoder over each surface's encode_word
+//   vi on Telex / VNI       - docs/10 §3.2 and §6.5: a word (a maximal run of
+//                             the 93 Vietnamese letters) is one unit, typed by
+//                             E, iff it is a syllable of G; else a literal
 //
 // The reading choices Python makes from tsi.csv (phrase readings, the
 // sandhi fallback, one-character phrase readings) and from hanja.txt (word
@@ -250,19 +253,26 @@ export function createNative({ data, layouts, lists }) {
 
   // ------------------------------------------------------ word-per-unit
   const esChars = layouts.esWordChars.join("");
+  // vi: a-z and the 67 other letters E types (docs/10 §3.2)
+  const viChars = layouts.viLetterSet("vi_telex").join("");
   const TOKENIZERS = {
     ko: /[가-힣ㄱ-ㅣ]+/gu,
     ru: /[а-яё]+/gu,
     es: new RegExp(`[${esChars}]+`, "gu"),
     en: /[a-z]+/gu,
+    vi: new RegExp(`[${viChars}]+`, "gu"),
   };
   const WORD_KEYS = {
     ko_dubeolsik: word => Array.from(word).map(ch => layouts.koKeys(ch)),
     ru_jcuken: word => [layouts.ruKeysForWord(word)],
     es_accent: word => [layouts.esKeysForWord(word)],
     en_identity: word => [layouts.enKeysForWord(word)],
+    vi_telex: word => [layouts.viKeys("vi_telex", word)],
+    vi_vni: word => [layouts.viKeys("vi_vni", word)],
   };
-  const SURFACE_LANGUAGE = { ko_dubeolsik: "ko", ru_jcuken: "ru", es_accent: "es", en_identity: "en" };
+  const SURFACE_LANGUAGE = {
+    ko_dubeolsik: "ko", ru_jcuken: "ru", es_accent: "es", en_identity: "en", vi_telex: "vi", vi_vni: "vi",
+  };
 
   /** encode_word of a bijective surface: [units, keys] or null. */
   function encodeBijectiveWord(word, sid) {
@@ -272,7 +282,7 @@ export function createNative({ data, layouts, lists }) {
     return [keys.map(k => ({ len: k.length })), keys.join("")];
   }
 
-  /** tokenized_native_encoder for ko / ru / es / en: {words, parts}. */
+  /** tokenized_native_encoder for ko / ru / es / en / vi (all spaced): {words, parts}. */
   function encodeBijective(text, sid) {
     const lang = SURFACE_LANGUAGE[sid];
     const items = tokensToItems(regexTokens(text, TOKENIZERS[lang]), word => {

@@ -2,14 +2,14 @@
 // (The static copy lives in index.html.)
 
 export const LANG_NAMES = {
-  en: "English", es: "Spanish", ru: "Russian", ko: "Korean", zh: "Chinese", ja: "Japanese",
+  en: "English", es: "Spanish", ru: "Russian", ko: "Korean", zh: "Chinese", ja: "Japanese", vi: "Vietnamese",
 };
 
 /** The BCP 47 tag for native-script text of each KeyPath language. */
-export const LANG_TAGS = { zh: "zh-Hant", ja: "ja", ko: "ko", ru: "ru", es: "es", en: "en" };
+export const LANG_TAGS = { zh: "zh-Hant", ja: "ja", ko: "ko", ru: "ru", es: "es", en: "en", vi: "vi" };
 
 /** Default keyboard when the message language changes (§4.1). */
-export const DEFAULT_SURFACE = { zh: "zh_daqian", ko: "ko_dubeolsik", ru: "ru_jcuken", es: "es_accent" };
+export const DEFAULT_SURFACE = { zh: "zh_daqian", ko: "ko_dubeolsik", ru: "ru_jcuken", es: "es_accent", vi: "vi_telex", en: "zh_daqian" };
 
 /** Segment badge names. */
 export const SURFACE_BADGE = {
@@ -22,6 +22,8 @@ export const SURFACE_BADGE = {
   ko_dubeolsik: "Dubeolsik · Korean",
   ru_jcuken: "ЙЦУКЕН · Russian",
   es_accent: "Accent digits · Spanish",
+  vi_telex: "Telex · Vietnamese",
+  vi_vni: "VNI · Vietnamese",
   en_identity: "Plain · English",
 };
 

@@ -12,6 +12,35 @@ const INDENT = [0, 0.5, 0.75, 1.25];
 const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
 const DAQIAN_TONES = new Set(["6", "3", "4", "7"]);
 const SHAPE = new Set(["zh_cangjie", "zh_quick"]);
+const VI = new Set(["vi_telex", "vi_vni"]);
+const VI_NOTE = {
+  vi_telex: "Every key types its own letter. Typed right after a letter, a modifier key changes it; typed right after a vowel, a tone key gives the syllable its tone:",
+  vi_vni: "Letters type themselves. Typed right after a letter, a digit changes it (6 to 9) or gives the syllable its tone (1 to 5):",
+};
+
+/**
+ * The Telex or VNI legend, read from the layout's table (docs/10 §6.1):
+ * {modifiers: [{keys, letter, used}], tones: [{key, name, example, used}], placement: [[word, keys]]},
+ * `used` when the units of `pairs` ([keys, reading]) type that modifier or tone.
+ */
+export function viLegendModel(layouts, layout, pairs = []) {
+  const { modifiers, tones } = layouts.viLegend(layout);
+  const usedMods = new Set(), usedTones = new Set();
+  for (const [keys] of pairs) {
+    let letters;
+    try { letters = layouts.viLetters(layout, keys); } catch { continue; }
+    for (const l of letters) for (const k of l.keys) {
+      if (k.role === "modifier") usedMods.add(l.keys[0].key + k.key);
+      if (k.role === "tone") usedTones.add(k.key);
+    }
+  }
+  return {
+    modifiers: modifiers.map(([keys, letter]) => ({ keys, letter, used: usedMods.has(keys) })),
+    tones: tones.map(([key, name, mark]) => ({ key, name, example: `a${mark}`.normalize("NFC"), used: usedTones.has(key) })),
+    // §6.3: the keys record where the mark sits
+    placement: ["hòa", "hoà"].map(w => [w, layouts.viKeys(layout, w)]),
+  };
+}
 
 /**
  * Render the picture for `layout` into `host` (a <details> body).  Returns
@@ -35,6 +64,18 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
     const pairs = extra.pairs || [];
     host.append(h("p.kb-note", "Kana are typed as romaji; っ doubles the next consonant; ん is nn."),
       pairs.length ? h("ul.kb-es", pairs.map(([keys, kana]) => h("li", h("kbd", { lang: "en" }, keys), " ", h("span", { lang: "ja" }, kana)))) : null);
+    return { highlight() {}, flash() {} };
+  }
+  if (VI.has(layout)) {
+    const m = viLegendModel(legends.layouts, layout, extra.pairs || []);
+    const vi = text => h("span", { lang: "vi" }, text);
+    host.append(h("p.kb-note", VI_NOTE[layout]),
+      h("ul.kb-es.kb-vi", { "aria-label": "Modifier keys" }, m.modifiers.map(x => h("li", { class: x.used ? "used" : null },
+        h("kbd", { lang: "en" }, x.keys), " ", vi(x.letter)))),
+      h("ul.kb-es.kb-vi", { "aria-label": "Tone keys" }, m.tones.map(x => h("li", { class: x.used ? "used" : null },
+        h("kbd", { lang: "en" }, x.key), " ", vi(`${x.name} (${x.example})`)))),
+      h("p.kb-note", "The keys record where the tone mark sits: ", vi(m.placement[0][0]), " is ", h("kbd", { lang: "en" }, m.placement[0][1]),
+        ", ", vi(m.placement[1][0]), " is ", h("kbd", { lang: "en" }, m.placement[1][1]), "."));
     return { highlight() {}, flash() {} };
   }
   if (layout === "en_identity") return null;

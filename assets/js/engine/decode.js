@@ -2,7 +2,8 @@
 // (the walk the page draws).  Adapted from cipher-project
 // scripts/build_demo.py (v2.0), MIT: decodeUnits / decodeKeypath and the
 // layout readers, extended with ja_romaji (keyed and inline selectors),
-// en_identity and the Cangjie and Quick shape codes, and reading every
+// en_identity, the Cangjie and Quick shape codes and the Vietnamese
+// syllables (Telex, VNI; docs/10 §6.5), and reading every
 // candidate list through the list store so the page refuses, never
 // misreads, when it lacks a list.
 import { cpLength } from "./unicode.js";
@@ -50,6 +51,9 @@ function makeUnitReader({ layouts, lists }) {
     "ru/ru_jcuken": chunk => bijective(guard(chunk, () => layouts.ruWord(chunk))),
     "es/es_accent": chunk => bijective(guard(chunk, () => layouts.esWord(chunk))),
     "en/en_identity": chunk => bijective(guard(chunk, () => layouts.enWord(chunk))),
+    // one unit is one syllable of G: D(chunk), when E types it back as the chunk
+    "vi/vi_telex": chunk => bijective(guard(chunk, () => layouts.viSyllable("vi_telex", chunk))),
+    "vi/vi_vni": chunk => bijective(guard(chunk, () => layouts.viSyllable("vi_vni", chunk))),
     "ja/ja_romaji": (chunk, unit, mode) => {
       let romaji = chunk, index, selected = null;
       if (mode === "inline") {

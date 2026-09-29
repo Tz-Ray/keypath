@@ -1,6 +1,8 @@
-// Ports of keypath/layouts/*.py (KeyPath 2.2.0), both directions, built
+// Ports of keypath/layouts/*.py (KeyPath 2.3.0), both directions, built
 // from data/layouts.json.  The keys -> text readers are adapted from
-// cipher-project scripts/build_demo.py (v2.0), MIT.
+// cipher-project scripts/build_demo.py (v2.0), MIT.  The Vietnamese
+// layouts (Telex, VNI) are written from KeyPath's specification (docs/10
+// §6): the syllable grammar, the canonical keystrokes and the decode pass.
 //
 // Every function throws LayoutError on a malformed unit, like Python.  The
 // keys -> text readers throw Python's own messages, values quoted by
@@ -287,10 +289,165 @@ export function makeLayouts(L) {
   /** "ab" -> 日月 (display only). */
   const radicalsOf = code => Array.from(code, ch => (has(radicals, ch) ? radicals[ch] : "?")).join("");
 
+  // ------------------------------------------------- vi_telex, vi_vni
+  // Written from docs/10 §6 over the tables in data/layouts.json: the
+  // syllable grammar G (§6.2, the inventories of vi_syllables.tsv), the
+  // canonical keystrokes E (§6.3) and the one left-to-right decode D (§6.4)
+  // of each key table (§6.1).  A unit is one syllable: a chunk c is a unit
+  // iff D(c) is defined, D(c) is in G and E(D(c)) = c (§6.5), and the
+  // rejections are §8.2's fixed texts.
+  const VI_LAYOUTS = ["vi_telex", "vi_vni"];
+  const VI_NAMES = { vi_telex: "Telex", vi_vni: "VNI" };
+  // §8.2 (a): the note that ends D's "undefined" message (on Telex every
+  // key of the alphabet is a letter, so it cannot show there)
+  const VI_UNDEFINED = { vi_telex: "Telex types only the letters a-z", vi_vni: "VNI: a digit must follow the letter it marks" };
+  const VOWEL_BASES = new Set("aeiouy");        // §6.4 rule 2: a tone lands only on these
+  const isLower = k => k.length === 1 && k >= "a" && k <= "z";
+  const nfc = s => s.normalize("NFC");
+  const vi = L.vi_syllables;
+  const viMarks = new Map(vi.tones);             // tone name -> combining mark
+  const viSchemes = new Map();
+  /** One key table: {pairs: base+modifier -> letter, tones: key -> mark, letterKeys: letter -> E keys}. */
+  function viScheme(layout) {
+    if (!VI_LAYOUTS.includes(layout)) fail(`${layout} is not a Vietnamese layout`);
+    let s = viSchemes.get(layout);
+    if (s) return s;
+    const pairs = new Map(), tones = new Map(), letterKeys = new Map();
+    for (const ch of "abcdefghijklmnopqrstuvwxyz") letterKeys.set(ch, ch);
+    // §6.1: a modified letter's first key is its base letter, its second the modifier key
+    for (const [letter, keys] of L[layout].letters) {
+      if (keys.length !== 2 || !isLower(keys[0]) || pairs.has(keys)) fail(`${layout}: ${letter} is not a base letter and one modifier key`);
+      pairs.set(keys, letter);
+      letterKeys.set(letter, keys);
+    }
+    for (const [name, key] of L[layout].tones) {
+      if (key.length !== 1 || tones.has(key) || !viMarks.has(name)) fail(`${layout}: the tone ${name} is not one key of its own`);
+      tones.set(key, viMarks.get(name));
+    }
+    // §6.3, letter by letter: a vowel carrying a tone is its keys, then the tone key
+    for (const [letter, keys] of [...letterKeys]) {
+      if (!VOWEL_BASES.has(keys[0])) continue;
+      for (const [key, mark] of tones) letterKeys.set(nfc(letter + mark), keys + key);
+    }
+    s = { layout, pairs, tones, letterKeys };
+    viSchemes.set(layout, s);
+    return s;
+  }
+
+  let viG = null;
+  /** G (§6.2): every NFC(o + n' + c); n' is n, or n with one letter carrying one tone; a stop coda takes sắc or nặng. */
+  function viGrammar() {
+    if (viG) return viG;
+    const checked = new Set(vi.checkedTones.map(name => viMarks.get(name)));
+    const stops = new Set(vi.stopCodas);
+    const G = new Set();
+    for (const nucleus of vi.nuclei) {
+      const letters = Array.from(nucleus);
+      const withChecked = [], withOther = [nucleus];
+      letters.forEach((letter, i) => {
+        for (const mark of viMarks.values()) {
+          const toned = nfc(letters.slice(0, i).join("") + letter + mark + letters.slice(i + 1).join(""));
+          (checked.has(mark) ? withChecked : withOther).push(toned);
+        }
+      });
+      for (const coda of vi.codas) {
+        const variants = stops.has(coda) ? withChecked : withChecked.concat(withOther);
+        for (const onset of vi.onsets) for (const v of variants) G.add(nfc(onset + v + coda));
+      }
+    }
+    viG = G;
+    return G;
+  }
+
+  /** E (§6.3) letter by letter over any string of Vietnamese letters (LayoutError otherwise). */
+  function viLettersKeys(layout, text) {
+    const { letterKeys } = viScheme(layout);
+    let out = "";
+    for (const ch of text) {
+      if (!letterKeys.has(ch)) fail(`${R(ch)} in ${R(text)} is not a Vietnamese letter`);
+      out += letterKeys.get(ch);
+    }
+    return out;
+  }
+  /** E(t) for a syllable t of G: việt -> "vieejt" (Telex), "vie65t" (VNI). */
+  function viKeys(layout, syllable) {
+    if (!viGrammar().has(syllable)) fail(`${R(syllable)} is not a syllable of G (vi_syllables.tsv), so it is not typable on ${layout}`);
+    return viLettersKeys(layout, syllable);
+  }
+
+  /**
+   * D's pass (§6.4) over a chunk, keeping each key's part: -> [{base, mod, tone, keys: [[key, role]]}]
+   * with role "letter", "modifier" or "tone"; LayoutError (§8.2 a) where D is undefined.
+   */
+  function viCells(layout, chunk) {
+    const s = viScheme(layout);
+    const cells = [];
+    const keys = Array.from(chunk);
+    keys.forEach((k, i) => {
+      const last = cells.length ? cells[cells.length - 1] : null;
+      if (last && !last.mod && !last.tone && s.pairs.has(last.base + k)) {          // rule 1
+        last.mod = s.pairs.get(last.base + k);
+        last.keys.push([k, "modifier"]);
+      } else if (last && VOWEL_BASES.has(last.base) && s.tones.has(k) && !cells.some(c => c.tone)) {   // rule 2
+        last.tone = s.tones.get(k);
+        last.keys.push([k, "tone"]);
+      } else if (isLower(k)) {                                                         // rule 3
+        cells.push({ base: k, mod: "", tone: "", keys: [[k, "letter"]] });
+      } else {                                                                         // rule 4
+        fail(`key ${R(k)} at position ${i} cannot follow ${R(keys.slice(0, i).join(""))} (${VI_UNDEFINED[layout]})`);
+      }
+    });
+    return cells;
+  }
+  const cellText = c => nfc((c.mod || c.base) + c.tone);
+  /** D(chunk): the NFC concatenation of the cells. */
+  const viDecode = (layout, chunk) => nfc(viCells(layout, chunk).map(cellText).join(""));
+
+  /** The syllable a unit reads as (§6.5), or LayoutError with §8.2's text for the first condition that fails. */
+  function viSyllable(layout, chunk) {
+    if (!chunk) fail(`empty unit for ${layout}`);
+    const text = viDecode(layout, chunk);                                             // (a)
+    if (!viGrammar().has(text))                                                       // (b)
+      fail(`D(${chunk}) = ${text} is not a syllable of G; canonical ${VI_NAMES[layout]} types a vowel's tone key `
+        + `right after that vowel and its modifier key (e.g. việt = ${viKeys(layout, "việt")})`);
+    const canonical = viKeys(layout, text);
+    if (canonical !== chunk) fail(`D(${chunk}) = ${text}, whose canonical keys are ${canonical}`);   // (c)
+    return text;
+  }
+
+  /**
+   * A unit's letters over its keys, for the walk: [{letter, keys: [{key, role, shows}]}], where
+   * `shows` is the letter as it stands after a modifier or tone key ("" for a letter key).
+   */
+  function viLetters(layout, chunk) {
+    return viCells(layout, chunk).map(c => {
+      const partial = { base: c.base, mod: "", tone: "" };
+      return {
+        letter: cellText(c),
+        keys: c.keys.map(([key, role]) => {
+          if (role === "modifier") partial.mod = c.mod;
+          if (role === "tone") partial.tone = c.tone;
+          return { key, role, shows: role === "letter" ? "" : cellText(partial) };
+        }),
+      };
+    });
+  }
+
+  /** The keyboard legend of a Vietnamese layout: {modifiers: [[keys, letter]], tones: [[key, name, mark]]}, in table order. */
+  function viLegend(layout) {
+    return {
+      modifiers: L[layout].letters.map(([letter, keys]) => [keys, letter]),
+      tones: L[layout].tones.map(([name, key]) => [key, name, viMarks.get(name)]),
+    };
+  }
+
   return {
     data: L,
     daqianKeys, daqianReading, pinyinKeys, pinyinReading,
     shapeCode, quickOf, radicalsOf, radicals,
+    viGrammar, viKeys, viLettersKeys, viDecode, viSyllable, viLetters, viLegend,
+    /** The Vietnamese letters (a-z, then the 67 others, §3.2) that layout's E types. */
+    viLetterSet: layout => [...viScheme(layout).letterKeys.keys()],
     koKeys, koUnit, koDecompose, isKoUnit,
     koUnits: () => { koEnumeration(); return koForward; },
     ruKeysForWord, ruWord, esKeysForWord, esWord, esWordChars,
