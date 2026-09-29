@@ -338,6 +338,21 @@ await attempt("ETen, Jyutping and kana", async () => {
     [...document.querySelectorAll("#dec-walk .rank")].map(r => r.textContent), [...document.querySelectorAll("#dec-walk .seg-badge")].map(x => x.textContent)]`);
   check("kana: ありがとう's key walks back, kana over its keys, as typed", kanaWalk[0] === "ありがとう"
     && js(kanaWalk[1]) === js(["3あ", "lり", "tか", "[゛", "sと", "4う"]) && js(kanaWalk[2]) === js(["kana as typed"]), js(kanaWalk));
+  // its unit, left at its kana, still names the reading's SKK words (Python's count 2), never the kana alone
+  await b.evaluate(`document.querySelector('#dec-walk .stack').click()`);
+  await b.waitFor(`document.querySelector('.popover') && !document.querySelector('.popover').hidden`);
+  const kanaPop = await b.evaluate(`[document.querySelector('.popover .pop-title').textContent, [...document.querySelectorAll('.popover .cand .cg')].map(c => c.textContent)]`);
+  check("kana: the unit's popover lists SKK's two words for ありがとう", kanaPop[0] === "ありがとう: 2 words share this reading"
+    && js(kanaPop[1]) === js(["有難う", "有り難う"]), js(kanaPop));
+  await b.evaluate("document.querySelector('.popover .pop-close').click()");
+  // a kana unit whose reading's list the page lacks is refused, with the reason
+  const lacking = JSON.parse(kanaGolden.expect.keyText);
+  lacking.segments[0].words[0].units[0].len = 5;
+  await b.evaluate(`(() => { ${q("#dec-err")}.hidden = true; ${q("#dec-cipher")}.value = "3lt[s"; ${q("#dec-key")}.value = ${js(JSON.stringify(lacking))}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-err")}.hidden`);
+  const lackMsg = await b.evaluate(`${q("#dec-err")}.textContent`);
+  check("kana: a unit whose list the page lacks is refused, not shown as the kana alone",
+    lackMsg.includes("This key needs dictionary data this page doesn't carry (the homophone:ja candidates of ありがと)"), lackMsg);
   await b.evaluate(`${q("#tab-enc")}.click()`);
 
   // a #walk link on a new keyboard (the kana golden, its key as kp1) decodes and animates
@@ -366,7 +381,9 @@ await attempt("ETen, Jyutping and kana", async () => {
     [k.dataset.key, [k.querySelector(".us").textContent, k.querySelector(".sym") ? k.querySelector(".sym").textContent : "", k.classList.contains("tone")]]))`);
   const matches = (pic, layout, shift) => Object.entries(pic).every(([key, [us, sym]]) => {
     const typed = shift ? shiftedOf(key) : key;
-    return sym === (legendsJson.layouts[layout][typed] ?? "") && us === (typed === key ? key : `⇧${typed}`);
+    // KeyPath's legends, except where its picture shows another label (kana's [ ゛ and ] ゜)
+    const want = (legendsJson.pictures[layout] || {})[typed] ?? legendsJson.layouts[layout][typed] ?? "";
+    return sym === want && us === (typed === key ? key : `⇧${typed}`);
   });
   const shiftedOf = key => legendsJson.usShiftedRows.join("")[legendsJson.usRows.join("").indexOf(key)];
   for (const [w, h] of [[1280, 800], [360, 780]]) {

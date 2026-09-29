@@ -448,7 +448,11 @@ def legends_fixture(out: Out) -> None:
     """tests/fixtures/legends.json: what each key alone means on every
     registered layout (docs/10 §8.4, `LayoutInfo.legends`, read from the
     tables) and the US keys row by row with their shifted keys.  The page's
-    keyboard pictures must draw exactly these legends (docs/10 §9.7)."""
+    keyboard pictures must draw exactly these legends (docs/10 §9.7), except
+    where `pictures` says a key's picture shows something else: the JIS kana
+    voicing keys `[` `]`, whose legends are the keys themselves (§8.4's
+    default), show the marks ゛ ゜ they add, as `keypath layouts ja_kana`
+    draws them."""
     layouts = {layout: dict(registry.layout_info(layout).legends) for layout in registry.registered_layouts()}
     grid = set("".join(US_ROWS)) | set("".join(US_SHIFTED_ROWS))
     assert [len(r) for r in US_ROWS] == [len(r) for r in US_SHIFTED_ROWS]
@@ -459,8 +463,13 @@ def legends_fixture(out: Out) -> None:
     assert layouts["zh_eten"]["7"] == "ㄑ" == next(s for s, k in et.symbol_to_key.items() if k == "7")
     for key, want in (("\\", "む"), (")", "を"), ("V", "ゐ"), ("Z", "っ")):
         assert layouts["ja_kana"][key] == want and kana[want] == key, key
+    labels = kana_layout.picture_labels()
+    pictures = {"ja_kana": {k: v for k, v in labels.items() if layouts["ja_kana"][k] != v}}
+    assert pictures == {"ja_kana": {"[": "゛", "]": "゜"}}, pictures
+    assert (layouts["ja_kana"]["["], layouts["ja_kana"]["]"]) == ("[", "]")
+    assert kana["が"] == "t[" and kana["ぱ"] == "f]"
     out.json("tests/fixtures/legends.json", {"usRows": list(US_ROWS), "usShiftedRows": list(US_SHIFTED_ROWS),
-                                             "layouts": layouts})
+                                             "layouts": layouts, "pictures": pictures})
 
 
 def unicode14_ranges() -> list[list[int]]:
@@ -603,6 +612,38 @@ def jyutping_data(out: Out) -> dict[str, str]:
     assert sum(len(cs) for cs in table.candidates_by_reading.values()) == len(table.reading_by_char)
     out.json("data/jyutping.json", lists)
     print(f"[jyutping] {len(lists)} readings, {len(table.reading_by_char)} characters")
+    return lists
+
+
+# =============================================================== Japanese
+
+JA_LISTS = "data/ja/lists.json"
+
+
+def ja_lists_data(out: Out) -> dict[str, list[Any]]:
+    """data/ja/lists.json: the whole homophone:ja (SKK) list of each Japanese
+    example reading: docs/10 §5's JIS kana goldens, and its `t3` chunk read
+    keyed (かあ).  A ja unit left at its kana still carries that reading's
+    candidates in its Trace (keypath.trace: count and head), and the page
+    ships no SKK table (docs/10 §9.7), so it walks such a unit back only
+    over a list it carries, and refuses (notCarried) otherwise.  As list
+    slices: {edge: {reading: [count, list]}}; [0, []] for a reading with no
+    candidates (its unit is the kana alone).  -> the readings' lists."""
+    golden = json.loads((PROJECT / "tests" / "golden" / "vectors_ja_kana.json").read_text(encoding="utf-8"))
+    readings = [v["reading"] for v in golden["vectors"]] + [golden["inline_negative"]["keyed"]]
+    assert len(set(readings)) == len(readings) == 11, readings
+    surface = registry.surface("ja", "ja_kana")
+    lists: dict[str, list[Any]] = {}
+    for reading in readings:
+        parsed = surface.unit_candidates(kana_layout.kana_to_keys(reading), "keyed")
+        assert parsed.reading == reading, (reading, parsed.reading)
+        lists[reading] = [0, []] if parsed.identity else [len(parsed.candidates), list(parsed.candidates)]
+    # docs/10 §5: ありがとう has two SKK candidates; むずかしい none (its
+    # SKK entry is okuri-ari, which the table drops); かあ is 母
+    assert lists["ありがとう"] == [2, ["有難う", "有り難う"]] and lists["むずかしい"] == [0, []]
+    assert lists["かあ"] == [1, ["母"]]
+    out.json(JA_LISTS, {"homophone:ja": lists})
+    print(f"[ja] {len(lists)} example readings, {sum(n for n, _ in lists.values())} SKK candidates")
     return lists
 
 
@@ -1094,7 +1135,8 @@ EDGE_CASES = [
 
 
 def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]],
-                   corpora: dict[str, list[str]], shipped: list[dict[str, Any]]) -> None:
+                   corpora: dict[str, list[str]], shipped: list[dict[str, Any]],
+                   ja_lists: dict[str, list[Any]]) -> None:
     rng = random.Random(SEED)
     vec = Vectors(set(vocab))
     # site vectors
@@ -1217,6 +1259,28 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for c in shipped:
         traces.append({"id": f"challenge-{c['n']:02d}", "ciphertext": c["ciphertext"], "keyText": c["keyText"],
                        "trace": site_trace(c["ciphertext"], json.loads(c["keyText"]))})
+    # docs/10 §5: the JIS kana goldens, their keyed ja_romaji twins and the
+    # `t3` chunk read keyed.  The page does not type Japanese, but walks
+    # these keys back over data/ja/lists.json: a kana unit left at its kana
+    # carries its reading's SKK count and head (ありがとう: 2, 有難う 有り難う)
+    ja_golden = json.loads((PROJECT / "tests" / "golden" / "vectors_ja_kana.json").read_text(encoding="utf-8"))
+    ja_keys: list[tuple[str, str, dict[str, Any], str]] = []
+    for i, g in enumerate(ja_golden["vectors"]):
+        for sid in ("ja_kana", "ja_romaji"):
+            result = py_encode(g["plaintext"], "ja", sid)
+            assert result.ciphertext == (g["ciphertext"] if sid == "ja_kana" else g["romaji"]), (sid, g)
+            ja_keys.append((f"golden-ja-{i}-{sid}", result.ciphertext, result.key, g["plaintext"]))
+    t3 = ja_golden["inline_negative"]
+    ja_keys.append(("golden-ja-t3-keyed", t3["chunk"], {
+        "keypath": KEY_VERSION, "tables_sha256": EDITION, "source_language": "ja",
+        "segments": [{"language": "ja", "layout": "ja_kana", "route": ["homophone:ja", "keystroke:ja_kana"],
+                      "selector_mode": "keyed", "words": [{"units": [dict(t3["unit"])]}]}]}, t3["keyed"]))
+    for ident, cipher, key, text in ja_keys:
+        assert decode(cipher, key) == text, ident
+        trace = site_trace(cipher, key)
+        units = [u for seg in trace["segments"] for w in seg["words"] for u in w.get("units", [])]
+        assert all(u["reading"] in ja_lists for u in units), ident
+        traces.append({"id": ident, "ciphertext": cipher, "keyText": key_text(key), "trace": trace})
     for i, (text, source, segments) in enumerate(MIXED):
         result = encode(text, source, segments=segments)
         assert decode(result.ciphertext, result.key) == normalize(text, source)
@@ -2251,6 +2315,7 @@ _CHEWING = {"chewing": ("2026-07-10", "2026-09-23", "2026-09-24")}
 _CHEWING_SHAPE = {"chewing": ("2026-07-10", "2026-09-28")}   # the Cangjie table's character set and order
 _CHEWING_JYUTPING = {"chewing": ("2026-07-10", "2026-09-29")}   # the Jyutping table's character set and order
 _SKK = {"skk": ("2026-07-10", "2026-09-24")}
+_SKK_JA = {"skk": ("2026-07-10", "2026-09-29")}   # the Japanese example readings' whole lists
 _SPA = {"spa": ("2026-07-10", "2026-09-24")}
 _KENG = {"keng": ("2026-09-23", "2026-09-24")}
 _ = ()
@@ -2262,6 +2327,7 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/layouts.json", "data", {"keypath": _, **_CHEWING}),
     ("data/quick.json", "data", {"unihan": _, **_CHEWING_SHAPE}),
     ("data/jyutping.json", "data", {"unihan": _, **_CHEWING_JYUTPING}),
+    ("data/ja/*.json", "data/ja", {"keypath": _, **_SKK_JA}),
     ("data/zh/core.json", "data/zh", {**_CHEWING}),
     ("data/zh/p/*.txt", "data/zh", {**_CHEWING, "hanja": _}),
     ("data/hanja/core.json", None, {"hanja": _}),
@@ -2519,6 +2585,7 @@ def build(root: Path) -> Out:
     hanja_data(out)
     shape = shape_data(out)
     jyutping_data(out)
+    ja_lists = ja_lists_data(out)
     vocab = vocabulary()
     example_words = set(re.findall("[a-z]+", " ".join([HERO[0]] + [c[0] for c in CHIPS if c[1] == "en"])))
     assert example_words <= set(vocab), example_words - set(vocab)
@@ -2526,7 +2593,7 @@ def build(root: Path) -> Out:
     shipped = challenges_data(out)
     hero = hero_data(out)
     corpora = load_corpora()
-    build_fixtures(out, vocab, rows, corpora, shipped)
+    build_fixtures(out, vocab, rows, corpora, shipped, ja_lists)
     workbench_fixtures(out, corpora)
     legends_fixture(out)
     digests(out, vocab, rows)

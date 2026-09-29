@@ -2,8 +2,10 @@
 // one US shift map, and on every layout drawn as a key grid exactly the
 // legends KeyPath's layouts give each key (tests/fixtures/legends.json,
 // written by tools/build_data.py from the tables), the shift layers of
-// Dubeolsik and JIS kana included.  The browser run (tools/cdp.mjs) checks
-// the drawn pictures and their width at 360 px.
+// Dubeolsik and JIS kana included.  The one exception is the fixture's
+// `pictures`: kana's voicing keys [ and ], their own legends, show the
+// marks ゛ ゜ they add, as keypath's own kana picture does.  The browser
+// run (tools/cdp.mjs) checks the drawn pictures and their width at 360 px.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { engine, readJson } from "./helpers.js";
@@ -30,6 +32,7 @@ test("every grid layout draws exactly KeyPath's legends, unshifted and shifted",
   const drawn = new Set([...ROWS.flat(), ...ROWS.flat().map(k => US_SHIFT[k])]);
   for (const layout of GRID_LAYOUTS) {
     const want = fixture.layouts[layout];
+    const picture = fixture.pictures[layout] || {};
     assert.ok(want, layout);
     // no legend is lost: every key the layout labels is on the picture, or on its shift layer
     for (const key of Object.keys(want)) assert.ok(drawn.has(key), `${layout}: ${key}`);
@@ -38,7 +41,7 @@ test("every grid layout draws exactly KeyPath's legends, unshifted and shifted",
       for (const row of keyboardModel(legends, layout, layer)) {
         for (const k of row) {
           assert.equal(k.typed, layer ? US_SHIFT[k.key] : k.key);
-          assert.equal(k.legend, want[k.typed] ?? "", `${layout} ${layer ? "Shift+" : ""}${k.key}`);
+          assert.equal(k.legend, picture[k.typed] ?? want[k.typed] ?? "", `${layout} ${layer ? "Shift+" : ""}${k.key}`);
         }
       }
     }
@@ -46,6 +49,10 @@ test("every grid layout draws exactly KeyPath's legends, unshifted and shifted",
     assert.equal(shift, Object.keys(want).some(k => !ROWS.flat().includes(k)), layout);
   }
   assert.deepEqual([...GRID_LAYOUTS].filter(l => hasShiftLayer(legends, l)), ["ko_dubeolsik", "ja_kana"]);
+  // docs/10 §8.4: kana's [ and ] are on no one-key row, so each is its own
+  // legend; only the picture shows the marks they add
+  assert.deepEqual(fixture.pictures, { ja_kana: { "[": "゛", "]": "゜" } });
+  assert.deepEqual([fixture.layouts.ja_kana["["], fixture.layouts.ja_kana["]"]], ["[", "]"]);
 });
 
 test("ETen and kana legends, asserted from the tables", async () => {

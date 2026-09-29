@@ -28,6 +28,7 @@ by their URIs below.
 | `data/cangjie/*.json` (the Cangjie lists, by first letter) | Unihan `kCangjie` (Unicode 18.0.0: the codes); libchewing-data (which characters, and their order) | [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later |
 | `data/quick.json` (the Quick lists) | Unihan `kCangjie` (each code's first and last letters); libchewing-data (which characters, and their order) | [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later |
 | `data/jyutping.json` (the Cantonese Jyutping lists) | Unihan `kCantonese` (Unicode 18.0.0: the readings); libchewing-data (which characters, and their order) | [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later |
+| `data/ja/lists.json` (the SKK candidates of the Japanese example readings) | SKK-JISYO.L; the example readings from KeyPath (MIT) | GPL-2.0-or-later; MIT |
 | `data/en/vocab/*.json` (the 10,000-word English list) | wordfreq 3.1.1 data | CC BY-SA 4.0 |
 | `data/en/zh_daqian/` (the page derives the ETen rows from these), `data/en/zh_pinyin/`, `data/en/zh_hanja/` | CC-CEDICT; libchewing-data; libhangul `hanja.txt` (zh_hanja); wordfreq data | CC BY-SA 4.0; LGPL-2.1-or-later; BSD-3-Clause; CC BY-SA 4.0 |
 | `data/en/zh_cangjie/` (the page derives the Quick rows from these) | CC-CEDICT; Unihan `kCangjie`; libchewing-data; wordfreq data | CC BY-SA 4.0; [Unicode License V3](LICENSES/Unicode-3.0.txt); LGPL-2.1-or-later; CC BY-SA 4.0 |
@@ -294,7 +295,7 @@ these changes; the dates are those of the processed tables (pinned in
 [`docs/VERSIONS.md`](docs/VERSIONS.md)) and of this site's files (the
 repository's history records any later change).
 
-- **SKK-JISYO.L** → `data/en/ja_romaji/`, `tests/fixtures/`. Changed
+- **SKK-JISYO.L** → `data/en/ja_romaji/`, `data/ja/`, `tests/fixtures/`. Changed
   2026-07-10: converted from EUC-JIS-2004 to UTF-8; the header, comments
   and the okuri-ari section removed; entries whose reading does not
   round-trip through KeyPath's romaji table, and candidates that are Lisp
@@ -304,7 +305,9 @@ repository's history records any later change).
   reading typed as romaji, its position among that reading's candidates,
   the number of candidates and the first four; stored as one JSON file per
   initial letter. Changed 2026-09-29: in `tests/fixtures/`, readings also
-  typed as JIS kana keystrokes.
+  typed as JIS kana keystrokes; in `data/ja/lists.json`, the whole
+  candidate lists of eleven Japanese example readings (an empty list for a
+  reading with none), in one JSON file.
 - **FreeDict spa-eng 0.3.1** → `data/en/es_accent/`,
   `data/challenges/02.json`, `tests/fixtures/`. Changed 2026-07-10: TEI
   markup and header removed, keeping each headword and its translations;

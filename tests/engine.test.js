@@ -406,3 +406,39 @@ test("ETen and kana keys load the rows they derive from, not files of their own"
   assert.equal((await e.encode({ text: "welcome home", source: "en", surface: "zh_jyutping" })).ciphertext, "fun1jing4gaa1");
   assert.ok(seen.includes("data/en/zh_jyutping/w.json") && seen.includes("data/jyutping.json"), seen.join(" "));
 });
+
+// A ja unit left at its kana still carries its reading's SKK candidates in
+// the Trace (Python's count and head), so the page walks one back only over
+// a list it carries (data/ja/lists.json: docs/10 §5's examples), and
+// refuses (notCarried) rather than show the kana as the only word.
+test("a kana unit left at its kana: Python's count and head, or a refusal", async () => {
+  const { createEngine } = await import("../assets/js/engine/index.js");
+  const { fetchText } = await import("./helpers.js");
+  const seen = [];
+  const e = await createEngine({ fetchText: p => { seen.push(p); return fetchText(p); } });
+  const kanaKey = (layout, len) => JSON.stringify({ keypath: "1.1", tables_sha256: e.edition, source_language: "ja",
+    segments: [{ language: "ja", layout, route: ["homophone:ja", `keystroke:${layout}`], selector_mode: "keyed",
+      words: [{ units: [{ len }] }] }] });
+  const walk = async (layout, ciphertext) => {
+    const r = await e.decode({ ciphertext, keyText: kanaKey(layout, ciphertext.length) });
+    return r.ok ? [r.text, ...(({ reading, count, head, index }) => [reading, count, head, index])(r.trace.segments[0].words[0].units[0])]
+      : [r.reason, r.message];
+  };
+  // SKK lists two words for ありがとう, neither of them the kana
+  for (const [layout, keys] of [["ja_kana", "3lt[s4"], ["ja_romaji", "arigatou"]])
+    assert.deepEqual(await walk(layout, keys), ["ありがとう", "ありがとう", 2, ["有難う", "有り難う"], null], layout);
+  assert.ok(seen.includes("data/ja/lists.json"), seen.join(" "));
+  // むずかしい has none: the kana alone; §5's t3, read keyed, is かあ, whose one word is 母
+  assert.deepEqual(await walk("ja_kana", "\\r[tde"), ["むずかしい", "むずかしい", 1, ["むずかしい"], null]);
+  assert.deepEqual(await walk("ja_kana", "t3"), ["かあ", "かあ", 1, ["母"], null]);
+  // a reading whose list the page lacks is refused, whether or not SKK has it (かみ: 15 words; ありがと: none)
+  for (const [layout, keys, reading] of [["ja_kana", "tn", "かみ"], ["ja_romaji", "kami", "かみ"], ["ja_kana", "3lt[s", "ありがと"],
+    ["ja_romaji", "arigato", "ありがと"]]) {
+    const [reason, message] = await walk(layout, keys);
+    assert.equal(reason, "notCarried", `${layout} ${keys}`);
+    assert.equal(message, `the homophone:ja candidates of ${reading}`);
+  }
+  // ... and so is one whose first four words it does not all know
+  e._internal.lists.addEntry("homophone:ja", "かみ", 15, 1, "紙");
+  assert.deepEqual(await walk("ja_kana", "tn"), ["notCarried", "the homophone:ja candidates of かみ"]);
+});

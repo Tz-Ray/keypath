@@ -30,6 +30,8 @@ export { dumpsKey, dumpsKeyWithSpans } from "./dumps.js";
 export { trimAscii, KP1_PREFIX } from "./kp1.js";
 
 const CHALLENGE_COUNT = 6;
+/** The SKK candidate lists of the Japanese example readings (a kana unit's Trace carries its list). */
+const JA_LISTS = "data/ja/lists.json";
 
 export async function createEngine({ fetchText } = {}) {
   if (!fetchText) fetchText = browserFetchText(new URL("../../../", import.meta.url));
@@ -67,11 +69,23 @@ export async function createEngine({ fetchText } = {}) {
     }
     return challengeLists;
   }
-  /** {edge: {value: [count, prefix]}} -> the list store. */
+  /** {edge: {value: [count, prefix]}} -> the list store (count 0: a value with no candidates). */
   function registerSlices(slices) {
     for (const [edge, values] of Object.entries(slices))
-      for (const [value, [count, prefix]] of Object.entries(values))
+      for (const [value, [count, prefix]] of Object.entries(values)) {
+        if (count === 0) lists.setFull(edge, value, []);
         prefix.forEach((item, i) => lists.addEntry(edge, value, count, i, item));
+      }
+  }
+  // The SKK lists of the Japanese example readings (JA_LISTS): whole lists,
+  // so a key over one of them walks back with Python's counts and heads.
+  let jaLists = null;
+  function loadJaLists() {
+    if (!jaLists) {
+      jaLists = data.json(JA_LISTS).then(slices => registerSlices(slices));
+      jaLists.catch(() => { jaLists = null; });
+    }
+    return jaLists;
   }
 
   // ------------------------------------------------------------ detect
@@ -98,9 +112,9 @@ export async function createEngine({ fetchText } = {}) {
 
   // ------------------------------------------------------------ decode
   // Before walking, load what the key reads: the cores of its homophone
-  // surfaces, every English row file of an en->X surface (unless encode
-  // just registered the rows it used), and the challenge slices for any
-  // other hop.
+  // surfaces, the Japanese example lists for a ja surface, every English
+  // row file of an en->X surface (unless encode just registered the rows
+  // it used), and the challenge slices for any other hop.
   async function prefetch(key, ciphertext, withRows) {
     const needs = keyNeeds(key, ciphertext, { siteId, liveEnglishTargets });
     await Promise.all([
@@ -108,6 +122,7 @@ export async function createEngine({ fetchText } = {}) {
       needs.hanja ? native.loadHanjaCore() : null,
       needs.quick ? native.loadQuick() : null,
       needs.jyutping ? native.loadJyutping() : null,
+      needs.ja ? loadJaLists() : null,
       native.loadCangjieShards([...needs.cangjie]),
       ...(withRows ? [...needs.rows].map(sid => english.loadAllRows(sid)) : []),
       needs.challenges ? loadChallengeLists() : null,

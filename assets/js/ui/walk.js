@@ -52,7 +52,9 @@ export function makeLegends(layouts) {
   /**
    * What the character `ch` (a key, or a key with Shift) alone means on
    * `layout`, as the keyboard picture labels it (docs/10 §8.4's legends: the
-   * tables' own maps; Pinyin's tone digits show their marks), or "".
+   * tables' own maps; Pinyin's tone digits show their marks), or "".  Kana's
+   * voicing keys [ and ] are their own §8.4 legends; the picture shows the
+   * marks ゛ ゜ they add, as keypath's own kana picture does.
    */
   function keyLegend(layout, ch) {
     switch (layout) {

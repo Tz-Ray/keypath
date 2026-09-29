@@ -10,6 +10,10 @@
 import { cpLength } from "./unicode.js";
 import { KeyError, has, splitRoute, HOP_PREFIX } from "./keycheck.js";
 import { LayoutError } from "./layouts.js";
+import { NotCarried } from "./lists.js";
+
+/** A unit's `head` (trace/1): its first ≤ 4 candidates. */
+const HEAD = 4;
 
 export class Tier2Error extends Error {}
 const fail = msg => { throw new KeyError(msg); };
@@ -32,19 +36,34 @@ function makeUnitReader({ layouts, lists }) {
       throw e;
     }
   };
+  /**
+   * The count and head of `reading`'s list, as the Trace carries them: the
+   * page must know the list and its first min(count, 4) items, or it
+   * refuses (notCarried) rather than draw a shorter or made-up list.
+   */
+  const listHead = (edge, reading) => {
+    const d = lists.describe(edge, reading);
+    if (!d || d.items.length < Math.min(d.count, HEAD)) throw new NotCarried(`the ${edge} candidates of ${reading}`);
+    return { count: d.count, head: d.items.slice(0, Math.min(d.count, HEAD)) };
+  };
   const homophone = (edge, reading, index, what = "homophone_index") => {
     const out = lists.pick(edge, reading, index, what);
-    const d = lists.describe(edge, reading);
-    return { reading, count: d.count, head: d.items.slice(0, Math.min(d.count, 4)), index, selected: null, out };
+    return { reading, ...listHead(edge, reading), index, selected: null, out };
   };
   const bijective = out => ({ reading: out, count: 1, head: [out], index: null, selected: null, out });
   const unitIndex = unit => (has(unit, "homophone_index") ? unit.homophone_index : undefined);
 
-  /** A ja unit with no index is its own kana (Python still reports that kana's SKK candidates when it has some). */
+  /**
+   * A ja unit with no index is its own kana, and its Trace still carries
+   * that kana's SKK candidates (Python's count and head).  So the page needs
+   * the reading's list: one it lacks is notCarried, never guessed.  A
+   * carried empty list (a reading with no candidates) leaves the kana alone:
+   * count 1, head [kana], as Python has it.
+   */
   const kanaIdentity = kana => {
     const d = lists.describe("homophone:ja", kana);
-    return d ? { reading: kana, count: d.count, head: d.items.slice(0, Math.min(d.count, 4)), index: null, selected: null, out: kana }
-      : { reading: kana, count: 1, head: [kana], index: null, selected: null, out: kana };
+    const { count, head } = d && d.count === 0 ? { count: 1, head: [kana] } : listHead("homophone:ja", kana);
+    return { reading: kana, count, head, index: null, selected: null, out: kana };
   };
   const readers = {
     "zh/zh_daqian": (chunk, unit) => homophone("homophone:zh", guard(chunk, () => layouts.daqianReading(chunk)), unitIndex(unit)),
@@ -178,10 +197,11 @@ export function walkKey(ctx, cipher, key) {
 
 /**
  * What a key needs loaded before walking over `cipher`: {zh, hanja, quick,
- * jyutping, cangjie: first letters of its Cangjie units, rows: [sid], challenges}.
+ * jyutping, ja: the Japanese example lists, cangjie: first letters of its
+ * Cangjie units, rows: [sid], challenges}.
  */
 export function keyNeeds(key, cipher, { siteId, liveEnglishTargets }) {
-  const needs = { zh: false, hanja: false, quick: false, jyutping: false, cangjie: new Set(), rows: new Set(), challenges: false };
+  const needs = { zh: false, hanja: false, quick: false, jyutping: false, ja: false, cangjie: new Set(), rows: new Set(), challenges: false };
   let pos = 0;
   for (const seg of key.segments) {
     const [hops, tail] = splitRoute(seg.route);
@@ -189,6 +209,7 @@ export function keyNeeds(key, cipher, { siteId, liveEnglishTargets }) {
     if (tail[0] === "homophone:ko_hanja") needs.hanja = true;
     if (tail[0] === "shape:zh_quick") needs.quick = true;
     if (tail[0] === "homophone:zh_jyutping") needs.jyutping = true;
+    if (tail[0] === "homophone:ja") needs.ja = true;
     for (const word of seg.words)
       for (const unit of has(word, "units") && Array.isArray(word.units) ? word.units : []) {
         if (tail[0] === "shape:zh_cangjie" && pos < cipher.length) needs.cangjie.add(cipher[pos]);
