@@ -106,7 +106,10 @@ function stringsSplit(value) {
       if (holdsWindow(found.map(([, text]) => text))) return true;
       if (names) continue;
       const byName = new Map();
-      for (const [name, text] of found) byName.set(name, [...(byName.get(name) ?? []), text]);
+      for (const [name, text] of found) {
+        if (!byName.has(name)) byName.set(name, []);
+        byName.get(name).push(text);
+      }
       if ([...byName.values()].some(holdsWindow)) return true;
     }
   }
