@@ -249,6 +249,7 @@ await attempt("vietnamese", async () => {
     js(legend) === js([telex.letters.map(([l, k]) => [`${k} ${l}`, l === "ô"]), telex.tones.map(([n, k]) => [`${k} ${n} (${example(n)})`, ["sắc", "huyền"].includes(n)])]), js(legend));
   const placement = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note")].map(n => n.textContent)`);
   check("Telex keyboard: the keys record where the tone sits", placement.includes("The keys record where the tone mark sits: hòa is hofa, hoà is hoaf."), js(placement));
+  check("Telex keyboard: the note says how a syllable is typed", placement[0].startsWith("Type each letter as its base letter, then its modifier key if it has one."), js(placement));
   // VNI: the digits carry the misdirection dot and name the letter they make
   await b.evaluate(`${q("input[name=kbd][value=vi_vni]")}.click()`);
   await b.waitFor(cipherIs("to6ico1gi2"));
@@ -259,6 +260,9 @@ await attempt("vietnamese", async () => {
   const legendV = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-vi")].map(ul => [...ul.children].map(li => li.textContent))`);
   check("VNI keyboard: the modifier and tone digits are the table's",
     js(legendV) === js([vni.letters.map(([l, k]) => `${k} ${l}`), vni.tones.map(([n, k]) => `${k} ${n} (${example(n)})`)]), js(legendV));
+  const noteV = await b.evaluate(`document.querySelector("#kbd-pic .kb-note").textContent`);
+  check("VNI keyboard: the note says how a syllable is typed", noteV.startsWith("Type each letter as its base letter, then its modifier digit (6 to 9)")
+    && noteV.includes("type the tone digit (1 to 5), once per syllable"), noteV);
   // "có" alone stays Spanish (the writer can pick Vietnamese by hand)
   await typeFresh("có");
   await b.waitFor(`${q("#lang")}.value === "es" && !${q("#enc-result")}.hidden`);

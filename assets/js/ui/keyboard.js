@@ -13,9 +13,11 @@ const PINYIN_TONE = { 1: "ˉ", 2: "ˊ", 3: "ˇ", 4: "ˋ", 5: "˙" };
 const DAQIAN_TONES = new Set(["6", "3", "4", "7"]);
 const SHAPE = new Set(["zh_cangjie", "zh_quick"]);
 const VI = new Set(["vi_telex", "vi_vni"]);
-const VI_NOTE = {
-  vi_telex: "Every key types its own letter. Typed right after a letter, a modifier key changes it; typed right after a vowel, a tone key gives the syllable its tone:",
-  vi_vni: "Letters type themselves. Typed right after a letter, a digit changes it (6 to 9) or gives the syllable its tone (1 to 5):",
+// How a syllable is typed (docs/10 §6.3): each letter's base letter, then its
+// modifier key, then (on the vowel that carries it) the syllable's one tone key
+export const VI_NOTE = {
+  vi_telex: "Type each letter as its base letter, then its modifier key if it has one. Right after the vowel that carries the tone (and its modifier key), type the tone key, once per syllable:",
+  vi_vni: "Type each letter as its base letter, then its modifier digit (6 to 9) if it has one. Right after the vowel that carries the tone (and its modifier digit), type the tone digit (1 to 5), once per syllable:",
 };
 
 /**

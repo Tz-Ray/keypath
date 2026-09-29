@@ -206,3 +206,18 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
     assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);
   }
 });
+
+// The build notes name the keypath release the data is built from: the tag
+// tools/build_data.py pins (TAG, VERSION), everywhere they mention it.
+test("the build notes name the tag and version build_data.py pins", () => {
+  const build = readFileSync(join(ROOT, "tools/build_data.py"), "utf8");
+  const tag = build.match(/^TAG = "(v\d+\.\d+)"$/m)[1];
+  const version = build.match(/^VERSION = "(\d+\.\d+\.\d+)"$/m)[1];
+  assert.ok(version.startsWith(`${tag.slice(1)}.`), `${tag} ${version}`);
+  for (const f of ["tools/requirements.txt", "README.md", "tools/build_data.py"]) {
+    const text = readFileSync(join(ROOT, f), "utf8");
+    const tags = [...text.matchAll(/\bat tag (v\d+\.\d+)/g)].map(m => m[1]);
+    assert.ok(tags.length, `${f} names no tag`);
+    assert.deepEqual([...new Set(tags)], [tag], f);
+  }
+});

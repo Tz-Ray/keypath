@@ -1,5 +1,5 @@
 # Build-time only (tools/build_data.py, tools/build_fonts.py); nothing here ships.
-# keypath itself is installed from the cipher project at tag v2.2 (see README.md).
+# keypath itself is installed from the cipher project at tag v2.3 (see README.md).
 wordfreq==3.1.1
 fonttools==4.60.1
 brotli==1.1.0

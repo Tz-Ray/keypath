@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { engine, readJson, readJsonl } from "./helpers.js";
 import { cpCompare } from "../assets/js/engine/unicode.js";
 import { LOWERCASE_LANGUAGES, LOWER_OVERRIDES, normalize } from "../assets/js/engine/normalize.js";
-import { viLegendModel } from "../assets/js/ui/keyboard.js";
+import { VI_NOTE, viLegendModel } from "../assets/js/ui/keyboard.js";
 
 const digests = readJson("tests/fixtures/digests.json");
 const registry = readJson("data/registry.json");
@@ -144,6 +144,48 @@ test("the Telex and VNI keyboard legend is read from the tables (docs/10 §6.1)"
   assert.deepEqual(layoutsJson.vi_telex.tones.map(([, k]) => k).join(" "), "s f r x j");
   assert.deepEqual(layoutsJson.vi_vni.letters.map(([, k]) => k).join(" "), "a6 a8 e6 o6 o7 u7 d9");
   assert.deepEqual(layoutsJson.vi_vni.tones.map(([, k]) => k).join(" "), "1 2 3 4 5");
+});
+
+test("the keyboard note says how a syllable is typed, and every syllable of G is typed so (docs/10 §6.3-§6.4)", async () => {
+  const { layouts } = await engine();
+  const G = layouts.viGrammar();
+  const VOWELS = new Set("aeiouy");
+  const span = keys => { const s = [...new Set(keys)].sort(); return `${s[0]} to ${s[s.length - 1]}`; };
+  for (const layout of VI) {
+    const { modifiers, tones } = layouts.viLegend(layout);
+    const pairs = new Set(modifiers.map(([keys]) => keys));
+    const toneKeys = new Set(tones.map(([key]) => key));
+    const note = VI_NOTE[layout];
+    const key = layout === "vi_vni" ? "digit" : "key";
+    assert.ok(note.startsWith(`Type each letter as its base letter, then its modifier ${key}`), note);
+    assert.ok(note.includes(`Right after the vowel that carries the tone (and its modifier ${key}), type the tone ${key}`), note);
+    assert.ok(note.endsWith("once per syllable:"), note);
+    // the digits the VNI note names are the table's
+    if (layout === "vi_vni") {
+      assert.ok(note.includes(`modifier digit (${span(modifiers.map(([k]) => k.slice(1)))})`), note);
+      assert.ok(note.includes(`tone digit (${span([...toneKeys])})`), note);
+    }
+    // every letter of every syllable: its base letter, then a modifier key of
+    // its own pair, then the tone key; the tone on a vowel, at most once
+    for (const t of G) {
+      const letters = layouts.viLetters(layout, layouts.viKeys(layout, t));
+      let toned = 0;
+      for (const { keys } of letters) {
+        const roles = keys.map(k => k.role).join(" ");
+        assert.ok(["letter", "letter modifier", "letter tone", "letter modifier tone"].includes(roles), `${layout} ${t}: ${roles}`);
+        if (keys[1]?.role === "modifier") assert.ok(pairs.has(keys[0].key + keys[1].key), `${layout} ${t}`);
+        if (keys.at(-1).role === "tone") {
+          toned++;
+          assert.ok(VOWELS.has(keys[0].key) && toneKeys.has(keys.at(-1).key), `${layout} ${t}`);
+        }
+      }
+      assert.ok(toned <= 1, `${layout} ${t}`);
+    }
+  }
+  // the M15 review's counterexamples to the old VNI note ("a digit right
+  // after a letter changes it or gives the tone"): neither reads
+  for (const chunk of ["an5", "b6"]) assert.throws(() => layouts.viSyllable("vi_vni", chunk), chunk);
+  assert.equal(layouts.viSyllable("vi_vni", "vie65t"), "việt");
 });
 
 test("vi walks: one unit per syllable, a letter's keys as its legend, and literals for text outside G", async () => {
