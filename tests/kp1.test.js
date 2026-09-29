@@ -45,7 +45,8 @@ test("every reject vector is refused with a KeyError", () => {
 });
 
 test("inline on a keyed-only surface: the flag reads, the key is refused (docs/10 §2.1, §5's t3)", () => {
-  assert.deepEqual(F.inlineRefused.map(g => JSON.parse(g.keyText).segments[0].layout), ["ja_kana", "zh_eten", "zh_jyutping", "ja_kana"]);
+  assert.deepEqual(F.inlineRefused.map(g => JSON.parse(g.keyText).segments[0].layout),
+    ["ja_kana", "zh_eten", "zh_jyutping", "ja_kana", "el_greek", "el_greek"]);
   for (const g of F.inlineRefused) {
     throwsKey(() => kp1.unpack(g.kp1, R), g.why);
     // the same key as JSON fails the same check
@@ -243,9 +244,10 @@ test("a markup hint and literal stay text: the key packs, unpacks and decodes to
 });
 
 test("the registry's ordinal lists are the ones the codec reads", () => {
-  assert.deepEqual(R.kp1Languages, ["zh", "ja", "es", "en", "ko", "ru", "vi"]);
-  assert.equal(R.kp1Surfaces.length, 15);
-  assert.deepEqual(R.kp1Surfaces.slice(10), [["vi", "vi_telex"], ["vi", "vi_vni"], ["zh", "zh_eten"], ["zh", "zh_jyutping"], ["ja", "ja_kana"]]);
+  assert.deepEqual(R.kp1Languages, ["zh", "ja", "es", "en", "ko", "ru", "vi", "el"]);
+  assert.equal(R.kp1Surfaces.length, 16);
+  assert.deepEqual(R.kp1Surfaces.slice(10), [["vi", "vi_telex"], ["vi", "vi_vni"], ["zh", "zh_eten"], ["zh", "zh_jyutping"], ["ja", "ja_kana"],
+    ["el", "el_greek"]]);
   // integer arithmetic (docs/10 §2.2): no shift or bitwise and/or in the codec
   const src = readFileSync(join(ROOT, "assets/js/engine/kp1.js"), "utf8").replace(/\/\/[^\n]*/g, "");
   assert.doesNotMatch(src, /<<|>>|[\w)\]]\s*[|&](?![|&=])\s*[\w(]/);

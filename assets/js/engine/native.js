@@ -1,4 +1,4 @@
-// Hop-free encoders, ported from keypath 2.4.0:
+// Hop-free encoders, ported from keypath 2.5.0:
 //   zh on Dàqiān / ETen / Pinyin - zh.greedy_segment + make_surface.encode_native + word_units
 //   zh on Cangjie / Quick / Jyutping - the same segmentation + zh_coded.make_surface's encode_word
 //   zh on Dubeolsik (hanja) - zh_ko_hanja.encode_native / encode_word
@@ -6,6 +6,9 @@
 //   vi on Telex / VNI       - docs/10 §3.2 and §6.5: a word (a maximal run of
 //                             the 93 Vietnamese letters) is one unit, typed by
 //                             E, iff it is a syllable of G; else a literal
+//   el on Greek             - docs/10 §3.2 and §7.1: a word (a maximal run of
+//                             the 36 Greek letters) is one unit, typed letter
+//                             by letter (the accent's dead key first)
 //
 // The reading choices Python makes from tsi.csv (phrase readings, the
 // sandhi fallback, one-character phrase readings) and from hanja.txt (word
@@ -283,12 +286,16 @@ export function createNative({ data, layouts, lists }) {
   const esChars = layouts.esWordChars.join("");
   // vi: a-z and the 67 other letters E types (docs/10 §3.2)
   const viChars = layouts.viLetterSet("vi_telex").join("");
+  // el: docs/10 §3.2's 36 letters, α-ω (U+03B1-U+03C9, ς included) and the
+  // 11 accented ones; everything else (polytonic letters, capitals with no
+  // lowercase form, Greek punctuation) is a separator
   const TOKENIZERS = {
     ko: /[가-힣ㄱ-ㅣ]+/gu,
     ru: /[а-яё]+/gu,
     es: new RegExp(`[${esChars}]+`, "gu"),
     en: /[a-z]+/gu,
     vi: new RegExp(`[${viChars}]+`, "gu"),
+    el: /[\u03b1-\u03c9άέήίόύώϊϋΐΰ]+/gu,
   };
   const WORD_KEYS = {
     ko_dubeolsik: word => Array.from(word).map(ch => layouts.koKeys(ch)),
@@ -297,9 +304,11 @@ export function createNative({ data, layouts, lists }) {
     en_identity: word => [layouts.enKeysForWord(word)],
     vi_telex: word => [layouts.viKeys("vi_telex", word)],
     vi_vni: word => [layouts.viKeys("vi_vni", word)],
+    el_greek: word => [layouts.elKeysForWord(word)],
   };
   const SURFACE_LANGUAGE = {
     ko_dubeolsik: "ko", ru_jcuken: "ru", es_accent: "es", en_identity: "en", vi_telex: "vi", vi_vni: "vi",
+    el_greek: "el",
   };
 
   /** encode_word of a bijective surface: [units, keys] or null. */
@@ -310,7 +319,7 @@ export function createNative({ data, layouts, lists }) {
     return [keys.map(k => ({ len: k.length })), keys.join("")];
   }
 
-  /** tokenized_native_encoder for ko / ru / es / en / vi (all spaced): {words, parts}. */
+  /** tokenized_native_encoder for ko / ru / es / en / vi / el (all spaced): {words, parts}. */
   function encodeBijective(text, sid) {
     const lang = SURFACE_LANGUAGE[sid];
     const items = tokensToItems(regexTokens(text, TOKENIZERS[lang]), word => {

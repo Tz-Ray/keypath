@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.4 (tag `v2.4`). The scripts, tests and design documents
+> From KeyPath 2.5 (tag `v2.5`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -40,7 +40,7 @@ rewrites the blocks. With no flag the script prints them.
 <!-- BEGIN GENERATED: headline -->
 - A Chinese reading has a median of 11 and at most 215 candidate characters (1,412 readings, 11.1% of them unambiguous); a Korean hanja syllable a median of 33 and at most 352; a Japanese SKK reading a median of 1 and at most 239.
 - On the zh round-trip corpus, 73.4% of the 154 Dàqiān (and Pinyin) choices are rank 0 (73.4% of the 154 made from a set of two or more); typed as hanja on Dubeolsik, 41.6%. On the ja corpus, 40.0% of the 15 keyed choices are rank 0.
-- Across the round-trip corpora and routes, 72.7% of the 198 translation-hop choices are rank 0. The frozen v1.0 keys, whose texts were picked to select non-zero candidates, have 37.1% of their 256 translation-hop choices at rank 0.
+- Across the round-trip corpora and routes, 72.8% of the 224 translation-hop choices are rank 0. The frozen v1.0 keys, whose texts were picked to select non-zero candidates, have 37.1% of their 256 translation-hop choices at rank 0.
 - A zh message costs 5.41 key bits per character on Dàqiān and 7.00 as hanja on Dubeolsik; an en message routed to Chinese costs 3.55 per character by lexicon and 4.02 in free mode, where 71.3% of the bits are tier-2 patch text.
 - The 6 shipped challenges carry 273.69 key bits between them; the largest, challenge-06, carries 113.63.
 <!-- END GENERATED: headline -->
@@ -109,10 +109,12 @@ rewrites the blocks. With no flag the script prints them.
 | ru vectors | `test_ru: GOLDEN plaintexts` | ru on (ru, ru_jcuken) | 3 | 16 |
 | vi round-trip | `test_walk_roundtrip_vi: CORPUS` | vi on (vi, vi_telex) | 18 | 445 |
 | vi round-trip | `test_walk_roundtrip_vi: CORPUS` | vi on (vi, vi_vni) | 18 | 445 |
+| el round-trip | `test_walk_roundtrip_el: CORPUS` | el on (el, el_greek) | 13 | 244 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en → zh (lexicon) on (zh, zh_daqian) | 25 | 483 |
 | en round-trip | `test_walk_roundtrip_en: CORPUS` | en → zh (free) on (zh, zh_daqian) | 25 | 483 |
 | ko routes | `test_ko: ROUTES` | each row's route, default layout | 8 | 153 |
 | ru routes | `test_ru: ROUTES` | each row's route and layout | 12 | 233 |
+| el routes | `test_el: ROUTES` | each row's route, default layout | 6 | 98 |
 | frozen v1.0 | `tests/golden/keys-v1.0 (test_frozen_v1: CASES)` | each key as minted | 100 | 1,781 |
 | challenges | `puzzles/challenge-*` | each shipped key | 6 | 168 |
 <!-- END GENERATED: corpora -->
@@ -122,7 +124,8 @@ rewrites the blocks. With no flag the script prints them.
 A layout adds keyed ambiguity only if it has a homophone layer.
 English letters type themselves, the Spanish accent selectors name
 each variant, and ЙЦУКЕН puts each Russian letter on its own key. On Korean Dubeolsik, every syllable and
-jamo has its own key sequence. Such a layout is a bijection. Its keys
+jamo has its own key sequence. On Greek, each letter is its own key, or
+a dead key and then its vowel. Such a layout is a bijection. Its keys
 carry no index, and its unit space (every word) is infinite, so it is
 checked rather than enumerated. Every symbol its units spell is
 encoded by the surface and parsed back to exactly one candidate. A
@@ -140,6 +143,7 @@ sample):
 | (ru, ru_jcuken) | ru_jcuken.tsv letters | 33 | 33 | 1 |
 | (vi, vi_telex) | G, the syllables of vi_syllables.tsv, sample of 20,000 of 111,003 | 20,000 | 20,000 | 1 |
 | (vi, vi_vni) | G, the syllables of vi_syllables.tsv, sample of 20,000 of 111,003 | 20,000 | 20,000 | 1 |
+| (el, el_greek) | el_greek.tsv letters | 36 | 36 | 1 |
 <!-- END GENERATED: bijective -->
 
 The other surfaces are homophone layers, or shape layers: Cangjie and
@@ -219,7 +223,7 @@ position of the source word in the list the table gives for the
 (`zh>en`, `ja>en`, `ko>en`) point into lists that start from an English
 word and hold every source-language word with a gloss containing it,
 so a common English word can have a very long list. The hops into
-English from Spanish and Russian (`es>en`, `ru>en`) are exact reverse
+English from Spanish, Russian and Greek (`es>en`, `ru>en`, `el>en`) are exact reverse
 indexes instead: an English translation, taken whole (a phrase is an
 entry of its own), lists only the headwords that give exactly that
 translation, so those lists stay about as short as the lists in the
@@ -240,6 +244,8 @@ those stay short.
 | `translate:ko>en` | English words → kengdic candidates | 44,381 | 56.5% | 1 | 1 | 3.58 | 5 | 33 | 4,186 |
 | `translate:en>ru` | Russian headwords → translations | 38,887 | 57.3% | 1 | 1 | 1.84 | 3 | 7 | 24 |
 | `translate:ru>en` | English words → Russian candidates | 45,280 | 74.1% | 1 | 1 | 1.58 | 3 | 8 | 36 |
+| `translate:en>el` | Greek headwords → translations | 34,383 | 68.1% | 1 | 1 | 1.49 | 3 | 5 | 16 |
+| `translate:el>en` | English words → Greek candidates | 35,854 | 75.9% | 1 | 1 | 1.43 | 2 | 6 | 17 |
 <!-- END GENERATED: hop-lists -->
 
 <!-- BEGIN GENERATED: hop-histogram -->
@@ -255,6 +261,8 @@ those stay short.
 | `translate:ko>en` | 25,089 | 13,843 | 3,169 | 1,804 | 400 | 76 |
 | `translate:en>ru` | 22,271 | 14,625 | 1,895 | 96 | 0 | 0 |
 | `translate:ru>en` | 33,563 | 9,852 | 1,573 | 291 | 1 | 0 |
+| `translate:en>el` | 23,409 | 10,432 | 533 | 9 | 0 | 0 |
+| `translate:el>en` | 27,199 | 7,875 | 749 | 31 | 0 | 0 |
 <!-- END GENERATED: hop-histogram -->
 
 ## 3. How often the chosen candidate is rank 0
@@ -268,12 +276,12 @@ direction:
   is the English word before one that merely contains it), then by the
   source word's frequency (Chinese, Korean) or by JMdict's common-word
   flag (Japanese), then by code point.
-- `es>en` and `ru>en` have no match class. They order by the source
+- `es>en`, `ru>en` and `el>en` have no match class. They order by the source
   word's frequency, then lexicographically.
 - The hops out of English keep each headword's own list order: the
   dictionary's gloss order for `en>zh`, `en>ja` and `en>ko`, and English
-  word frequency, fixed when the table was built, for `en>es` and
-  `en>ru`.
+  word frequency, fixed when the table was built, for `en>es`, `en>ru`
+  and `en>el`.
 
 Natural text concentrates at rank 0 as far as an order agrees with it,
 and the tables show how far each one does:
@@ -296,6 +304,7 @@ and the tables show how far each one does:
 | ru vectors | ru on (ru, ru_jcuken) | (ru, ru_jcuken) | 0 | 0 | — | — | — | — |
 | vi round-trip | vi on (vi, vi_telex) | (vi, vi_telex) | 0 | 0 | — | — | — | — |
 | vi round-trip | vi on (vi, vi_vni) | (vi, vi_vni) | 0 | 0 | — | — | — | — |
+| el round-trip | el on (el, el_greek) | (el, el_greek) | 0 | 0 | — | — | — | — |
 | en round-trip | en → zh (lexicon) on (zh, zh_daqian) | (zh, zh_daqian) | 97 | 96 | 63.9% | 63.5% | 1.04 | 19 |
 | en round-trip | en → zh (free) on (zh, zh_daqian) | (zh, zh_daqian) | 123 | 122 | 61.0% | 60.7% | 1.03 | 19 |
 | ko routes | each row's route, default layout | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
@@ -309,6 +318,8 @@ and the tables show how far each one does:
 | ru routes | each row's route and layout | (zh, ko_dubeolsik) | 6 | 6 | 66.7% | 66.7% | 0.67 | 3 |
 | ru routes | each row's route and layout | (ja, ja_romaji) | 3 | 3 | 66.7% | 66.7% | 0.67 | 2 |
 | ru routes | each row's route and layout | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
+| el routes | each row's route, default layout | (el, el_greek) | 0 | 0 | — | — | — | — |
+| el routes | each row's route, default layout | (en, en_identity) | 0 | 0 | — | — | — | — |
 | frozen v1.0 | each key as minted | (zh, zh_daqian) | 286 | 282 | 50.3% | 49.6% | 7.65 | 214 |
 | frozen v1.0 | each key as minted | (en, en_identity) | 0 | 0 | — | — | — | — |
 | frozen v1.0 | each key as minted | (es, es_accent) | 0 | 0 | — | — | — | — |
@@ -343,6 +354,11 @@ of them:
 | ru routes | each row's route and layout | `translate:zh>en` | 4 | 4 | 75.0% | 75.0% | 0.25 | 1 |
 | ru routes | each row's route and layout | `translate:ja>en` | 2 | 2 | 0.0% | 0.0% | 3.00 | 4 |
 | ru routes | each row's route and layout | `translate:ko>en` | 3 | 3 | 100.0% | 100.0% | 0.00 | 0 |
+| el routes | each row's route, default layout | `translate:el>en` | 3 | 2 | 66.7% | 50.0% | 0.33 | 1 |
+| el routes | each row's route, default layout | `translate:en>el` | 14 | 10 | 85.7% | 80.0% | 0.14 | 1 |
+| el routes | each row's route, default layout | `translate:es>en` | 5 | 2 | 60.0% | 0.0% | 0.40 | 1 |
+| el routes | each row's route, default layout | `translate:ru>en` | 3 | 3 | 33.3% | 33.3% | 1.33 | 3 |
+| el routes | each row's route, default layout | `translate:zh>en` | 1 | 1 | 100.0% | 100.0% | 0.00 | 0 |
 | frozen v1.0 | each key as minted | `translate:en>zh` | 49 | 42 | 34.7% | 23.8% | 4.47 | 31 |
 | frozen v1.0 | each key as minted | `translate:zh>en` | 38 | 38 | 26.3% | 26.3% | 2.82 | 17 |
 | frozen v1.0 | each key as minted | `translate:en>ja` | 46 | 45 | 39.1% | 37.8% | 7.28 | 65 |
@@ -355,15 +371,17 @@ of them:
 | challenges | each shipped key | `translate:en>ru` | 2 | 1 | 100.0% | 100.0% | 0.00 | 0 |
 | challenges | each shipped key | `translate:zh>en` | 2 | 2 | 0.0% | 0.0% | 2.50 | 4 |
 | all corpora |  | `translate:en>zh` | 136 | 105 | 47.8% | 32.4% | 2.75 | 31 |
-| all corpora |  | `translate:zh>en` | 48 | 48 | 33.3% | 33.3% | 2.38 | 17 |
+| all corpora |  | `translate:zh>en` | 49 | 49 | 34.7% | 34.7% | 2.33 | 17 |
 | all corpora |  | `translate:en>ja` | 52 | 51 | 36.5% | 35.3% | 7.27 | 65 |
 | all corpora |  | `translate:ja>en` | 25 | 25 | 0.0% | 0.0% | 13.64 | 34 |
-| all corpora |  | `translate:es>en` | 76 | 55 | 52.6% | 34.5% | 1.08 | 11 |
+| all corpora |  | `translate:es>en` | 81 | 57 | 53.1% | 33.3% | 1.04 | 11 |
 | all corpora |  | `translate:en>es` | 35 | 19 | 57.1% | 21.1% | 2.40 | 13 |
 | all corpora |  | `translate:en>ko` | 24 | 7 | 75.0% | 14.3% | 0.33 | 3 |
 | all corpora |  | `translate:ko>en` | 20 | 20 | 95.0% | 95.0% | 0.05 | 1 |
 | all corpora |  | `translate:en>ru` | 23 | 12 | 95.7% | 91.7% | 0.04 | 1 |
-| all corpora |  | `translate:ru>en` | 27 | 22 | 100.0% | 100.0% | 0.00 | 0 |
+| all corpora |  | `translate:ru>en` | 30 | 25 | 93.3% | 92.0% | 0.13 | 3 |
+| all corpora |  | `translate:en>el` | 14 | 10 | 85.7% | 80.0% | 0.14 | 1 |
+| all corpora |  | `translate:el>en` | 3 | 2 | 66.7% | 50.0% | 0.33 | 1 |
 <!-- END GENERATED: rank0-hops -->
 
 The frozen v1.0 row is the control. Those texts were picked to select
@@ -396,10 +414,12 @@ apart from the key size, the unit-boundary bits per character:
 | ru vectors | ru on (ru, ru_jcuken) | 3 | 0.00 | 0 | 0 | 0.00 | — | 0.81 |
 | vi round-trip | vi on (vi, vi_telex) | 18 | 29.33 | 8 | 176 | 1.19 | 100.0% | 0.19 |
 | vi round-trip | vi on (vi, vi_vni) | 18 | 29.33 | 8 | 176 | 1.19 | 100.0% | 0.13 |
+| el round-trip | el on (el, el_greek) | 13 | 25.23 | 24 | 104 | 1.34 | 100.0% | 0.70 |
 | en round-trip | en → zh (lexicon) on (zh, zh_daqian) | 24 | 71.43 | 54.34 | 198.00 | 3.55 | 65.8% | 0.17 |
 | en round-trip | en → zh (free) on (zh, zh_daqian) | 24 | 80.84 | 80.06 | 287.09 | 4.02 | 71.3% | 0.23 |
 | ko routes | each row's route, default layout | 8 | 37.93 | 32.46 | 133.88 | 1.98 | 39.5% | 0.77 |
 | ru routes | each row's route and layout | 12 | 33.48 | 25.93 | 140.32 | 1.72 | 35.8% | 0.63 |
+| el routes | each row's route, default layout | 6 | 9.21 | 7.22 | 24 | 0.56 | 43.4% | 0.90 |
 | frozen v1.0 | each key as minted | 97 | 45.41 | 39.97 | 136 | 2.47 | 46.0% | 0.74 |
 | challenges | each shipped key | 6 | 45.62 | 21.33 | 113.63 | 1.63 | 5.8% | 0.63 |
 <!-- END GENERATED: key-size -->
@@ -419,8 +439,8 @@ Per shipped challenge:
 
 Reading the table:
 
-- **Bijective layouts add no keyed bits.** An English, Spanish, Korean
-  or Russian key spends bits only on residual text (punctuation,
+- **Bijective layouts add no keyed bits.** An English, Spanish, Korean,
+  Russian or Greek key spends bits only on residual text (punctuation,
   digits and words the layout cannot type, carried as tier-3
   literals). Its ciphertext is the message retyped on another keyboard
   with the spaces taken out.

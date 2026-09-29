@@ -1,4 +1,4 @@
-// Encode/decode parity with keypath 2.4.0 on the generated corpus
+// Encode/decode parity with keypath 2.5.0 on the generated corpus
 // (tests/fixtures/vectors.jsonl.gz, written by tools/build_data.py): the
 // site's examples, the cipher project's round-trip corpora and golden
 // vectors, seeded fuzz strings per live surface, and edge cases.
@@ -11,10 +11,11 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 test("the corpus covers every class and live surface", () => {
   const classes = new Set(vectors.map(v => v.class));
   for (const c of ["site", "golden-shape", "golden-vi", "golden-m16", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en",
-    "corpus-vi", "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "fuzz-vi", "route", "edge"])
+    "corpus-vi", "fuzz-zh", "fuzz-ko", "fuzz-ru", "fuzz-es", "fuzz-en-id", "fuzz-en-x", "fuzz-en-oov", "fuzz-vi", "route", "edge",
+    "golden-el", "corpus-el", "fuzz-el"])
     assert.ok(classes.has(c), c);
   const surfaces = new Set(vectors.filter(v => !v.jsRefusal && !v.expect.error).map(v => v.surface));
-  assert.equal(surfaces.size, 15);
+  assert.equal(surfaces.size, 16);
   // Vietnamese: the §6.6 goldens, the corpus, fuzz and edge cases on both keyboards
   for (const sid of ["vi_telex", "vi_vni"])
     for (const c of ["golden-vi", "corpus-vi", "fuzz-vi", "edge"])
@@ -37,6 +38,17 @@ test("the corpus covers every class and live surface", () => {
     assert.ok(vectors.some(v => v.class === c && v.surface === "ja_kana" && !v.jsRefusal), `${c} on ja_kana`);
   for (const c of ["golden-m16", "corpus-ja"])
     assert.ok(vectors.some(v => v.class === c && v.surface === "ja_kana" && v.jsRefusal[0] === "jaSource"), `${c} on ja_kana`);
+  // Greek (docs/10 §7.1, §7.3, §9.7): the goldens, the corpus, the
+  // normalization fixtures, fuzz and edge cases natively; English onto Greek
+  for (const [c, source] of [["golden-el", "el"], ["golden-el", "en"], ["corpus-el", "el"], ["fuzz-el", "el"], ["edge", "el"],
+    ["corpus-en", "en"], ["fuzz-en-x", "en"]])
+    assert.ok(vectors.some(v => v.class === c && v.surface === "el_greek" && v.source === source && !v.jsRefusal), `${c} ${source} on el_greek`);
+  // el→X and the pivots into Greek: Python encodes them (all but el→vi), the page refuses them
+  const elRoutes = vectors.filter(v => v.class === "route" && (v.source === "el") !== (v.surface === "el_greek"));
+  assert.ok(elRoutes.every(v => v.jsRefusal[0] === "routeOff"), JSON.stringify(elRoutes.map(v => [v.source, v.surface])));
+  assert.ok(elRoutes.filter(v => v.expect.ciphertext !== undefined).length >= 7);
+  assert.ok(elRoutes.every(v => v.expect.ciphertext !== undefined || (v.surface.startsWith("vi_") && v.expect.error === "EncodeError")));
+  assert.ok(elRoutes.some(v => v.source === "el" && v.surface === "en_identity"));
 });
 
 const byClass = new Map();

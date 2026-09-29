@@ -5,6 +5,7 @@
 {"list": "languages", "ordinal": 4, "id": "ko"}
 {"list": "languages", "ordinal": 5, "id": "ru"}
 {"list": "languages", "ordinal": 6, "id": "vi"}
+{"list": "languages", "ordinal": 7, "id": "el"}
 {"list": "surfaces", "ordinal": 0, "id": ["zh", "zh_daqian"]}
 {"list": "surfaces", "ordinal": 1, "id": ["zh", "zh_pinyin"]}
 {"list": "surfaces", "ordinal": 2, "id": ["ja", "ja_romaji"]}
@@ -20,3 +21,4 @@
 {"list": "surfaces", "ordinal": 12, "id": ["zh", "zh_eten"]}
 {"list": "surfaces", "ordinal": 13, "id": ["zh", "zh_jyutping"]}
 {"list": "surfaces", "ordinal": 14, "id": ["ja", "ja_kana"]}
+{"list": "surfaces", "ordinal": 15, "id": ["el", "el_greek"]}

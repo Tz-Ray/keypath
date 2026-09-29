@@ -194,9 +194,10 @@ test("decode refusals: invalid key, missing data, free translation", async () =>
 test("detect, allowed routes and surfaces", async () => {
   const e = await engine();
   assert.deepEqual(e.surfaces.map(s => s.id), ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick",
-    "zh_hanja", "ja_romaji", "ja_kana", "ko_dubeolsik", "ru_jcuken", "es_accent", "vi_telex", "vi_vni", "en_identity"]);
+    "zh_hanja", "ja_romaji", "ja_kana", "ko_dubeolsik", "ru_jcuken", "es_accent", "vi_telex", "vi_vni", "el_greek", "en_identity"]);
   assert.deepEqual(e.allowed("zh"), ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "zh_hanja"]);
-  assert.equal(e.allowed("en").length, 13);
+  assert.equal(e.allowed("en").length, 14);
+  assert.deepEqual(e.allowed("el"), ["el_greek"]);
   assert.ok(!e.allowed("en").some(s => s.startsWith("vi_")));
   assert.deepEqual(e.allowed("vi"), ["vi_telex", "vi_vni"]);
   assert.deepEqual(e.allowed("ja"), []);
@@ -204,6 +205,8 @@ test("detect, allowed routes and surfaces", async () => {
     // docs/10 §9.7: a Vietnamese letter Spanish does not share wins over the Spanish test
     "tôi có gì": "vi", "có": "es", "VIỆT NAM": "vi", "đ": "vi", "à": "vi", "xin chao": "en", "canción ở": "vi",
     "國家": "zh", "カタカナ and 漢字": "ja", "123 !?": null,
+    // docs/10 §9.7: any Greek-script letter is Greek, before the Spanish test
+    "Καλημέρα": "el", "ΟΔΟΣ": "el", "ά": "el", "\u1f08θ\u1fc6ναι": "el", "mañana θ": "el", "café λ": "el",
     // the katakana middle dot and long-vowel mark are punctuation, also used in Chinese
     "哈利・波特": "zh", "ー・": null, "ラーメン": "ja", "ひらがな": "ja" };
   for (const [text, lang] of Object.entries(cases)) assert.equal(e.detect(text), lang, text);

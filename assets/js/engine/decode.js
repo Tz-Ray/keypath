@@ -4,7 +4,7 @@
 // layout readers, extended with ja_romaji (keyed and inline selectors),
 // en_identity, the Cangjie and Quick shape codes, the Vietnamese
 // syllables (Telex, VNI; docs/10 §6.5), ETen, Jyutping and JIS kana
-// (docs/10 §4.3-§5), and reading every
+// (docs/10 §4.3-§5), Greek (docs/10 §7.1), and reading every
 // candidate list through the list store so the page refuses, never
 // misreads, when it lacks a list.
 import { cpLength } from "./unicode.js";
@@ -85,6 +85,9 @@ function makeUnitReader({ layouts, lists }) {
     // one unit is one syllable of G: D(chunk), when E types it back as the chunk
     "vi/vi_telex": chunk => bijective(guard(chunk, () => layouts.viSyllable("vi_telex", chunk))),
     "vi/vi_vni": chunk => bijective(guard(chunk, () => layouts.viSyllable("vi_vni", chunk))),
+    // one unit is one word, read left to right: a dead key must be followed
+    // by a vowel key it accents
+    "el/el_greek": chunk => bijective(guard(chunk, () => layouts.elWord(chunk))),
     "ja/ja_romaji": (chunk, unit, mode) => {
       let romaji = chunk, index, selected = null;
       if (mode === "inline") {

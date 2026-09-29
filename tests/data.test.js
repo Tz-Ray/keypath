@@ -16,9 +16,9 @@ const dataFiles = files(join(ROOT, "data")).map(p => relative(ROOT, p).split("\\
 const manifest = readJson("data/manifest.json");
 
 test("data/manifest.json lists every data file with its size and sha256", () => {
-  assert.equal(manifest.keypath, "2.4.0");
-  assert.equal(manifest.tag, "v2.4");
-  assert.equal(manifest.edition, "b31f6b0c5fd8391c1fc7bc1c4a1491152a449308bdd1abe3e53dad8fa80dc55b");
+  assert.equal(manifest.keypath, "2.5.0");
+  assert.equal(manifest.tag, "v2.5");
+  assert.equal(manifest.edition, "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2");
   assert.deepEqual(Object.keys(manifest.files).sort(), dataFiles.filter(f => f !== "data/manifest.json"));
   for (const [path, { bytes, sha256 }] of Object.entries(manifest.files)) {
     const buf = readFileSync(join(ROOT, path));
@@ -56,7 +56,7 @@ test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 
   // ones (their rows are computed from their base surface's), none for those
   assert.deepEqual(reg.derivedRows, { zh_eten: "zh_daqian", zh_quick: "zh_cangjie", ja_kana: "ja_romaji" });
   const withFiles = reg.allowed.en.filter(s => s !== "en_identity" && !Object.hasOwn(reg.derivedRows, s));
-  assert.equal(withFiles.length, 9);
+  assert.equal(withFiles.length, 10);
   assert.equal(withFiles.length * 26, dataFiles.filter(f => /^data\/en\/(?!vocab\/)[a-z_]+\/[a-z]\.json$/.test(f)).length);
   for (const sid of withFiles)
     assert.equal(dataFiles.filter(f => f.startsWith(`data/en/${sid}/`) && f.endsWith(".json")).length, 26, sid);
@@ -70,6 +70,10 @@ test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 
   assert.ok(dataFiles.includes("data/quick.json"));
   // the Jyutping lists in one file (docs/10 §9.7)
   assert.ok(dataFiles.includes("data/jyutping.json"));
+  // docs/10 §9.7: the 26 files of en→el rows; the el→en lists are never shipped
+  assert.ok(withFiles.includes("el_greek"));
+  assert.equal(dataFiles.filter(f => /^data\/en\/el_greek\/[a-z]\.json$/.test(f)).length, 26);
+  assert.deepEqual(dataFiles.filter(f => /el_en|el>en|el-en/.test(f)), []);
   const index = readJson("data/challenges/index.json");
   assert.deepEqual(index.map(c => c.n), [1, 2, 3, 4, 5, 6]);
   for (const c of index) assert.equal(readJson(`data/challenges/0${c.n}.json`).ciphertext, c.ciphertext);
@@ -95,10 +99,20 @@ test("registry: kp1's ordinal lists equal kp1-ordinals.jsonl (docs/10 §2.2, §9
   for (const [l, y] of reg.kp1Surfaces.slice(reg.strictSelectorOrdinal))
     assert.deepEqual(reg.surfaces[l][y].selectorModes, ["keyed"], `${l}/${y}`);
   assert.deepEqual(reg.kp1Surfaces.slice(8), [["zh", "zh_cangjie"], ["zh", "zh_quick"], ["vi", "vi_telex"], ["vi", "vi_vni"],
-    ["zh", "zh_eten"], ["zh", "zh_jyutping"], ["ja", "ja_kana"]]);
+    ["zh", "zh_eten"], ["zh", "zh_jyutping"], ["ja", "ja_kana"], ["el", "el_greek"]]);
+  assert.deepEqual(reg.kp1Languages.slice(-1), ["el"]);
   // vi is native-only (docs/10 §6.5): no English rows, no other source reaches it
   assert.deepEqual(reg.allowed.vi, ["vi_telex", "vi_vni"]);
   for (const [lang, sids] of Object.entries(reg.allowed))
     if (lang !== "vi") assert.ok(sids.every(s => !s.startsWith("vi_")), lang);
   assert.ok(!reg.hops.some(h => h.split(">").includes("vi")));
+  // Greek (docs/10 §9.7): from Greek and from English; the hop out of Greek
+  // is registered, but its lists are never shipped, so keys using it are refused
+  assert.deepEqual(reg.allowed.el, ["el_greek"]);
+  assert.ok(reg.allowed.en.includes("el_greek"));
+  for (const [lang, sids] of Object.entries(reg.allowed))
+    if (!["el", "en"].includes(lang)) assert.ok(!sids.includes("el_greek"), lang);
+  assert.deepEqual(reg.hops.filter(h => h.split(/[:>]/).includes("el")), ["translate:en>el", "translate:el>en"]);
+  assert.deepEqual(reg.refusedHops, ["translate:el>en"]);
+  assert.deepEqual(reg.recomposedLanguages, ["el"]);
 });

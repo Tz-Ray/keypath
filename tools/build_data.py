@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the site's data/ and tests/fixtures/ from keypath 2.4.0.
+"""Generate the site's data/ and tests/fixtures/ from keypath 2.5.0.
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v2.4); the cipher project
+site's own venv (from the cipher project at tag v2.5); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
 docs/09) and never imported from, executed or written to.  The walks the
 page draws come from keypath.trace (trace/1), mapped to the site's surface
@@ -53,6 +53,7 @@ from keypath.keyspec import (  # noqa: E402
 from keypath.errors import KeyValidationError, KeypathError, LayoutError  # noqa: E402
 from keypath.keycodec import pack as kp1_pack, payload as kp1_payload, text as kp1_text  # noqa: E402
 from keypath.keycodec import unpack as kp1_unpack  # noqa: E402
+from keypath.layouts import el_greek as el_layout  # noqa: E402
 from keypath.layouts import ja_kana as kana_layout  # noqa: E402
 from keypath.layouts import ja_romaji as ja_layout  # noqa: E402
 from keypath.layouts.keyboard import US_ROWS, US_SHIFTED_ROWS  # noqa: E402
@@ -65,24 +66,25 @@ from keypath.layouts import zh_daqian as daqian_layout  # noqa: E402
 from keypath.layouts import zh_eten as eten_layout  # noqa: E402
 from keypath.layouts import zh_jyutping as jyutping_layout  # noqa: E402
 from keypath.layouts import zh_pinyin as pinyin_layout  # noqa: E402
-from keypath.normalize import LOWERCASE_LANGUAGES, normalize  # noqa: E402
+from keypath.normalize import LOWERCASE_LANGUAGES, RECOMPOSED_LANGUAGES, normalize  # noqa: E402
+from keypath.surfaces import el as el_language  # noqa: E402
 from keypath.surfaces import zh as zh_surface  # noqa: E402
 from keypath.surfaces import zh_ko_hanja  # noqa: E402
 from keypath.surfaces.base import SPACED  # noqa: E402
 from keypath.tables import (  # noqa: E402
-    VI_CHECKED_TONES, VI_STOP_CODAS, VI_TONE_MARKS, es_accent, es_en, ja_kana, ja_romaji, ko_dubeolsik, ko_hanja,
-    ko_hanja_readings, ru_en, ru_jcuken, tables_sha256, vi_syllables, vi_telex, vi_vni, zh_cangjie, zh_chars, zh_daqian,
-    zh_eten, zh_jyutping, zh_phrases, zh_pinyin, zh_quick,
+    VI_CHECKED_TONES, VI_STOP_CODAS, VI_TONE_MARKS, el_en, el_greek, es_accent, es_en, ja_kana, ja_romaji, ko_dubeolsik,
+    ko_hanja, ko_hanja_readings, ru_en, ru_jcuken, tables_sha256, vi_syllables, vi_telex, vi_vni, zh_cangjie, zh_chars,
+    zh_daqian, zh_eten, zh_jyutping, zh_phrases, zh_pinyin, zh_quick,
 )
 from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v2.4; by default next to this repository
+# a checkout of the cipher project at tag v2.5; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-VERSION = "2.4.0"
-TAG = "v2.4"
-EDITION = "b31f6b0c5fd8391c1fc7bc1c4a1491152a449308bdd1abe3e53dad8fa80dc55b"
+VERSION = "2.5.0"
+TAG = "v2.5"
+EDITION = "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2"
 VOCAB_SIZE = 10_000
 SEED = 20260924
 LETTERS = "abcdefghijklmnopqrstuvwxyz"
@@ -105,6 +107,7 @@ SURFACES: dict[str, tuple[str, str]] = {
     "es_accent": ("es", "es_accent"),
     "vi_telex": ("vi", "vi_telex"),
     "vi_vni": ("vi", "vi_vni"),
+    "el_greek": ("el", "el_greek"),
     "en_identity": ("en", "en_identity"),
 }
 SURFACE_LABELS = {
@@ -122,6 +125,7 @@ SURFACE_LABELS = {
     "es_accent": ("ñ", "Spanish accents", "a Spanish accent-digit keyboard"),
     "vi_telex": ("ư", "Vietnamese Telex", "a Vietnamese Telex keyboard"),
     "vi_vni": ("ơ", "Vietnamese VNI", "a Vietnamese VNI keyboard"),
+    "el_greek": ("λ", "Greek", "a Greek keyboard"),
     "en_identity": ("a", "Plain English", "a plain English keyboard"),
 }
 SITE_ID = {pair: sid for sid, pair in SURFACES.items()}
@@ -144,7 +148,13 @@ ALLOWED = {
     "ru": ["ru_jcuken"],
     "es": ["es_accent"],
     "vi": VI,
+    # docs/10 §9.7: Greek from Greek and from English; el→X routes are
+    # refused (the lists they read are never shipped, REFUSED_HOPS)
+    "el": ["el_greek"],
 }
+# docs/10 §9.7: hops whose candidate lists the page never ships (the el→en
+# lists), so a key that walks one is refused, never guessed
+REFUSED_HOPS = ["translate:el>en"]
 # The workbench's keyboards (docs/10 §9.7, M14): lookup and type answer for
 # the one layout the visitor names, over every surface typed on it (both of
 # ko_dubeolsik's: Korean and hanja).  No Japanese.
@@ -170,6 +180,7 @@ HERO_ALL = {
     "ko_dubeolsik": "ghksduddkstlrcj", "ru_jcuken": "ghbdtncndjdfnmljvf",
     "ja_romaji": "kanngeikokunai", "es_accent": "bienvenida", "en_identity": "welcomehome",
     "zh_eten": "hx8e-2gea", "zh_jyutping": "fun1jing4gaa1", "ja_kana": "ty'[ebhue",
+    "el_greek": "kalvs;orismasp;iti",
 }
 STRIP = {
     "text": "la luna y el sol de la ciudad", "source": "es",
@@ -206,7 +217,14 @@ MIXED = [
                                        {"length": 10, "route": "ja", "layout": "ja_kana"}]),
     ("six good", "en", [{"length": 4, "route": "ja", "layout": "ja_kana"},
                         {"length": 4, "route": "ru", "layout": "ru_jcuken"}]),
+    # docs/10 §10 M17: Greek's tonos `;` right after Dàqiān's ㄤ `;` (ej;;hliow)
+    ("light sun", "en", [{"length": 6, "route": "zh", "layout": "zh_daqian"},
+                         {"length": 3, "route": "el", "layout": "el_greek"}]),
+    ("the sea, my friend", "en", [{"length": 8, "route": "el", "layout": "el_greek"},
+                                  {"length": 10, "route": "ru", "layout": "ru_jcuken"}]),
 ]
+# the tables edition of KeyPath 2.4, which lists neither Greek table
+EDITION_V2_4 = "b31f6b0c5fd8391c1fc7bc1c4a1491152a449308bdd1abe3e53dad8fa80dc55b"
 # the tables edition of KeyPath 2.3, which lists none of the M16 tables
 EDITION_V2_3 = "ea386152bead693068cebb19c3d09244f19f299afaf9a650846fff2a6f8181af"
 # the tables edition of KeyPath 2.1 and 2.2, which lists no Vietnamese table
@@ -344,6 +362,8 @@ def registry_data() -> dict[str, Any]:
         "v1Layouts": list(V1_LAYOUTS),
         "spacedLanguages": sorted(SPACED),
         "lowercaseLanguages": sorted(LOWERCASE_LANGUAGES),
+        # docs/10 §3.2: normalized with NFC again after lowercasing
+        "recomposedLanguages": sorted(RECOMPOSED_LANGUAGES),
         "languages": list(registry.LANGUAGES),
         "surfaces": {
             lang: {
@@ -369,6 +389,7 @@ def registry_data() -> dict[str, Any]:
         ],
         "allowed": ALLOWED,
         "derivedRows": DERIVED_ROWS,
+        "refusedHops": REFUSED_HOPS,
         # docs/10 §9.7: the keyboards the workbench looks up and types on,
         # each with the surfaces typed on it, in registration order
         "workbench": [
@@ -398,7 +419,24 @@ def layouts_data() -> dict[str, Any]:
         "zh_quick": {"maxLetters": quick_layout.MAX_LETTERS},
         **vi_layouts_data(),
         **m16_layouts_data(),
+        **el_layouts_data(),
     }
+
+
+# docs/10 §3.2: an el word is a maximal run of these 36 letters
+EL_WORD_LETTERS = [chr(cp) for cp in range(0x03B1, 0x03CA)] + list("άέήίόύώϊϋΐΰ")
+
+
+def el_layouts_data() -> dict[str, Any]:
+    """docs/10 §7.1: the Windows Greek key table, el_greek.tsv's 36 rows in
+    its order (a letter and its keys: one key, or a dead key `;` `:` `W`
+    and the vowel's key).  The page builds E, D and the dead-key rule from
+    these, as the table is the one the words of docs/10 §3.2 are typed on."""
+    table = el_greek().keys_by_letter
+    assert set(table) == set(EL_WORD_LETTERS) == el_language.LETTERS, list(table)
+    assert len(table) == len(set(table.values())) == 36
+    assert set("".join(table.values())) == set(registry.surface("el", "el_greek").alphabet)
+    return {"el_greek": {"letters": [[letter, keys] for letter, keys in table.items()]}}
 
 
 def m16_layouts_data() -> dict[str, Any]:
@@ -873,15 +911,21 @@ def load_corpora() -> dict[str, list[str]]:
     wanted = {"test_walk_roundtrip_zh.py": {"CURATED": "CURATED", "OOV_CASES": "OOV_CASES"},
               "test_walk_roundtrip_en.py": {"CORPUS": "CORPUS"},
               "test_walk_roundtrip_ja_es.py": {"ES_CORPUS": "ES_CORPUS", "JA_CORPUS": "JA_CORPUS"},
-              "test_walk_roundtrip_vi.py": {"CORPUS": "VI_CORPUS"}}
-    found: dict[str, list[str]] = {}
+              "test_walk_roundtrip_vi.py": {"CORPUS": "VI_CORPUS"},
+              "test_walk_roundtrip_el.py": {"CORPUS": "EL_CORPUS"},
+              # docs/10 §3.2's normalization fixtures (input, normalized) and
+              # §10 M17's routes (source, route language, text)
+              "test_el.py": {"NORMALIZATION": "EL_NORMALIZATION", "ROUTES": "EL_ROUTES"}}
+    found: dict[str, list[Any]] = {}
     for file, names in wanted.items():
         tree = ast.parse((PROJECT / "tests" / file).read_text(encoding="utf-8"))
         for node in tree.body:
-            if isinstance(node, ast.Assign) and len(node.targets) == 1 \
-                    and isinstance(node.targets[0], ast.Name) and node.targets[0].id in names:
-                found[names[node.targets[0].id]] = ast.literal_eval(node.value)
-    for name in ("CURATED", "OOV_CASES", "CORPUS", "ES_CORPUS", "JA_CORPUS", "VI_CORPUS"):
+            target = node.targets[0] if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                else node.target if isinstance(node, ast.AnnAssign) else None
+            if isinstance(target, ast.Name) and target.id in names and node.value is not None:
+                found[names[target.id]] = ast.literal_eval(node.value)
+    for name in ("CURATED", "OOV_CASES", "CORPUS", "ES_CORPUS", "JA_CORPUS", "VI_CORPUS", "EL_CORPUS",
+                 "EL_NORMALIZATION", "EL_ROUTES"):
         assert name in found, name
     golden = {}
     for name in ("vectors_zh", "vectors_zh_pinyin", "vectors_ko_hanja", "vectors_zh_cangjie", "vectors_ko", "vectors_ru"):
@@ -1118,7 +1162,51 @@ def fuzz_strings(rng: random.Random, vocab: list[str], rows: dict[str, dict[str,
 
     fvi = ["".join(vi_token() + (" " if rng.random() < 0.7 else "") for _ in range(rng.randint(1, 7))).rstrip()
            for _ in range(400)]
-    return {"zh": fz, "ko": fko, "ru": fru, "es": fes, "en": fen, "enx": fx, "oov": foov, "vi": fvi}
+    return {"zh": fz, "ko": fko, "ru": fru, "es": fes, "en": fen, "enx": fx, "oov": foov, "vi": fvi,
+            "el": el_fuzz_strings(random.Random(SEED + 17))}
+
+
+def el_fuzz_strings(rng: random.Random) -> list[str]:
+    """Greek (docs/10 §3.2, §7.1): FreeDict ell-eng headwords (every accent),
+    capitalized, upper case (a final Σ lowercases to ς, a capital Ϊ/Ϋ with
+    U+0301 recomposes to ΐ/ΰ), decomposed, Greek letters outside the 36
+    (polytonic ones, ϐ ϑ ϲ …, and capitals such as ϴ Ϲ, which lowercase to θ
+    and ϲ), the Greek question mark and ano teleia (NFC folds them to `;`
+    and `·`), Latin, digits and punctuation.  Every
+    code point is assigned in Unicode 14.0, so Final_Sigma is part of the
+    contract here (docs/10 §3.2)."""
+    words = sorted(el_en().translations_by_el)
+    accented = [w for w in words if any(ch in "ϊϋΐΰ" for ch in w)]
+    odd = ["\u1f08θ\u1fc6ναι", "\u1f00", "\u1fe5", "ϐ", "ϑ", "ϕ", "ϖ", "ϰ", "ϱ", "ϲ", "ϳ", "ͻ", "Ϗ", "ϴ", "Ϲ",
+           "\u03aa\u0301", "\u03ab\u0301", "ΚΑ\u03aa\u0301ΚΙ", "ε\u0301", "Ε\u0301ΝΑ", "α\u0308", "ι\u0308\u0301"]
+
+    def el_token() -> str:
+        kind = rng.randrange(14)
+        if kind < 4:
+            return rng.choice(words)
+        if kind == 4:
+            return rng.choice(accented)
+        if kind == 5:
+            return rng.choice(words).capitalize()
+        if kind == 6:
+            return rng.choice(words).upper()
+        if kind == 7:
+            return unicodedata.normalize("NFD", rng.choice(words))
+        if kind == 8:
+            return rng.choice(odd)
+        if kind == 9:
+            return rng.choice(["\u037e", "\u0387", ";", ":", "·", "«", "»", ",", ".", "!", "—", "-", "'"])
+        if kind == 10:
+            return rng.choice(["ΣΑΣ", "Α.Σ.", "ΑΣ1", "Σ", "ΟΔΟΣ", "ΣΟΦΟΣ", "ΣΣ", "Σ.Σ", "ΑΣΑ", "ΑΣ'"])
+        if kind == 11:
+            return rng.choice(["hello", "cat", "q", "W", "2024", "10", "é", "ñ", "ё"])
+        return " " * rng.randint(1, 3)
+
+    out = ["".join(el_token() + (" " if rng.random() < 0.6 else "") for _ in range(rng.randint(1, 7))).rstrip()
+           for _ in range(400)]
+    for text in out:
+        assert all(unicodedata.category(ch) not in ("Cn", "Cs") for ch in text), text
+    return out
 
 
 EDGE_CASES = [
@@ -1131,6 +1219,10 @@ EDGE_CASES = [
     ("\U00031350", "zh"), ("hello \U00031350", "en"), ("\ud800", "en"), ("a\udc00b", "zh"),
     ("", "vi"), (" ", "vi"), ("   ", "vi"), ("\t", "vi"), ("VIỆT NAM", "vi"), ("vie\u0323\u0302t", "vi"),
     ("x\u0301", "vi"), ("Đ", "vi"), ("12 34", "vi"), ("ΣΑΣ việt", "vi"), ("việt \U00031350", "vi"),
+    # docs/10 §3.2, §7.1: Greek
+    ("", "el"), (" ", "el"), ("   ", "el"), ("\t", "el"), (";", "el"), ("\u037e", "el"), ("ΟΔΟΣ", "el"),
+    ("ΚΑ\u03aa\u0301ΚΙ", "el"), ("\u03ab\u0301", "el"), ("ς", "el"), ("ΣΣ", "el"), ("Σ1Σ", "el"),
+    ("θάλασσα \U00031350", "el"), ("hello κόσμε", "el"), ("12 34", "el"), ("q W ;", "el"),
 ]
 
 
@@ -1180,6 +1272,27 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
                 vec.add("golden-m16", g["plaintext"], "zh", "zh_daqian")
                 twin = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (g["plaintext"], "zh", "zh_daqian"))
                 assert twin["expect"]["ciphertext"] == g["zh_daqian_ciphertext"], (g, twin["expect"])
+    # docs/10 §7.1 and §7.3 (M17): the Greek goldens (hop-free el words, one
+    # unit each), and en words that the en>el hop takes onto Greek
+    golden_el = json.loads((PROJECT / "tests" / "golden" / "vectors_el_greek.json").read_text(encoding="utf-8"))
+
+    def added(cls: str, text: str, source: str, sid: str) -> dict[str, Any]:
+        vec.add(cls, text, source, sid)
+        return next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (text, source, sid))
+
+    for g in golden_el["vectors"]:
+        rec = added("golden-el", g["plaintext"], "el", "el_greek")
+        assert (rec["text"], rec["expect"]["ciphertext"], rec["expect"]["decoded"]) == \
+            (g["plaintext"], g["ciphertext"], g["normalized"]), (g, rec["expect"])
+        units = [u for w in json.loads(rec["expect"]["keyText"])["segments"][0]["words"] for u in w.get("units", [])]
+        assert units == [{"len": n} for n in g["unit_lens"]], (g, units)
+    for g in golden_el["hops"]:
+        rec = added("golden-el", g["plaintext"], g["source_language"], "el_greek")
+        assert rec["text"] == g["plaintext"] and rec["expect"]["ciphertext"] == g["ciphertext"], (g, rec["expect"])
+        key = json.loads(rec["expect"]["keyText"])
+        assert key["segments"][0]["route"] == g["route"], key
+        assert key["segments"][0]["words"][0]["translation"] == {"tier": 1, "index": g["index"]}, key
+        assert len(registry.HOPS[("en", "el")].edge.backward(g["word"])) == g["count"], g
     for text, source, sid, cipher in CHIPS:
         vec.add("site", text, source, sid)
         rec = next(r for r in vec.records if (r["text"], r["source"], r["surface"]) == (text, source, sid))
@@ -1205,6 +1318,12 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for t in corpora["JA_CORPUS"]:
         for sid in ("ja_romaji", "ja_kana"):
             vec.add("corpus-ja", t, "ja", sid)
+    # Greek (docs/10 §3.2): the round-trip corpus and the normalization
+    # fixtures (Final_Sigma, the second NFC), typed natively
+    for t in corpora["EL_CORPUS"] + [text for text, _normalized in corpora["EL_NORMALIZATION"]]:
+        vec.add("corpus-el", t, "el", "el_greek")
+    for text, normalized in corpora["EL_NORMALIZATION"]:
+        assert normalize(text, "el") == normalized, (text, normalized)
     # routes the page refuses
     vec.add("route", "你好", "zh", "ru_jcuken")
     vec.add("route", "привет", "ru", "zh_daqian")
@@ -1213,6 +1332,19 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     vec.add("route", "xin chào", "vi", "en_identity")
     vec.add("route", "welcome home", "en", "vi_telex")
     vec.add("route", "привет", "ru", "vi_vni")
+    # docs/10 §9.7, §10 M17: Greek from Greek and English only.  The pivots
+    # into Greek (es, ru, zh through en) and every route out of Greek (el→en,
+    # el→en→X), which Python encodes, are refused
+    for source, route, text in corpora["EL_ROUTES"]:
+        if source == route:
+            vec.add("corpus-el", text, "el", "el_greek")
+        elif source == "en" and route == "el":
+            vec.add("corpus-en", text, "en", "el_greek")
+        else:
+            vec.add("route", text, source, "en_identity" if route == "en" else next(
+                sid for sid, (lang, _layout) in SURFACES.items() if lang == route))
+    for sid in ("zh_daqian", "ru_jcuken", "ja_romaji", "vi_telex"):
+        vec.add("route", "θάλασσα φίλος γάτα", "el", sid)
     # fuzz
     fz = fuzz_strings(rng, vocab, rows)
     for t in fz["zh"]:
@@ -1234,6 +1366,8 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     for t in fz["vi"]:
         for sid in VI:
             vec.add("fuzz-vi", t, "vi", sid)
+    for t in fz["el"]:
+        vec.add("fuzz-el", t, "el", "el_greek")
     for text, source in EDGE_CASES:
         for sid in ALLOWED[source] if source != "en" else ["en_identity", "zh_daqian", "ja_romaji", "ja_kana"]:
             vec.add("edge", text, source, sid)
@@ -1247,12 +1381,15 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     long_vi = " ".join(rng.choice(grammar) for _ in range(60))[:200].rstrip()
     for sid in VI:
         vec.add("edge", long_vi, "vi", sid)
+    el_words = sorted(el_en().translations_by_el)
+    long_el = " ".join(random.Random(SEED + 17).choice(el_words) for _ in range(40))[:200].rstrip()
+    vec.add("edge", long_el, "el", "el_greek")
     out.jsonl_gz("tests/fixtures/vectors.jsonl.gz", vec.records)
 
     # traces: site, challenges, sample
     traces = []
     for rec in vec.valid:
-        if rec["class"] in ("site", "golden-m16"):
+        if rec["class"] in ("site", "golden-m16", "golden-el"):
             traces.append({"id": rec["id"], "ciphertext": rec["expect"]["ciphertext"],
                            "keyText": rec["expect"]["keyText"],
                            "trace": site_trace(rec["expect"]["ciphertext"], json.loads(rec["expect"]["keyText"]))})
@@ -1606,6 +1743,52 @@ def tampered(rng: random.Random, valid: list[dict[str, Any]], shipped: list[dict
                                        ("kana-voicing-alone", kana_key("[", "keyed", {"len": 1})),
                                        ("kana-voicing-after-voiced", kana_key("t[[", "keyed", {"len": 3}))):
         add(name, cipher, key)
+    # Greek (docs/10 §7.1, §2.1, M17): keyed only, no homophone_index, the
+    # v2.4 edition lists no Greek table, another layout's route tail, a
+    # unit's chunk made malformed (a dead key before a key it does not
+    # accent, a dead key ending the unit, `q`, which types no letter), and
+    # an en>el record past its list
+    el_keys = pick(lambda r: r["surface"] == "el_greek" and r["source"] == "el" and has_units(r, False), 24)
+    assert len(el_keys) == 24
+
+    def el_bad_chunk(chunk: str, kind: int) -> str:
+        n = len(chunk)
+        if kind == 0:
+            return (";b" + chunk[2:]) if n >= 2 else ";"
+        if kind == 1:
+            return chunk[:-1] + "W"
+        if kind == 2:
+            return (":a" + chunk[2:]) if n >= 2 else ":"
+        return "q" + chunk[1:]
+
+    for i, (c, k) in enumerate(el_keys):
+        k2 = copy.deepcopy(k)
+        seg = k2["segments"][0]
+        choice = i % 6
+        if choice == 0:
+            seg["selector_mode"] = "inline"
+            add("el-inline", c, k2)
+        elif choice == 1:
+            first_unit(k2, False)["homophone_index"] = 0
+            add("el-index", c, k2)
+        elif choice == 2:
+            k2["tables_sha256"] = EDITION_V2_4
+            add("el-old-edition", c, k2)
+        elif choice == 3:
+            seg["route"] = ["keystroke:ru_jcuken"]
+            add("el-route-tail", c, k2)
+        else:
+            # literals take no keys, so the first unit's chunk starts the ciphertext
+            n = first_unit(k2, False)["len"]
+            kind = (i // 6) % 4
+            bad = el_bad_chunk(c[:n], kind)
+            assert len(bad) == n and bad != c[:n]
+            add(f"el-dead-key-{kind}", bad + c[n:], k2)
+    for c, k in pick(lambda r: r["surface"] == "el_greek" and r["source"] == "en"
+                     and '"translation"' in r["expect"]["keyText"], 4):
+        k2 = copy.deepcopy(k)
+        first_word(k2, True)["translation"]["index"] = 10_000
+        add("el-hop-index-range", c, k2)
     records = []
     for name, cipher, key in muts:
         text = json.dumps(key, ensure_ascii=False, indent=2) + "\n"
@@ -1681,6 +1864,7 @@ def digests(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]) -> No
         result[name] = sha("".join(sorted(lines)))
         result[f"{name}Count"] = len(lines)
     vi_digests(result)
+    el_digests(result)
     result["readings"] = sha("".join(
         f"{r}\t{daqian_layout.keys_for_reading(r)}\t{pinyin_layout.keys_for_reading(r)}\n"
         for r in sorted(chars.candidates_by_reading)))
@@ -1789,6 +1973,49 @@ def vi_digests(result: dict[str, Any]) -> None:
                                    "wellFormed": sum(line.split("\t")[1].startswith("=") for line in body)}
 
 
+# docs/10 §9.7 (M17): every chunk of up to EL_CHUNK_MAX keys over el_greek's
+# alphabet and the keys that type no letter or need quoting (q, Q, ' " \)
+EL_CHUNK_MAX = 3
+EL_CHUNK_EXTRA = "q", "Q", "'", '"', "\\"
+
+
+def el_digests(result: dict[str, Any]) -> None:
+    """docs/10 §9.7 `el`: letter<TAB>keys for the 36 letters of el_greek.tsv,
+    lines sorted by code point, through the surface's own encoder (each one
+    unit that decodes back).  `elChunks`: every chunk of 1 to EL_CHUNK_MAX
+    keys over the alphabet and EL_CHUNK_EXTRA (length, then code-point
+    order) as chunk<TAB>=word, or chunk<TAB>!rule with the layout's error
+    (docs/10 §7.1's dead-key rule); for chunks of the alphabet the rule is
+    the one `keypath lookup` prints."""
+    import itertools
+
+    s = surface_of("el_greek")
+    lines = []
+    for letter in el_greek().keys_by_letter:
+        units, keys = s.encode_word(letter, "keyed")
+        assert units == [{"len": len(keys)}] and s.decode_unit(keys, units[0], "keyed") == letter, letter
+        lines.append(f"{letter}\t{keys}\n")
+    result["el"] = sha("".join(sorted(lines)))
+    result["elCount"] = len(lines)
+    symbols = sorted(set(s.alphabet) | set(EL_CHUNK_EXTRA))
+    body, good = [], 0
+    for n in range(1, EL_CHUNK_MAX + 1):
+        for parts in itertools.product(symbols, repeat=n):
+            chunk = "".join(parts)
+            try:
+                verdict = "=" + el_layout.word_for_keys(chunk)
+                good += 1
+            except LayoutError as exc:
+                verdict = "!" + str(exc)
+            if set(chunk) <= s.alphabet:
+                entry = toolkit.lookup_unit(s, chunk, top=0)
+                assert verdict == (f"={entry['reading']}" if entry["well_formed"] else f"!{entry['error']}"), chunk
+            body.append(f"{chunk}\t{verdict}\n")
+    result["elChunks"] = {"maxLen": EL_CHUNK_MAX, "extra": "".join(EL_CHUNK_EXTRA), "count": len(body), "ok": good,
+                          "sha256": sha("".join(body))}
+    print(f"[el] chunks: {good} of {len(body)} read")
+
+
 def vi_chunk_fixture(out: Out) -> None:
     """tests/fixtures/vi-chunks.jsonl.gz: longer chunks near the syllables of
     G, with each one's verdict (vi_verdict): a syllable's keys, and the keys
@@ -1812,6 +2039,50 @@ def vi_chunk_fixture(out: Out) -> None:
                     records.append({"layout": sid, "chunk": chunk, "verdict": vi_verdict(s, chunk)})
     out.jsonl_gz("tests/fixtures/vi-chunks.jsonl.gz", records)
     print(f"[vi] {len(records)} chunks near G, {sum(r['verdict'][0] == '=' for r in records)} of them units")
+
+
+def el_fixture(out: Out, corpora: dict[str, list[Any]]) -> None:
+    """tests/fixtures/el.json (docs/10 §3.2, §9.7, M17): `normalize`, Python's
+    normalize(text, "el") of the normalization fixtures (Final_Sigma, the
+    second NFC), the el corpus and the §7.1 goldens; and `outward`, keys out
+    of Greek (el→en, el→en→X, and a message whose first segment goes out
+    and whose second stays Greek) that Python decodes and the page refuses,
+    since it never ships the el→en lists."""
+    golden = json.loads((PROJECT / "tests" / "golden" / "vectors_el_greek.json").read_text(encoding="utf-8"))
+    texts = [t for t, _n in corpora["EL_NORMALIZATION"]] + corpora["EL_CORPUS"] + [g["plaintext"] for g in golden["vectors"]]
+    pairs = []
+    for text in texts:
+        once = normalize(text, "el")
+        assert normalize(once, "el") == once, text
+        pairs.append([text, once])
+    # docs/10 §3.2: Final_Sigma results are part of the contract only when
+    # every code point around a Σ is assigned in Unicode 14.0; these are
+    # ASCII or assigned Greek and Coptic, whose assignments predate 14.0
+    for text, _once in pairs:
+        if "Σ" in text:
+            assert all(ord(ch) < 0x80 or (0x370 <= ord(ch) <= 0x3FF and unicodedata.category(ch) != "Cn")
+                       for ch in text), text
+    got = dict(pairs)
+    assert " ".join(got[t] for t in ("ΟΔΟΣ", "ΣΟΦΟΣ", "Α.Σ.", "ΑΣ1")) == "οδος σοφος α.ς. ας1"
+    assert got["ΚΑ\u03aa\u0301ΚΙ"] == "καΐκι" and got["\u03ab\u0301"] == "ΰ"
+    outward = []
+    cases: list[tuple[str, str, Any]] = [(text, "el", sid) for text, sid in (
+        ("θάλασσα φίλος γάτα", "en_identity"), ("θάλασσα", "zh_daqian"), ("γάτα και θάλασσα", "ru_jcuken"))]
+    cases.append(("φως όταν", "el", [{"length": 4, "route": "zh"}, {"length": 4, "route": "el"}]))
+    for i, (text, source, how) in enumerate(cases):
+        if isinstance(how, str):
+            lang, layout = SURFACES[how]
+            result = encode(text, source, route_language=lang, layout=layout)
+        else:
+            result = encode(text, source, segments=how)
+        decoded = decode(result.ciphertext, result.key)
+        assert decoded == normalize(text, source)
+        routes = [seg["route"] for seg in result.key["segments"]]
+        assert any(step in REFUSED_HOPS for route in routes for step in route), routes
+        outward.append({"id": f"el-out-{i}", "ciphertext": result.ciphertext, "keyText": key_text(result.key),
+                        "decoded": decoded})
+    assert outward[-1]["ciphertext"] == "ej;;otan", outward[-1]
+    out.json("tests/fixtures/el.json", {"normalize": pairs, "outward": outward})
 
 
 def unicode_fixture(out: Out) -> None:
@@ -2306,6 +2577,7 @@ SOURCE_INFO: dict[str, tuple[str, str, str | None, bool]] = {
     "jmdict": ("JMdict", "CC BY-SA 4.0", None, False),
     "hanja": ("libhangul hanja.txt", "BSD-3-Clause", None, False),
     "rus": ("FreeDict rus-eng", "CC BY-SA 3.0", None, False),
+    "ell": ("FreeDict ell-eng", "CC BY-SA 3.0", None, False),
     "wordfreq": ("wordfreq data", "CC BY-SA 4.0", None, False),
     "unihan": ("Unihan", "Unicode-3.0", "LICENSES/Unicode-3.0.txt", False),
     "ucd": ("Unicode Character Database", "Unicode License", "LICENSES/Unicode.txt", False),
@@ -2341,6 +2613,8 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/en/ja_romaji/*.json", "data/en/ja_romaji", {"jmdict": _, **_SKK, "wordfreq": _}),
     ("data/en/ko_dubeolsik/*.json", "data/en/ko_dubeolsik", {**_KENG, "wordfreq": _}),
     ("data/en/ru_jcuken/*.json", None, {"rus": _, "wordfreq": _}),
+    # docs/10 §9.2: permissive and CC sources only, so no NOTICE
+    ("data/en/el_greek/*.json", None, {"ell": _, "wordfreq": _}),
     ("data/en/es_accent/*.json", "data/en/es_accent", {**_SPA, "wordfreq": _}),
     ("data/challenges/02.json", "data/challenges", {"keypath": _, "cedict": _, **_SPA, **_CHEWING, "wordfreq": _}),
     ("data/challenges/*.json", "data/challenges",
@@ -2349,7 +2623,7 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     # typed on the JIS kana keys)
     ("tests/fixtures/*", "tests/fixtures",
      {"keypath": _, "cedict": _, "jmdict": _, "skk": _SKK["skk"] + ("2026-09-29",), **_KENG, "hanja": _, "rus": _,
-      **_SPA, "chewing": _CHEWING["chewing"] + ("2026-09-28", "2026-09-29"), "unihan": _, "wordfreq": _, "ucd": _}),
+      "ell": _, **_SPA, "chewing": _CHEWING["chewing"] + ("2026-09-28", "2026-09-29"), "unihan": _, "wordfreq": _, "ucd": _}),
 ]
 
 
@@ -2539,7 +2813,8 @@ def kp1_fixtures(out: Out) -> None:
           "segments": [{"language": "ja", "layout": "ja_kana", "route": ["homophone:ja", "keystroke:ja_kana"],
                         "selector_mode": "inline", "words": [{"units": [{"len": 2}]}]}]}
     cases = [("the ja_kana chunk t3 as an inline unit (docs/10 §5)", t3)]
-    for text, source, sid in (("你好", "zh", "zh_eten"), ("你好", "zh", "zh_jyutping"), ("welcome home", "en", "ja_kana")):
+    for text, source, sid in (("你好", "zh", "zh_eten"), ("你好", "zh", "zh_jyutping"), ("welcome home", "en", "ja_kana"),
+                              ("θάλασσα", "el", "el_greek"), ("sea", "en", "el_greek")):
         key = copy.deepcopy(py_encode(text, source, sid).key)
         key["segments"][0]["selector_mode"] = "inline"
         cases.append((f"{text} on {sid}, inline", key))
@@ -2598,6 +2873,7 @@ def build(root: Path) -> Out:
     legends_fixture(out)
     digests(out, vocab, rows)
     vi_chunk_fixture(out)
+    el_fixture(out, corpora)
     unicode_fixture(out)
     static_fixture(out, hero, rows)
     kp1_ordinals(out)

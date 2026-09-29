@@ -86,6 +86,17 @@ each processed table, which pins the raw sources.  Regenerate with
 - raw sha256 (unihan-kCangjie.txt, the 29,189 kCangjie data lines of Unihan_DictionaryLikeData.txt): fccf1261026d081605dd32c3d5b3fb92d46e76b46952dde822824875a02e0b9a
 - raw sha256 (unihan-kCantonese.txt, the 29,936 kCantonese data lines of Unihan_Readings.txt): 87513d07ef4cc8c92513937caa8e0b449e03e76f6d40aaa6ce75a8a881a5dfe6
 
+## Source: FreeDict ell-eng (el↔en; en→el derived as reverse index)
+
+- url: https://download.freedict.org/dictionaries/ell-eng/2025.11.23/freedict-ell-eng-2025.11.23.src.tar.xz
+- release: 2025.11.23 (TEI source; WikDict, from Wiktionary via DBnary)
+- retrieved: 2026-09-29
+- license: CC BY-SA 3.0
+- tarball sha512 (as published in freedict-database.json): 61b64a5a89cc32f42ae99d9de14c38b6683fcdacc645aa1693d2f37c5944e49ab1a221138442c7fda0369f05c586f45567560dc606786a66dc0be15ab2c70300
+- tarball sha256: 3a102b1a72b5b7773dcd3669bc14c3e5d0df04616b525dca96c82d0d79ab17ef
+- raw sha256 (ell-eng.tei): c5476f83b7955755dc161a47c91aa4d6a9053b8781c9f3ffa3ec25435676d673
+- ordering: wordfreq==3.1.1 zipf_frequency, en for the el→en order and el for the en→el order, Zipf baked at build
+
 ## Processed tables
 
 - zh_chars.tsv: b9de5dd9a051e35d3cc57647de66af3458f3620a6fb541cbc5dbe3f8d3e72095
@@ -128,3 +139,7 @@ each processed table, which pins the raw sources.  Regenerate with
   (Unihan 18.0.0 kCantonese, as written, for each zh_chars.tsv character that has one; docs/10 §4.4 order: derived_freq desc, then code point)
 - ja_kana.tsv: a520438e86eff1eaa88a9bdf2cdb264bc7358a35fb23c739fbd63b27ab2ec45d
   (layout pinned by docs/10-v3-spec.md §5 (JIS kana on US key positions), not derived from raw data; cross-checked at build time against Mozc src/data/preedit/mac-kana.tsv (sha256 e0a8535aeef495351deaf45f75806e45b02bf8ec6aa5782189b666ae6689b0fe) and src/data/preedit/kana.tsv (sha256 4116a66ff0eecac7f1c9a65e561b5b674828818ac1b304df271e71fcef587892) @ b9c3fcbd6d76b19649ef572324fa9da2559bc18e, BSD-3-Clause, not table inputs)
+- el_greek.tsv: f39f88b7fbfb54309934d5492ae812190d9e8789f02529dfa02d1836fd3c2e63
+  (layout pinned by docs/10-v3-spec.md §7.1 (Windows Greek KLID 00000408 on US key positions), not derived from raw data; cross-checked at build time by the docs/10 §7.2 derivation from CLDR release-43 @ 66d15bfc1b4762b38bf1330319534e237d4670a3 keyboards/windows/el-t-k0-windows.xml (sha256 25399fc0cbffa33732e2e8e3c61ea1db307db1a505cb67b70164e9723e2a1bd5), which also derives ru_jcuken.tsv from keyboards/windows/ru-t-k0-windows.xml (sha256 102f149d9553606d2d65cbfc0800d00da6fb07220d12915b988bd94db1485999), Unicode, Inc. License Agreement – Data Files and Software, not table inputs)
+- el_en_freedict.tsv: 795ebe7f9057802465f6387f53119edc08d70ef7bbf6daadec90c383f3f847e6
+  (Zipf(el) millis (wordfreq zipf_frequency, which folds ς to σ) and the el→en order baked with wordfreq==3.1.1; the en→el order is derived at load)

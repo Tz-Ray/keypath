@@ -1,5 +1,5 @@
 // The in-browser KeyPath engine: encodes the site's live routes exactly like
-// keypath 2.4.0 and decodes keys, returning the Trace the page draws.
+// keypath 2.5.0 and decodes keys, returning the Trace the page draws.
 //
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })
@@ -18,7 +18,7 @@ import { createLists, NotCarried, PickError } from "./lists.js";
 import { createNative } from "./native.js";
 import { createEnglish } from "./rows.js";
 import { walkKey, keyNeeds, Tier2Error } from "./decode.js";
-import { KeyError, JsonError, checkKey, parseKeyJson, has } from "./keycheck.js";
+import { KeyError, JsonError, checkKey, parseKeyJson, has, splitRoute } from "./keycheck.js";
 import { dumpsKeyWithSpans } from "./dumps.js";
 import * as kp1 from "./kp1.js";
 import { createWorkbench } from "./workbench.js";
@@ -90,9 +90,11 @@ export async function createEngine({ fetchText } = {}) {
 
   // ------------------------------------------------------------ detect
   // The language of the plaintext a visitor types (never of a ciphertext).
-  // Vietnamese: any of its 62 letters that Spanish does not share (the 67
-  // non-ASCII letters of docs/10 §3.2 but á é í ó ú), in either case, before
-  // the Spanish test: "tôi có gì" is Vietnamese, "có" alone stays Spanish.
+  // Greek: any Greek-script letter (polytonic ones included).  Vietnamese:
+  // any of its 62 letters that Spanish does not share (the 67 non-ASCII
+  // letters of docs/10 §3.2 but á é í ó ú), in either case.  Both come
+  // before the Spanish test: "tôi có gì" is Vietnamese, "có" alone stays
+  // Spanish (docs/10 §9.7).
   const VI_ONLY = new Set(layouts.viLetterSet("vi_telex").filter(ch => ch > "\x7f" && !"áéíóú".includes(ch)));
   function detect(text) {
     const t = text.normalize("NFC");
@@ -102,6 +104,7 @@ export async function createEngine({ fetchText } = {}) {
     if (/\p{Script=Han}/u.test(t)) return "zh";
     if (/\p{Script=Hangul}/u.test(t)) return "ko";
     if (/\p{Script=Cyrillic}/u.test(t)) return "ru";
+    if (/(?=\p{L})\p{Script=Greek}/u.test(t)) return "el";
     for (const ch of t.toLowerCase()) if (VI_ONLY.has(ch)) return "vi";
     if (/[ñáéíóúü¿¡]/iu.test(t)) return "es";
     if (/\p{Script=Latin}/u.test(t)) return "en";
@@ -143,6 +146,15 @@ export async function createEngine({ fetchText } = {}) {
   const isCompact = keyText => /^kp1\./i.test(kp1.trimAscii(keyText));
   const decode = ({ ciphertext, keyText, format = "auto" }) => decodeText(ciphertext, keyText, true, format);
 
+  // docs/10 §9.7: the lists of these hops are never shipped (the el→en
+  // lists), so a key that walks one is refused before anything loads
+  const refusedHop = key => {
+    for (const seg of key.segments)
+      for (const hop of splitRoute(seg.route)[0]) if (registry.refusedHops.includes(hop)) return hop;
+    return null;
+  };
+  const REFUSED_WHAT = { "translate:el>en": "the Greek-to-English lists of translate:el>en" };
+
   async function decodeText(ciphertext, keyText, withRows, format = "json") {
     let key, compact = null;
     if (format === "kp1" || (format === "auto" && isCompact(keyText))) {
@@ -159,6 +171,8 @@ export async function createEngine({ fetchText } = {}) {
     }
     try {
       checkKey(key, registry);
+      const refused = refusedHop(key);
+      if (refused) throw new NotCarried(REFUSED_WHAT[refused] || `the lists of ${refused}`);
       await prefetch(key, ciphertext, withRows);
       const { text, trace } = walkKey({ registry, layouts, lists, siteId }, ciphertext, key);
       const dumped = dumpsKeyWithSpans(key);

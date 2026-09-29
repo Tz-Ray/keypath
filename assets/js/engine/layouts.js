@@ -1,9 +1,9 @@
-// Ports of keypath/layouts/*.py (KeyPath 2.4.0), both directions, built
+// Ports of keypath/layouts/*.py (KeyPath 2.5.0), both directions, built
 // from data/layouts.json.  The keys -> text readers are adapted from
 // cipher-project scripts/build_demo.py (v2.0), MIT.  The Vietnamese
 // layouts (Telex, VNI) are written from KeyPath's specification (docs/10
 // §6): the syllable grammar, the canonical keystrokes and the decode pass;
-// ETen, Jyutping and JIS kana from its §4.3-§5.
+// ETen, Jyutping and JIS kana from its §4.3-§5; Greek from its §7.1.
 //
 // Every function throws LayoutError on a malformed unit, like Python.  The
 // keys -> text readers throw Python's own messages, values quoted by
@@ -565,8 +565,108 @@ export function makeLayouts(L) {
     };
   }
 
+  // ------------------------------------------------------------ el_greek
+  // Written from docs/10 §7.1 over el_greek.tsv (data/layouts.json, in the
+  // table's order): each of the 25 unaccented letters is one key; each of the
+  // 11 accented letters is a dead key and then its vowel's key (`;` the
+  // tonos, `:` the dialytika, `W` the dialytika-tonos), so the accent is
+  // typed before the letter.  A word is one unit, typed letter by letter.
+  // Decode reads left to right: a dead key must be followed by a vowel key
+  // it combines with, else the unit is malformed; any other key is its
+  // letter.  The dead keys, their accents and their vowels are read from the
+  // table's two-key rows (a letter's NFD marks give the accent), never listed
+  // here.
+  const EL_ACCENT = { "\u0301": "\u0384", "\u0308": "\u00a8", "\u0308\u0301": "\u0385" };   // ΄ ¨ ΅
+  const elKeysByLetter = new Map(), elByKey = new Map(), elByPair = new Map(), elAccentByDeadKey = new Map();
+  for (const [letter, keys] of L.el_greek.letters) {
+    const n = Array.from(keys).length;
+    if (n !== 1 && n !== 2) fail(`el_greek.tsv must give each letter one key, or a dead key and a vowel key; it gives ${letter} ${R(keys)}`);
+    const target = n === 1 ? elByKey : elByPair;
+    if (target.has(keys)) fail(`el_greek.tsv is not injective: ${R(keys)} types both ${R(target.get(keys))} and ${R(letter)}`);
+    target.set(keys, letter);
+    elKeysByLetter.set(letter, keys);
+  }
+  for (const [keys, letter] of elByPair) {
+    const decomposed = Array.from(letter.normalize("NFD"));
+    const base = decomposed[0], accent = EL_ACCENT[decomposed.slice(1).join("")];
+    const [dead, vowel] = Array.from(keys);
+    if (!accent || elByKey.has(dead) || elKeysByLetter.get(base) !== vowel
+        || (elAccentByDeadKey.has(dead) && elAccentByDeadKey.get(dead) !== accent))
+      fail(`el_greek.tsv: ${letter} = ${R(keys)} is not a dead key followed by the key of ${base}`);
+    elAccentByDeadKey.set(dead, accent);
+  }
+  /** Each dead key -> the vowel keys it combines with, in table order. */
+  const elVowelsByDeadKey = new Map([...elAccentByDeadKey.keys()].map(dead => [dead, []]));
+  for (const pair of elByPair.keys()) {
+    const [dead, vowel] = Array.from(pair);
+    if (!elVowelsByDeadKey.get(dead).includes(vowel)) elVowelsByDeadKey.get(dead).push(vowel);
+  }
+
+  /** E: καλημέρα -> "kalhm;era".  Every character must be one of the 36 letters. */
+  function elKeysForWord(word) {
+    if (!word) fail("empty word");
+    let out = "";
+    for (const ch of word) {
+      if (!elKeysByLetter.has(ch)) fail(`${R(ch)} is not one of the 36 Greek letters, so it is not typable on el_greek`);
+      out += elKeysByLetter.get(ch);
+    }
+    return out;
+  }
+  /** D: "kalhm;era" -> καλημέρα, left to right (the dead-key rule). */
+  function elWord(chunk) {
+    if (!chunk) fail("empty unit for el_greek");
+    const keys = Array.from(chunk);
+    let out = "";
+    for (let i = 0; i < keys.length;) {
+      const key = keys[i];
+      if (elAccentByDeadKey.has(key)) {
+        const letter = i + 1 < keys.length ? elByPair.get(key + keys[i + 1]) : undefined;
+        if (letter === undefined) {
+          const after = i + 1 < keys.length ? `is followed by ${R(keys[i + 1])}` : "ends the unit";
+          fail(`dead key ${R(key)} (${elAccentByDeadKey.get(key)}) at position ${i} of unit ${R(chunk)} ${after}; `
+            + `on el_greek it must be followed by a vowel key it combines with (${elVowelsByDeadKey.get(key).join(" ")})`);
+        }
+        out += letter;
+        i += 2;
+        continue;
+      }
+      if (!elByKey.has(key)) fail(`key ${R(key)} types no letter on layout el_greek`);
+      out += elByKey.get(key);
+      i += 1;
+    }
+    return out;
+  }
+  /**
+   * A unit's letters over its keys, for the walk: [{letter, keys: [{key, dead}]}],
+   * `dead` the accent a dead key adds (null for a letter's own key).
+   */
+  function elLetters(chunk) {
+    const keys = Array.from(chunk);
+    const out = [];
+    for (let i = 0; i < keys.length;) {
+      if (elAccentByDeadKey.has(keys[i])) {
+        out.push({ letter: elByPair.get(keys[i] + keys[i + 1]),
+          keys: [{ key: keys[i], dead: elAccentByDeadKey.get(keys[i]) }, { key: keys[i + 1], dead: null }] });
+        i += 2;
+      } else {
+        out.push({ letter: elByKey.get(keys[i]), keys: [{ key: keys[i], dead: null }] });
+        i += 1;
+      }
+    }
+    return out;
+  }
+
   return {
     data: L,
+    elKeysForWord, elWord, elLetters,
+    /** The Greek legends: {oneKey: Map(key -> letter), dead: [[deadKey, accent, [[vowelKey, letter]]]]}, in table order. */
+    elLegend: () => ({
+      oneKey: new Map(elByKey),
+      dead: [...elAccentByDeadKey].map(([dead, accent]) =>
+        [dead, accent, elVowelsByDeadKey.get(dead).map(vowel => [vowel, elByPair.get(dead + vowel)])]),
+    }),
+    /** The 36 letters el_greek.tsv types, in its order. */
+    elLetterSet: () => [...elKeysByLetter.keys()],
     daqianKeys, daqianReading, pinyinKeys, pinyinReading, etenKeys, etenReading, etenFromDaqian,
     jyutpingReading, jyutpingKeys: jyutpingReading,
     kanaToKeys, keysToKana,

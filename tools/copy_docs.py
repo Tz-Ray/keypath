@@ -5,10 +5,10 @@ The cipher project's repository is not public, so the page links to these
 copies in this repository instead.  Files are read from the project's git
 tags, never its working tree: the six puzzles from `v2.0`, where they were
 set (their solve paths describe that release's keyboards), and the
-analysis and the table provenance from `v2.4`, whose tables edition the
+analysis and the table provenance from `v2.5`, whose tables edition the
 data under data/ is built from.  Until that tag is made, they are read
 from the checkout's committed HEAD, and only if that is the release
-candidate (its package version is 2.4.0).  A solve path keeps its title and its
+candidate (its package version is 2.5.0).  A solve path keeps its title and its
 solving steps (the setter's notes after them, which cite unpublished
 documents and tools, are left out) and gets a short preface; the analysis
 gets a preface too; everything else is copied byte for byte.
@@ -29,8 +29,8 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parent.parent
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 PUZZLES_TAG = "v2.0"
-DOCS_TAG = "v2.4"
-DOCS_VERSION = "2.4.0"   # the package version of that tag (and of its candidate)
+DOCS_TAG = "v2.5"
+DOCS_VERSION = "2.5.0"   # the package version of that tag (and of its candidate)
 PAGE = "https://tz-ray.github.io/keypath/"
 RULES = "All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals."
 
@@ -59,7 +59,7 @@ SOLVE_PREFACE = """\
 """
 
 ANALYSIS_PREFACE = """\
-> From KeyPath 2.4 (tag `v2.4`). The scripts, tests and design documents
+> From KeyPath 2.5 (tag `v2.5`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in

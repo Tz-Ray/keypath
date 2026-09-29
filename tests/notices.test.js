@@ -145,3 +145,35 @@ test("ETen, Jyutping and JIS kana are credited, with the Unicode license text fo
     assert.match(line, /the page derives the [\w ]+ rows from these/, base);
   }
 });
+
+// docs/10 §9.2, §9.7 (M17): the en→el rows derive only from FreeDict ell-eng
+// (CC BY-SA 3.0) and wordfreq (CC BY-SA 4.0), so their directory has no
+// NOTICE (as data/en/ru_jcuken); DATA-LICENSES credits ell-eng as rus-eng,
+// with its TEI availability text and sourceDesc attribution; the Greek key
+// table is authored (MIT) and ships inside data/layouts.json
+test("Greek: the en→el rows are credited to FreeDict ell-eng and carry no NOTICE; the key table is authored", () => {
+  const rows = files.filter(f => f.startsWith("data/en/el_greek/"));
+  assert.equal(rows.length, 26);
+  for (const file of rows) {
+    const e = entryOf(file);
+    assert.deepEqual(Object.keys(e.sources).sort(), ["ell", "wordfreq"], file);
+    assert.equal(e.notice, null, file);
+  }
+  assert.ok(!notices.some(n => n.startsWith("data/en/el_greek/")));
+  assert.deepEqual(map.sources.ell, { name: "FreeDict ell-eng", license: "CC BY-SA 3.0", text: null, copyleft: false });
+  assert.ok(Object.hasOwn(entryOf("tests/fixtures/vectors.jsonl.gz").sources, "ell"));
+  const row = md.split("\n").find(l => l.startsWith("| `data/en/el_greek/`"));
+  assert.ok(row, "DATA-LICENSES row for data/en/el_greek/");
+  assert.match(row, /FreeDict ell-eng \(WikDict\); wordfreq data \| CC BY-SA 3\.0; CC BY-SA 4\.0 \|$/);
+  const ell = section("Sources").split("\n### ").find(s => s.startsWith("FreeDict ell-eng"));
+  assert.ok(ell, "### FreeDict ell-eng");
+  assert.ok(ell.includes('"Licensed under the Creative Commons\n  Attribution-ShareAlike 3.0 Unported license"'), "the TEI availability text");
+  assert.ok(ell.includes('"Automatic creation of this bilingual\n  dictionary by WikDict. Base data from Wiktionary.org via DBnary."'), "the TEI sourceDesc");
+  assert.match(ell, /https:\/\/creativecommons\.org\/licenses\/by-sa\/3\.0\/legalcode/);
+  assert.match(ell, /release 2025\.11\.23/);
+  const layouts = JSON.parse(readFileSync(join(ROOT, "data/layouts.json"), "utf8"));
+  assert.ok("el_greek" in layouts);
+  const layoutsRow = md.split("\n").find(l => l.startsWith("| `data/layouts.json`"));
+  assert.ok(layoutsRow.includes("`el_greek.tsv`") && section("Sources").includes("`el_greek.tsv`"));
+  assert.deepEqual(copyleft(entryOf("data/layouts.json")), ["chewing"], "the Greek key table adds no copyleft source");
+});
