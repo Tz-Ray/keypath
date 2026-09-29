@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>KeyPath: hide a message in keystrokes</title>
-<meta name="description" content="KeyPath is a puzzle cipher. A message becomes the keystrokes you would type for it on a Chinese, Japanese, Korean, Russian or Vietnamese keyboard (or in a Spanish accent-digit scheme), and a small key records the route back.">
+<meta name="description" content="KeyPath is a puzzle cipher. A message becomes the keystrokes you would type for it on a Chinese, Japanese, Korean, Russian, Vietnamese or Greek keyboard (or in a Spanish accent-digit scheme), and a small key records the route back.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23fffdf8' stroke='%231b1d22' stroke-width='2'/%3E%3Cpath d='M5 24h22' stroke='%23b9b2a4' stroke-width='2'/%3E%3Ctext x='16' y='20' font-family='ui-monospace,monospace' font-size='15' font-weight='700' text-anchor='middle' fill='%231b1d22'%3EK%3C/text%3E%3C/svg%3E">
 <script>
 try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}
@@ -76,7 +76,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         <h1 id="hero-h">Hide a message in the keys you'd press to type it.</h1>
       </div>
       <div class="hero-lead">
-        <p class="lead">KeyPath turns a message into the keystrokes you would type for it on a Chinese, Japanese, Korean, Russian or Vietnamese keyboard, or in a Spanish accent-digit scheme. A small key records every choice on the way, so the walk back is exact.</p>
+        <p class="lead">KeyPath turns a message into the keystrokes you would type for it on a Chinese, Japanese, Korean, Russian, Vietnamese or Greek keyboard, or in a Spanish accent-digit scheme. A small key records every choice on the way, so the walk back is exact.</p>
         <p class="honest-note" data-honesty>A puzzle, not a lock: it's built to be solved, not to keep secrets.</p>
       </div>
     </div>
@@ -107,6 +107,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
                 <option value="ko" lang="ko">한국어</option>
                 <option value="zh" lang="zh-Hant">中文（繁體）</option>
                 <option value="vi" lang="vi">Tiếng Việt</option>
+                <option value="el" lang="el">Ελληνικά</option>
               </select>
               <span id="lang-mode" class="muted small">detected</span>
             </div>
@@ -130,6 +131,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
             <label class="chip"><input type="radio" name="kbd" value="es_accent"><span class="g" lang="es" aria-hidden="true">ñ</span><span class="t">Spanish accents</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="vi_telex"><span class="g" lang="vi" aria-hidden="true">ư</span><span class="t">Vietnamese Telex</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="vi_vni"><span class="g" lang="vi" aria-hidden="true">ơ</span><span class="t">Vietnamese VNI</span><span class="tip vh"></span></label>
+            <label class="chip"><input type="radio" name="kbd" value="el_greek"><span class="g" lang="el" aria-hidden="true">λ</span><span class="t">Greek</span><span class="tip vh"></span></label>
             <label class="chip"><input type="radio" name="kbd" value="en_identity"><span class="g" aria-hidden="true">a</span><span class="t">Plain English</span><span class="tip vh"></span></label>
           </div>
           <p id="route-note" class="route-note small" hidden></p>
@@ -144,6 +146,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <button type="button" data-text="ёжик" data-lang="ru" data-surface="ru_jcuken" data-static="chips.4"><span lang="ru">ёжик</span></button>
           <button type="button" data-text="mañana" data-lang="es" data-surface="es_accent" data-static="chips.5"><span lang="es">mañana</span></button>
           <button type="button" data-text="tiếng việt" data-lang="vi" data-surface="vi_telex" data-static="chips.6"><span lang="vi">tiếng việt</span></button>
+          <button type="button" data-text="καλημέρα" data-lang="el" data-surface="el_greek" data-static="chips.7"><span lang="el">καλημέρα</span> (good morning)</button>
         </div>
         </div>
 
@@ -330,6 +333,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <label class="chip"><input type="radio" name="wbkbd" value="en_identity"><span class="g" aria-hidden="true">a</span><span class="t">Plain English</span></label>
           <label class="chip"><input type="radio" name="wbkbd" value="vi_telex"><span class="g" lang="vi" aria-hidden="true">ư</span><span class="t">Vietnamese Telex</span></label>
           <label class="chip"><input type="radio" name="wbkbd" value="vi_vni"><span class="g" lang="vi" aria-hidden="true">ơ</span><span class="t">Vietnamese VNI</span></label>
+          <label class="chip"><input type="radio" name="wbkbd" value="el_greek"><span class="g" lang="el" aria-hidden="true">λ</span><span class="t">Greek</span></label>
         </div>
       </fieldset>
       <div class="wb-tools">
@@ -339,7 +343,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
             <label for="wb-keys">Keys, split into units with spaces</label>
             <input id="wb-keys" class="mono" type="text" maxlength="600" spellcheck="false" autocomplete="off" autocapitalize="off" lang="en" aria-describedby="wb-keys-hint">
           </div>
-          <p id="wb-keys-hint" class="small muted">A unit is the keys of one character (of one syllable in Korean and Vietnamese, of one word in Russian, Spanish and English), for example <code>cj0 u/6 ru8</code> on Bopomofo. For each unit you get its reading and its candidates, numbered from 0 as a key numbers them, or the rule it breaks.</p>
+          <p id="wb-keys-hint" class="small muted">A unit is the keys of one character (of one syllable in Korean and Vietnamese, of one word in Russian, Greek, Spanish and English), for example <code>cj0 u/6 ru8</code> on Bopomofo. For each unit you get its reading and its candidates, numbered from 0 as a key numbers them, or the rule it breaks.</p>
           <div class="wb-row">
             <div class="field">
               <label for="wb-top">Candidates to list</label>
@@ -387,6 +391,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <tr><td><a href="https://github.com/garfieldnate/kengdic" rel="noopener">kengdic</a></td><td>English → Korean dictionary hops</td><td><a href="LICENSES/LGPL-2.0.txt">LGPL-2.0-or-later</a></td></tr>
           <tr><td><a href="https://github.com/libhangul/libhangul" rel="noopener">libhangul hanja.txt</a></td><td>Hanja candidates and readings</td><td>BSD-3-Clause</td></tr>
           <tr><td><a href="https://download.freedict.org/dictionaries/rus-eng/" rel="noopener">FreeDict rus-eng (WikDict, from Wiktionary via DBnary)</a></td><td>Russian ↔ English dictionary hops</td><td>CC BY-SA 3.0</td></tr>
+          <tr><td><a href="https://download.freedict.org/dictionaries/ell-eng/" rel="noopener">FreeDict ell-eng (WikDict, from Wiktionary via DBnary)</a></td><td>English → Greek dictionary hops</td><td>CC BY-SA 3.0</td></tr>
           <tr><td><a href="https://github.com/freedict/fd-dictionaries" rel="noopener">FreeDict spa-eng</a></td><td>Spanish ↔ English dictionary hops</td><td><a href="LICENSES/GPL-2.0.txt">GPL-2.0-or-later</a></td></tr>
           <tr><td><a href="https://github.com/rspeer/wordfreq" rel="noopener">wordfreq data</a></td><td>The English word list and dictionary ordering</td><td>CC BY-SA 4.0</td></tr>
           <tr><td><a href="https://www.unicode.org/reports/tr38/" rel="noopener">Unihan database (Unicode 18.0.0)</a></td><td>Cangjie codes, and the Quick codes made from them; Cantonese (Jyutping) readings</td><td><a href="LICENSES/Unicode-3.0.txt">Unicode License V3</a></td></tr>

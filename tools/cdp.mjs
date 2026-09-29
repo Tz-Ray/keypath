@@ -108,6 +108,22 @@ async function typeAndWait(text, source, surface) {
   return want;
 }
 
+/** The keyboard picture as drawn: key -> [US label, legend, tone key, dead key, dimmed]. */
+const pictureOf = () => b.evaluate(`Object.fromEntries([...document.querySelectorAll("#kbd-pic .kb-key")].map(k =>
+  [k.dataset.key, [k.querySelector(".us").textContent, k.querySelector(".sym") ? k.querySelector(".sym").textContent : "",
+    k.classList.contains("tone"), k.classList.contains("dead"), k.classList.contains("unused")]]))`);
+const shiftedOf = key => legendsJson.usShiftedRows.join("")[legendsJson.usRows.join("").indexOf(key)];
+/** Whether every key of a drawn picture carries KeyPath's legend for what it types. */
+const matches = (pic, layout, shift) => Object.entries(pic).every(([key, [us, sym]]) => {
+  const typed = shift ? shiftedOf(key) : key;
+  // KeyPath's legends, except where its picture shows another label (kana's [ ゛ and ] ゜)
+  const want = (legendsJson.pictures[layout] || {})[typed] ?? legendsJson.layouts[layout][typed] ?? "";
+  return sym === want && us === (typed === key ? key : `⇧${typed}`);
+});
+/** Every key inside the picture, and the picture inside its box. */
+const pictureFits = () => b.evaluate(`(() => { const p = ${q("#kbd-pic .kb-pic")}; const box = ${q("#kbd-pic")}.getBoundingClientRect();
+  return [...p.querySelectorAll(".kb-key")].every(k => k.getBoundingClientRect().right <= box.right + 0.5) && p.scrollWidth <= p.clientWidth + 1; })()`);
+
 // ================================================================ checks
 await attempt("hero", async () => {
   await open(1280, 800);
@@ -127,7 +143,7 @@ await attempt("hero", async () => {
 
 await attempt("example chips", async () => {
   const chips = await b.evaluate("[...document.querySelectorAll('#examples button')].map(b => b.dataset.text)");
-  check("chips: seven examples", chips.length === 7 && S.chips.length === 7 && chips.every((t, i) => t === S.chips[i].text), chips);
+  check("chips: eight examples", chips.length === 8 && S.chips.length === 8 && chips.every((t, i) => t === S.chips[i].text), chips);
   for (const [i, c] of S.chips.entries()) {
     await b.evaluate(`document.querySelectorAll('#examples button')[${i}].click()`);
     await b.waitFor(cipherIs(c.ciphertext));
@@ -377,15 +393,6 @@ await attempt("ETen, Jyutping and kana", async () => {
   await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: watch.identifier });
 
   // the keyboard pictures: legends from the tables, the kana shift layer, no overflow
-  const pictureOf = () => b.evaluate(`Object.fromEntries([...document.querySelectorAll("#kbd-pic .kb-key")].map(k =>
-    [k.dataset.key, [k.querySelector(".us").textContent, k.querySelector(".sym") ? k.querySelector(".sym").textContent : "", k.classList.contains("tone")]]))`);
-  const matches = (pic, layout, shift) => Object.entries(pic).every(([key, [us, sym]]) => {
-    const typed = shift ? shiftedOf(key) : key;
-    // KeyPath's legends, except where its picture shows another label (kana's [ ゛ and ] ゜)
-    const want = (legendsJson.pictures[layout] || {})[typed] ?? legendsJson.layouts[layout][typed] ?? "";
-    return sym === want && us === (typed === key ? key : `⇧${typed}`);
-  });
-  const shiftedOf = key => legendsJson.usShiftedRows.join("")[legendsJson.usRows.join("").indexOf(key)];
   for (const [w, h] of [[1280, 800], [360, 780]]) {
     await open(w, h);
     for (const sid of ["zh_eten", "zh_jyutping", "ja_kana"]) {
@@ -414,8 +421,7 @@ await attempt("ETen, Jyutping and kana", async () => {
         check(`kana keyboard at ${w}px: the voicing and shift notes`, notes.includes("Each key types one kana. [ after a kana adds ゛ (か t, が t[); ] after a kana adds ゜ (は f, ぱ f]).")
           && notes.includes(") を (Shift+0)") && notes.includes("V ゐ (Shift+v)"), js(notes));
       }
-      const fits = await b.evaluate(`(() => { const p = ${q("#kbd-pic .kb-pic")}; const box = ${q("#kbd-pic")}.getBoundingClientRect();
-        return [...p.querySelectorAll(".kb-key")].every(k => k.getBoundingClientRect().right <= box.right + 0.5) && p.scrollWidth <= p.clientWidth + 1; })()`);
+      const fits = await pictureFits();
       check(`${sid} keyboard at ${w}px: every key inside the picture, no horizontal scroll`, fits && await noHScroll(w),
         await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
     }
@@ -431,6 +437,172 @@ await attempt("ETen, Jyutping and kana", async () => {
     && "qwertop".split("").map(k => ko[k][1]).join("") === "ㅃㅉㄸㄲㅆㅒㅖ", js(ko.q));
 });
 
+await attempt("greek", async () => {
+  // docs/10 §7.1 and §7.3: every golden typed on the Greek chip, native and from English, shows Python's ciphertext and key
+  const goldens = vectors.filter(v => v.class === "golden-el");
+  const golden = (source, text) => goldens.find(v => v.source === source && v.text === text);
+  check("Greek goldens: καλημέρα is kalhm;era, ΟΔΟΣ is odow, English cat is g;ata (Python), twelve in all",
+    golden("el", "καλημέρα").expect.ciphertext === "kalhm;era" && golden("el", "ΟΔΟΣ").expect.ciphertext === "odow"
+    && golden("en", "cat").expect.ciphertext === "g;ata" && goldens.length === 12 && goldens.every(v => v.surface === "el_greek"), goldens.length);
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    for (const v of w === 1280 ? goldens : goldens.filter(g => ["καλημέρα", "ΟΔΟΣ", "cat"].includes(g.text))) {
+      await typeMessage(v.text, v.source, "el_greek");
+      try {
+        await b.waitFor(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)}`, 15000);
+        await settle();
+        check(`el_greek at ${w}px: ${v.source} "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`,
+          await b.evaluate(`${cipherIs(v.expect.ciphertext)} && ${keyIs(v.expect.keyText)} && ${q("input[name=kbd][value=el_greek]")}.checked`));
+      } catch {
+        const got = await b.evaluate(`[${q("#cipher")}.textContent, ${q("#enc-refusal")}.textContent]`);
+        check(`el_greek at ${w}px: ${v.source} "${v.text}" shows ${js(v.expect.ciphertext)} and Python's key`, false, js(got));
+      }
+    }
+    check(`Greek at ${w}px: no horizontal scroll`, await noHScroll(w), await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+  }
+
+  // detection (docs/10 §9.7): a Greek sentence is Greek, typed on the Greek keyboard; "tôi có gì" is still Vietnamese
+  await open(1280, 800);
+  const typeFresh = async text => {
+    await b.evaluate(`(() => { const t = ${q("#msg")}; t.value = ""; t.dispatchEvent(new Event("input")); t.focus(); })()`);
+    await b.send("Input.insertText", { text });
+  };
+  const sentence = "Η θάλασσα είναι ωραία σήμερα, φίλε μου.";
+  const sentenceKeys = await b.evaluate(`window.__keypath.engine.encode({ text: ${js(sentence)}, source: "el", surface: "el_greek" }).then(r => r.ciphertext)`);
+  await typeFresh(sentence);
+  await b.waitFor(cipherIs(sentenceKeys));
+  await settle();
+  check("detect: a Greek sentence is Greek, typed on the Greek keyboard",
+    await b.evaluate(`${q("#lang")}.value === "el" && ${q("#lang-mode")}.textContent === "detected" && ${q("input[name=kbd][value=el_greek]")}.checked`),
+    await b.evaluate(`[${q("#lang")}.value, ${q("#lang-mode")}.textContent]`));
+  await typeFresh("tôi có gì");
+  await b.waitFor(cipherIs("tooicosgif"));
+  check("detect: “tôi có gì” is still Vietnamese, typed on Telex",
+    await b.evaluate(`${q("#lang")}.value === "vi" && ${q("#lang-mode")}.textContent === "detected" && ${q("input[name=kbd][value=vi_telex]")}.checked`));
+
+  // the walk: one unit per word, each letter over its keys, an accented letter over its dead key and its vowel
+  await typeFresh("προϊόν καλημέρα");
+  await b.waitFor(cipherIs("pro:i;onkalhm;era"));
+  await settle();
+  const pairs = await b.evaluate(`[...document.querySelectorAll("#walk .unit")].map(u => [...u.querySelectorAll(".pair")].map(p =>
+    [p.querySelector(".lcell").textContent, [...p.querySelectorAll("kbd")].map(k => (k.querySelector(".shift") ? "⇧" : "")
+      + k.querySelector(".main").textContent + (k.querySelector(".leg") ? k.querySelector(".leg").textContent : "") + (k.classList.contains("mis") ? "*" : ""))]))`);
+  check("Greek walk: προϊόν καλημέρα, each letter over its keys, the dead keys first", js(pairs) === js([
+    [["π", ["pπ"]], ["ρ", ["rρ"]], ["ο", ["oο"]], ["ϊ", ["⇧:¨*", "iι"]], ["ό", [";΄*", "oο"]], ["ν", ["nν"]]],
+    [["κ", ["kκ"]], ["α", ["aα"]], ["λ", ["lλ"]], ["η", ["hη"]], ["μ", ["mμ"]], ["έ", [";΄*", "eε"]], ["ρ", ["rρ"]], ["α", ["aα"]]]]), js(pairs));
+  check("Greek walk: the band is labelled Letters, and the misdirection dot names the accent",
+    await b.evaluate(`[...document.querySelectorAll("#walk .walk-gutter span")].some(s => s.textContent === "Letters") && !document.querySelector("#walk .b-sound")
+      && document.querySelector("#walk kbd.mis").title === 'On this keyboard ":" types ¨.'`), await b.evaluate(`document.querySelector("#walk kbd.mis").title`));
+  // walk back animates, unit by unit, and reads the message back
+  await b.evaluate(`window.__litEl = []; window.__obsEl = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litEl.push(performance.now()); });
+    window.__obsEl.observe(${q("#walk")}, { subtree: true, attributes: true, attributeFilter: ["class"] });`);
+  await b.evaluate(`${q("#walk-back")}.click()`);
+  await b.waitFor(`!${q("#walked")}.hidden`);
+  const lit = await b.evaluate("window.__obsEl.disconnect(), window.__litEl");
+  check("walk back on Greek animates, unit by unit", lit.length >= 4 && lit[lit.length - 1] - lit[0] >= 400, lit.length);
+  check("walk back on Greek reads the message back",
+    await b.evaluate(`${q("#walked")}.textContent === "Walked back: “προϊόν καλημέρα”, identical to your message."`), await b.evaluate(`${q("#walked")}.textContent`));
+  // ΟΔΟΣ is lowercased with the final sigma (docs/10 §3.2), and the walk back says so
+  await typeFresh("ΟΔΟΣ");
+  await b.waitFor(cipherIs("odow"));
+  await settle();
+  await b.evaluate(`${q("#walk-back")}.click()`);
+  await b.waitFor(`!${q("#walked")}.hidden`);
+  check("walk back: ΟΔΟΣ reads back as οδος, KeyPath's normalization",
+    await b.evaluate(`${q("#walked")}.textContent === "Walked back: “οδος”, your message after KeyPath's normalization (lowercase, single spaces)."`),
+    await b.evaluate(`${q("#walked")}.textContent`));
+
+  // English onto Greek: the dictionary hop (en>el) and its sense, from FreeDict ell-eng
+  await typeMessage("cat", "en", "el_greek");
+  await b.waitFor(cipherIs("g;ata"));
+  await settle();
+  const hop = await b.evaluate(`[document.querySelector("#walk .pill").textContent, document.querySelector("#walk .wtile.dict").textContent, document.querySelector("#walk .sense").textContent]`);
+  check("English cat onto Greek: γάτα, the 2nd of its 2 English senses", js(hop) === js(["en → el", "γάτα", "sense 2 of 2"]), js(hop));
+  await b.evaluate(`document.querySelector("#walk .sense").click()`);
+  await b.waitFor(`document.querySelector('.popover') && !document.querySelector('.popover').hidden`);
+  const sense = await b.evaluate(`document.querySelector('.popover .pop-body').textContent`);
+  check("English cat onto Greek: the sense popover names FreeDict ell-eng", sense.startsWith("γάτα has 2 English senses in FreeDict ell-eng. The key records the 2nd: cat."), sense);
+  await b.evaluate("document.querySelector('.popover .pop-close').click()");
+
+  // el→X is refused: from Greek, only the Greek keyboard; the other chips say why
+  await b.evaluate(`(() => { const s = ${q("#lang")}; s.value = "el"; s.dispatchEvent(new Event("change")); })()`);
+  await b.waitFor(`${q("input[name=kbd][value=el_greek]")}.checked`);
+  await b.evaluate(`${q("input[name=kbd][value=zh_daqian]")}.click()`);
+  await sleep(200);
+  const off = await b.evaluate(`[${q("#route-note")}.hidden, ${q("#route-note")}.textContent, ${q("input[name=kbd][value=el_greek]")}.checked,
+    [...document.querySelectorAll("input[name=kbd]")].filter(i => i.getAttribute("aria-disabled") === "false").map(i => i.value),
+    ${q("input[name=kbd][value=zh_daqian]")}.closest(".chip").title]`);
+  const EL_OFF = "From Greek, this page types on the Greek keyboard only. Typing Greek on another keyboard needs the Greek-to-English dictionary, which this page doesn't carry.";
+  check("el→X: from Greek only the Greek chip is on, and the page says why", !off[0] && off[1] === EL_OFF && off[2] && js(off[3]) === js(["el_greek"]) && off[4] === EL_OFF, js(off));
+
+  // ... and a key that translates out of Greek (Python decodes it) is refused in "Walk one back" and as a #walk link
+  const EL_OUT = "This key translates Greek through the Greek-to-English dictionary, which this page doesn't carry.";
+  const elFixture = readJson("tests/fixtures/el.json");
+  const outward = elFixture.outward[0];
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  await b.evaluate(`(() => { ${q("#dec-err")}.hidden = true; ${q("#dec-cipher")}.value = ${js(outward.ciphertext)}; ${q("#dec-key")}.value = ${js(outward.keyText)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-err")}.hidden`);
+  check("el→X: a key out of Greek is refused with the page's reason", await b.evaluate(`${q("#dec-err")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
+    await b.evaluate(`${q("#dec-err")}.textContent`));
+  const outKp1 = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(outward.keyText)})`);
+  await b.navigate("about:blank");
+  await b.navigate(`${srv.url}#walk=${b64url({ c: outward.ciphertext, k: outKp1.text })}`);
+  await b.waitFor("document.documentElement.classList.contains('ready')");
+  await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
+  check("el→X: as a walk link, refused the same way, with no walk", await b.evaluate(`${q("#dec-err")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
+    await b.evaluate(`${q("#dec-err")}.textContent`));
+
+  // a #walk link on the Greek keyboard (native καλημέρα as kp1, English cat as JSON) decodes and animates
+  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+    new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
+      .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
+  const kalimera = golden("el", "καλημέρα"), cat = golden("en", "cat");
+  const kalimeraKp1 = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(kalimera.expect.keyText)})`);
+  for (const [name, body, want] of [["καλημέρα", { c: kalimera.expect.ciphertext, k: kalimeraKp1.text }, "καλημέρα"],
+    ["cat", { c: cat.expect.ciphertext, j: JSON.stringify(JSON.parse(cat.expect.keyText)) }, "cat"]]) {
+    await b.navigate("about:blank");
+    await b.navigate(`${srv.url}#walk=${b64url(body)}`);
+    await b.waitFor("document.documentElement.classList.contains('ready')");
+    await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
+    await b.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && [...document.querySelectorAll("#dec-walk .unit, #dec-walk .wg")].every(e => e.classList.contains("lit"))`);
+    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__lit.length ? window.__lit[window.__lit.length - 1] - window.__lit[0] : 0,
+      [...document.querySelectorAll("#dec-walk .seg-badge, #dec-walk .lcell")].map(e => e.textContent).join("")]`);
+    check(`walk link on Greek (${name}): decodes and animates`, kalimeraKp1.ok && got[0] === want && got[1] && got[2] >= 2 && got[3] >= (got[2] - 1) * 120
+      && got[4] === (name === "cat" ? "γάτα" : "καλημέρα"), js(got));
+  }
+  await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: watch.identifier });
+
+  // the keyboard picture: letters, the dead keys ; ΄, Shift-; ¨ and Shift-W ΅ from the table, q unused; no overflow at 360
+  const els = legendsJson.layouts.el_greek;
+  for (const [w, h] of [[1280, 800], [360, 780]]) {
+    await open(w, h);
+    await b.evaluate(`${q("input[name=kbd][value=el_greek]")}.click()`);
+    await b.waitFor(cipherIs(S.heroAll.el_greek));
+    await settle();
+    await b.evaluate(`${q("#kbd-panel")}.open = true`);
+    await sleep(120);
+    const pic = await pictureOf();
+    check(`Greek keyboard at ${w}px: 47 keys, legends as KeyPath's`, Object.keys(pic).length === 47 && matches(pic, "el_greek", false), js(pic).slice(0, 500));
+    check(`Greek keyboard at ${w}px: ; is the dead key ΄, q is unused`, pic[";"][1] === els[";"] && pic[";"][3] && pic.q[1] === "" && pic.q[4]
+      && Object.entries(pic).filter(([, v]) => v[3]).map(([k]) => k).join("") === ";", js([pic[";"], pic.q]));
+    await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
+    await sleep(80);
+    const shifted = await pictureOf();
+    check(`Greek keyboard at ${w}px with Shift: ; is ⇧: ¨ and w is ⇧W ΅, both dead, as KeyPath's`, matches(shifted, "el_greek", true)
+      && js(shifted[";"].slice(0, 4)) === js(["⇧:", els[":"], false, true]) && js(shifted.w.slice(0, 4)) === js(["⇧W", els.W, false, true])
+      && Object.entries(shifted).filter(([, v]) => v[1]).map(([k]) => k).sort().join("") === ";w", js([shifted[";"], shifted.w]));
+    const notes = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-note")].map(n => n.textContent)`);
+    const accented = await b.evaluate(`[...document.querySelectorAll("#kbd-pic .kb-es li")].map(li => [li.textContent, li.classList.contains("used")])`);
+    const rows = layoutsJson.el_greek.letters.filter(([, k]) => k.length === 2);
+    check(`Greek keyboard at ${w}px: the dead-key note, the 11 accented letters (those the message uses marked) and q`,
+      notes[0] === "Each letter key types one Greek letter. The accents are dead keys, typed before their vowel: ; ΄ (tonos), : ¨ (dialytika, Shift+;), W ΅ (dialytika and tonos, Shift+w)."
+      && js(accented) === js(rows.map(([l, k]) => [`${k} ${l}`, S.heroAll.el_greek.includes(k)]))
+      && notes[1] === "q types the Greek question mark, not a letter, so it never appears in the keys.", js([notes, accented]));
+    check(`Greek keyboard at ${w}px: every key inside the picture, no horizontal scroll`, await pictureFits() && await noHScroll(w),
+      await b.evaluate("[document.documentElement.scrollWidth, innerWidth]"));
+  }
+});
+
 await attempt("typing", async () => {
   // every keyboard chip on the page: the site vectors, the corpora and fuzz strings
   const chips = await b.evaluate(`[...document.querySelectorAll("input[name=kbd]")].map(i => i.value)`);
@@ -439,7 +611,8 @@ await attempt("typing", async () => {
   const bySurface = new Map();
   const usable = v => v.carried && !v.jsRefusal && v.expect && v.expect.ciphertext !== undefined && Array.from(v.text).length <= 200 && v.text.trim()
     && chips.includes(v.surface);
-  for (const cls of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en", "corpus-vi", "fuzz-en-x", "fuzz-zh", "fuzz-es", "fuzz-ru", "fuzz-ko", "fuzz-en-id", "fuzz-vi"]) {
+  for (const cls of ["site", "corpus-zh", "corpus-ko", "corpus-ru", "corpus-es", "corpus-en", "corpus-vi", "corpus-el", "fuzz-en-x", "fuzz-zh", "fuzz-es",
+    "fuzz-ru", "fuzz-ko", "fuzz-en-id", "fuzz-vi", "fuzz-el"]) {
     for (const v of vectors) {
       if (v.class !== cls || !usable(v)) continue;
       const k = `${v.source}/${v.surface}`;
@@ -1076,6 +1249,25 @@ if (SHOTS) {
           await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
           await sleep(200);
           await shotOf(`ja_kana-keyboard-shift-${tag}`, "#kbd-panel");
+          // Greek: native, with all three dead keys, and English onto Greek; the keyboard and its Shift layer
+          await typeAndWait("Καλημέρα! Προϊόν, καΐκι.", "el", "el_greek");
+          await b.evaluate(`${q("#kbd-panel")}.open = true`);
+          await sleep(1500);
+          await shotOf(`el_greek-${tag}`, ".enc-out");
+          await shotOf(`el_greek-keyboard-${tag}`, "#kbd-panel");
+          await b.evaluate(`${q("#kbd-pic .kb-shift input")}.click()`);
+          await sleep(200);
+          await shotOf(`el_greek-keyboard-shift-${tag}`, "#kbd-panel");
+          await typeAndWait("the cat and the sea", "en", "el_greek");
+          await sleep(1500);
+          await shotOf(`el_greek-en-${tag}`, ".enc-out");
+          await b.evaluate(`(() => { const s = ${q("#lang")}; s.value = "el"; s.dispatchEvent(new Event("change")); })()`);
+          await sleep(400);
+          await shotOf(`el_greek-chips-${tag}`, "#kbd");
+          await b.evaluate(`(() => { ${q("#wb-kbd input[value=el_greek]")}.click(); ${q("#wb-keys")}.value = "kalhm;era pro:i;on kal;b W q";
+            ${q("#wb-look")}.requestSubmit(); ${q("#wb-text")}.value = "Καλημέρα, κόσμε! ΟΔΟΣ"; ${q("#wb-type")}.requestSubmit(); })()`);
+          await b.waitFor(`!${q("#wb-look-out")}.hidden && !${q("#wb-type-out")}.hidden`);
+          await shotOf(`workbench-greek-${tag}`, "#workbench");
           await b.evaluate(`(() => { ${q("#wb-kbd input[value=zh_jyutping]")}.click(); ${q("#wb-keys")}.value = "nei5 hou2 nei7 si1";
             ${q("#wb-look")}.requestSubmit(); ${q("#wb-text")}.value = "廣東話, hello"; ${q("#wb-type")}.requestSubmit(); })()`);
           await b.waitFor(`!${q("#wb-look-out")}.hidden && !${q("#wb-type-out")}.hidden`);

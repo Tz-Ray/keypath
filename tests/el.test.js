@@ -192,6 +192,7 @@ test("refusals: keys out of Greek (never shipped), from other sources, inline, m
     const r = await e.decode({ ciphertext: o.ciphertext, keyText: o.keyText });
     assert.deepEqual([r.ok, r.reason], [false, "notCarried"], `${o.id}: ${JSON.stringify(r)}`);
     assert.equal(r.message, "the Greek-to-English lists of translate:el>en", o.id);
+    assert.equal(r.hop, "translate:el>en", o.id);
     // as a short key too
     const packed = e.kp1Pack(o.keyText);
     assert.equal(packed.ok, true, o.id);

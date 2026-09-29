@@ -2,7 +2,7 @@
 // one US shift map, and on every layout drawn as a key grid exactly the
 // legends KeyPath's layouts give each key (tests/fixtures/legends.json,
 // written by tools/build_data.py from the tables), the shift layers of
-// Dubeolsik and JIS kana included.  The one exception is the fixture's
+// Dubeolsik, JIS kana and Greek included.  The one exception is the fixture's
 // `pictures`: kana's voicing keys [ and ], their own legends, show the
 // marks ゛ ゜ they add, as keypath's own kana picture does.  The browser
 // run (tools/cdp.mjs) checks the drawn pictures and their width at 360 px.
@@ -10,7 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { engine, readJson } from "./helpers.js";
 import { makeLegends } from "../assets/js/ui/walk.js";
-import { ROWS, US_SHIFT, GRID_LAYOUTS, keyboardModel, hasShiftLayer, bopomofoToneNote, jyutpingNote, kanaNotes }
+import { ROWS, US_SHIFT, GRID_LAYOUTS, keyboardModel, hasShiftLayer, bopomofoToneNote, jyutpingNote, kanaNotes, greekNotes }
   from "../assets/js/ui/keyboard.js";
 
 const fixture = readJson("tests/fixtures/legends.json");
@@ -48,7 +48,7 @@ test("every grid layout draws exactly KeyPath's legends, unshifted and shifted",
     // a shift layer exactly when the layout labels a shifted key
     assert.equal(shift, Object.keys(want).some(k => !ROWS.flat().includes(k)), layout);
   }
-  assert.deepEqual([...GRID_LAYOUTS].filter(l => hasShiftLayer(legends, l)), ["ko_dubeolsik", "ja_kana"]);
+  assert.deepEqual([...GRID_LAYOUTS].filter(l => hasShiftLayer(legends, l)), ["ko_dubeolsik", "ja_kana", "el_greek"]);
   // docs/10 §8.4: kana's [ and ] are on no one-key row, so each is its own
   // legend; only the picture shows the marks they add
   assert.deepEqual(fixture.pictures, { ja_kana: { "[": "゛", "]": "゜" } });
@@ -88,6 +88,42 @@ test("ETen and kana legends, asserted from the tables", async () => {
   assert.deepEqual("qwertop".split("").map(k => at("ko_dubeolsik", k, true)).join(""), "ㅃㅉㄸㄲㅆㅒㅖ");
 });
 
+test("Greek legends, asserted from the table: the letters, the dead keys ; (΄), Shift-; (¨) and Shift-W (΅), q unused", async () => {
+  const legends = await legendsOf();
+  const model = shift => keyboardModel(legends, "el_greek", shift).flat();
+  const at = (key, shift = false) => model(shift).find(k => k.key === key);
+  // every one-key row of el_greek.tsv on its key; the two-key rows are a dead key and a vowel
+  const rows = layoutsJson.el_greek.letters;
+  assert.equal(rows.length, 36);
+  for (const [letter, keys] of rows) {
+    if (keys.length === 1) assert.equal(at(keys).legend, letter, letter);
+    else assert.ok(at(keys[1]).legend && [";", ":", "W"].includes(keys[0]), letter);
+  }
+  // ; ΄ (tonos); Shift-; types : ¨ (dialytika); Shift-W types W ΅ (dialytika-tonos)
+  assert.deepEqual([at(";").legend, at(";").dead], ["\u0384", true]);
+  assert.deepEqual([at(";", true).typed, at(";", true).legend, at(";", true).dead], [":", "\u00a8", true]);
+  assert.deepEqual([at("w", true).typed, at("w", true).legend, at("w", true).dead], ["W", "\u0385", true]);
+  assert.equal(at("w").legend, "ς");
+  assert.equal(at("q").legend, "", "q types the Greek question mark, never a letter");
+  assert.equal(at("q", true).legend, "");
+  assert.equal(at("a", true).legend, "", "Shift+a types no letter on this table");
+  // the dead keys and nothing else are marked so; no tone keys
+  assert.deepEqual(model(false).filter(k => k.dead).map(k => k.typed), [";"]);
+  assert.deepEqual(model(true).filter(k => k.dead).map(k => k.typed).sort(), [":", "W"]);
+  assert.ok(model(false).every(k => !k.tone));
+  // the shift layer holds exactly the two shifted dead keys
+  assert.deepEqual(model(true).filter(k => k.legend).map(k => k.typed).sort(), [":", "W"]);
+  // the notes: each dead key with its accent, the key it is typed with Shift on, and its letters
+  const { dead, unused } = greekNotes(legends);
+  assert.deepEqual(dead.map(d => [d.key, d.accent, d.name, d.shiftOf, d.letters.map(([k, l]) => k + l).join(" ")]), [
+    [";", "\u0384", "tonos", null, ";aά ;eέ ;hή ;iί ;oό ;yύ ;vώ"],
+    [":", "\u00a8", "dialytika", ";", ":iϊ :yϋ"],
+    ["W", "\u0385", "dialytika and tonos", "w", "Wiΐ Wyΰ"],
+  ]);
+  assert.equal(dead.flatMap(d => d.letters).length, 11);
+  assert.deepEqual(unused, ["q"]);
+});
+
 test("the notes under the pictures are read from the tables", async () => {
   const legends = await legendsOf();
   assert.equal(bopomofoToneNote(layoutsJson.zh_daqian), "Tone keys: 6 ˊ · 3 ˇ · 4 ˋ · 7 ˙; the first tone types nothing.");
@@ -111,4 +147,9 @@ test("the walk's keycaps: ETen and kana keys carry their legends, digits and pun
   assert.deepEqual(caps("ja_kana", "iZ-]yb["), ["iに", "Zっ^", "-ほ*", "]゜*", "yん", "bこ", "[゛*"]);
   assert.deepEqual(caps("ja_kana", "b+"), ["bこ", "+ゑ*^"]);
   assert.deepEqual(caps("zh_jyutping", "nei5"), ["n", "e", "i", "5"]);
+  // Greek: each key its letter; a dead key its accent, ; and : with the misdirection dot, : and W the Shift mark
+  assert.deepEqual(caps("el_greek", "kalhm;era"), ["kκ", "aα", "lλ", "hη", "mμ", ";΄*", "eε", "rρ", "aα"]);
+  assert.deepEqual(caps("el_greek", "pro:i;on"), ["pπ", "rρ", "oο", ":¨*^", "iι", ";΄*", "oο", "nν"]);
+  assert.deepEqual(caps("el_greek", "kaWiki"), ["kκ", "aα", "W΅^", "iι", "kκ", "iι"]);
+  assert.deepEqual(caps("el_greek", "odow"), ["oο", "dδ", "oο", "wς"]);
 });

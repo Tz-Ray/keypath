@@ -159,9 +159,9 @@ REFUSED_HOPS = ["translate:el>en"]
 # the one layout the visitor names, over every surface typed on it (both of
 # ko_dubeolsik's: Korean and hanja).  No Japanese.
 # M15 adds Vietnamese Telex and VNI; M16 ETen and Jyutping, each placed after
-# its twin (Dàqiān, Pinyin) as the page's chips are.
+# its twin (Dàqiān, Pinyin) as the page's chips are; M17 Greek, last.
 WORKBENCH_LAYOUTS = ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "ko_dubeolsik",
-                     "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni"]
+                     "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni", "el_greek"]
 
 # Examples used by the page (§6); every one is re-encoded and asserted.
 HERO = ("welcome home", "en", "zh_daqian", "cj0u/6ru8")
@@ -173,6 +173,7 @@ CHIPS = [
     ("ёжик", "ru", "ru_jcuken", "`;br"),
     ("mañana", "es", "es_accent", "man1ana"),
     ("tiếng việt", "vi", "vi_telex", "tieesngvieejt"),
+    ("καλημέρα", "el", "el_greek", "kalhm;era"),
 ]
 HERO_ALL = {
     "zh_daqian": "cj0u/6ru8", "zh_pinyin": "huan1ying2jia1", "zh_hanja": "ghksdudrk",
@@ -506,6 +507,13 @@ def legends_fixture(out: Out) -> None:
     assert pictures == {"ja_kana": {"[": "゛", "]": "゜"}}, pictures
     assert (layouts["ja_kana"]["["], layouts["ja_kana"]["]"]) == ("[", "]")
     assert kana["が"] == "t[" and kana["ぱ"] == "f]"
+    # Greek (docs/10 §7.1, §9.7): each letter's one key, and the three dead
+    # keys: ; the tonos, Shift-; (:) the dialytika, Shift-W (W) both; q none
+    el = el_greek().keys_by_letter
+    assert {k: v for k, v in layouts["el_greek"].items() if k not in ";:W"} == \
+        {keys: letter for letter, keys in el.items() if len(keys) == 1}
+    assert [layouts["el_greek"][k] for k in ";:W"] == ["\u0384", "\u00a8", "\u0385"]
+    assert "q" not in layouts["el_greek"] and el["έ"] == ";e" and el["ϊ"] == ":i" and el["ΐ"] == "Wi"
     out.json("tests/fixtures/legends.json", {"usRows": list(US_ROWS), "usShiftedRows": list(US_SHIFTED_ROWS),
                                              "layouts": layouts, "pictures": pictures})
 
@@ -2171,7 +2179,7 @@ _LIT = r"""('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")"""
 WB_RULES: dict[str, str] = {
     "alphabet": r"unit LIT contains LIT, which is outside the [a-z_]+ alphabet",
     "empty": r"empty keystroke unit",
-    "empty-unit": r"empty unit for (?:ru_jcuken|es_accent|vi_telex|vi_vni)",
+    "empty-unit": r"empty unit for (?:ru_jcuken|es_accent|vi_telex|vi_vni|el_greek)",
     "tone-not-final": r"tone key not final in unit LIT",
     "bare-tone": r"unit LIT is a bare tone key",
     "not-syllable": r"unit LIT maps to LIT, which is not a syllable in the reading table",
@@ -2195,6 +2203,11 @@ WB_RULES: dict[str, str] = {
     "vi-undefined": r"key LIT at position \d+ cannot follow LIT \(VNI: a digit must follow the letter it marks\)",
     "vi-not-g": r"D\([a-z0-9]+\) = [^ ]+ is not a syllable of G; canonical (?:Telex|VNI) types a vowel's tone key "
                 r"right after that vowel and its modifier key \(e\.g\. việt = (?:vieejt|vie65t)\)",
+    # docs/10 §7.1: a dead key must be followed by a vowel key it combines with
+    "el-dead-key": r"dead key LIT \([΄¨΅]\) at position \d+ of unit LIT is followed by LIT; on el_greek it must be "
+                   r"followed by a vowel key it combines with \([a-z](?: [a-z])*\)",
+    "el-dead-end": r"dead key LIT \([΄¨΅]\) at position \d+ of unit LIT ends the unit; on el_greek it must be "
+                   r"followed by a vowel key it combines with \([a-z](?: [a-z])*\)",
 }
 WB_RULE_RE = {name: re.compile("^" + pattern.replace("LIT", _LIT) + "$") for name, pattern in WB_RULES.items()}
 WB_SURFACE_RULES: dict[str, list[str]] = {
@@ -2213,6 +2226,8 @@ WB_SURFACE_RULES: dict[str, list[str]] = {
     "(en, en_identity)": ["alphabet", "not-word"],
     "(vi, vi_telex)": ["alphabet", "empty-unit", "vi-not-g"],
     "(vi, vi_vni)": ["alphabet", "empty-unit", "vi-undefined", "vi-not-g"],
+    # `key 'q' types no letter` cannot fire: q is outside the alphabet
+    "(el, el_greek)": ["alphabet", "empty-unit", "el-dead-key", "el-dead-end"],
 }
 # chunks with ', ", both, and \ (docs/10 §9.7), per surface
 QUOTE_CLASSES = {"single": lambda c: "'" in c and '"' not in c, "double": lambda c: '"' in c and "'" not in c,
@@ -2272,9 +2287,11 @@ def wb_units(layout: str) -> list[str]:
         # every 20th syllable of G, typed (G has 111,003)
         table = vi_telex() if layout == "vi_telex" else vi_vni()
         return sorted(keys for i, keys in enumerate(table.keys_by_syllable.values()) if i % 20 == 0)
-    lang = {"ru_jcuken": "ru", "es_accent": "es", "en_identity": "en"}[layout]
+    lang = {"ru_jcuken": "ru", "es_accent": "es", "en_identity": "en", "el_greek": "el"}[layout]
     if lang == "ru":
         words = sorted(ru_en().translations_by_ru)
+    elif lang == "el":
+        words = sorted(el_en().translations_by_el)
     elif lang == "es":
         words = sorted(es_en().translations_by_es)
     else:
@@ -2340,6 +2357,10 @@ def wb_lookup_fixtures(rng: random.Random) -> tuple[list[dict[str, Any]], dict[s
                      ["tooi", "cos", "gif"], ["the", "cat"]],
         "vi_vni": [["vie65t"], ["vie55"], ["ngu7o72i", "d9u7o72ng"], ["ho2a", "hoa2"], ["xoong"],
                    ["to6i", "co1", "gi2"], ["5a"]],
+        # docs/10 §7.1's goldens, and the dead-key rule's refusals
+        "el_greek": [["kalhm;era"], ["eyxarist;v", "u;alassa"], ["vra;iow"], ["kaWiki", "cyx;h"], ["sk;ylow"],
+                     ["pro:i;on"], ["odow"], ["g;ata"], ["kal;b"], ["ab;"], [":a"], ["W"], [";;a"], ["q"],
+                     ["kalhm;era", "q;a"]],
     }
     stats: dict[str, Any] = {}
     for layout in WORKBENCH_LAYOUTS:
@@ -2446,6 +2467,13 @@ def wb_type_texts(rng: random.Random, corpora: dict[str, list[str]]) -> dict[str
             own += some(corpora["ES_CORPUS"], 10)
         if layout == "en_identity":
             own += some(corpora["CORPUS"], 10)
+        if layout == "el_greek":
+            # docs/10 §7.1's goldens, Final_Sigma and the second NFC (§3.2),
+            # polytonic and archaic letters (literals), Greek punctuation
+            own += some(corpora["EL_CORPUS"], 10) + [
+                "καλημέρα", "ευχαριστώ", "θάλασσα", "ωραίος", "καΐκι", "ψυχή", "σκύλος", "προϊόν", "ΟΔΟΣ",
+                "ΣΟΦΟΣ Α.Σ. ΑΣ1", "ΚΑ\u03aa\u0301ΚΙ", "\u03ab\u0301", "Καλημέρα, κόσμε!", "τι κάνεις;",
+                "τι κάνεις\u037e", "ἀγάπη", "ϐϑϕ", "γάτα cat", "φίλος · άνθρωπος", "qW;:"]
         if layout in VI:
             own += some(corpora["VI_CORPUS"], 10) + [
                 "việt", "Việt Nam", "tôi có gì", "hòa hoà thủy thuỷ", "the man can sing", "the cat sat on the mat",
@@ -2516,6 +2544,21 @@ def workbench_fixtures(out: Out, corpora: dict[str, list[str]]) -> None:
     assert typed[("zh_jyutping", "銀行")] == "(zh, zh_jyutping)\n銀 ngan4 0/{}\n行 hang4 0/{}".format(
         len(zh_jyutping().candidates_by_reading["ngan4"]), len(zh_jyutping().candidates_by_reading["hang4"]))
     assert typed[("vi_vni", "tôi có gì")] == "(vi, vi_vni)\ntôi to6i -\ncó co1 -\ngì gi2 -"
+    # docs/10 §7.1: one unit per word, its keys the letters' (the accent's dead key first)
+    assert one("el_greek", ["kalhm;era"]) == ("kalhm;era · (el, el_greek) · well-formed: yes\n  reading: καλημέρα\n"
+                                              "  candidates: 1 (identity: the unit is its reading; a key carries no "
+                                              "homophone_index)\n  0:καλημέρα")
+    assert one("el_greek", ["kal;b"]).endswith("  violated rule: dead key ';' (΄) at position 3 of unit 'kal;b' is "
+                                               "followed by 'b'; on el_greek it must be followed by a vowel key it "
+                                               "combines with (a e h i o y v)")
+    assert one("el_greek", ["W"]).endswith("  violated rule: dead key 'W' (΅) at position 0 of unit 'W' ends the "
+                                           "unit; on el_greek it must be followed by a vowel key it combines with "
+                                           "(i y)")
+    assert one("el_greek", ["q"]).endswith("  violated rule: unit 'q' contains 'q', which is outside the el_greek "
+                                           "alphabet")
+    assert typed[("el_greek", "ΟΔΟΣ")] == "(el, el_greek)\nοδος odow -"
+    assert typed[("el_greek", "καΐκι")] == "(el, el_greek)\nκαΐκι kaWiki -"
+    assert typed[("el_greek", "προϊόν")] == "(el, el_greek)\nπροϊόν pro:i;on -"
 
     # coverage: every template of every surface, and each quote class, in a
     # violated rule; every quoted value is repr == pyrepr

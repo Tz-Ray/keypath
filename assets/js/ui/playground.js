@@ -60,6 +60,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     el.langMode.textContent = state.langMode === "detected" ? T.detected : T.chosen;
   }
   function routeOffText() {
+    if (state.lang === "el") return T.routeOffEl;
     const names = engine.allowed(state.lang).map(id => surfaces.get(id).label);
     return T.routeOff(LANG_NAMES[state.lang], names);
   }
@@ -377,7 +378,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
       el.decOut.hidden = true;
       const msg = r.reason === "badJson" ? T.badJson
         : r.reason === "keyInvalid" ? (r.compact ? T.kp1Invalid(r.message) : T.keyInvalid(r.message))
-        : r.reason === "notCarried" ? T.notCarried(r.message) : r.reason === "tier2" ? T.tier2
+        : r.reason === "notCarried" ? (r.hop === "translate:el>en" ? T.elOut : T.notCarried(r.message)) : r.reason === "tier2" ? T.tier2
         : r.reason === "crashed" ? T.keyCrashed : T.loadFailed;
       return decError(msg);
     }

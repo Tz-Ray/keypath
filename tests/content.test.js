@@ -81,6 +81,7 @@ const UPSTREAM = [
   "https://github.com/garfieldnate/kengdic",
   "https://github.com/libhangul/libhangul",
   "https://download.freedict.org/dictionaries/rus-eng/",
+  "https://download.freedict.org/dictionaries/ell-eng/",
   "https://github.com/freedict/fd-dictionaries",
   "https://github.com/rspeer/wordfreq",
   "https://github.com/notofonts/noto-cjk",

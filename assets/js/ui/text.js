@@ -66,6 +66,9 @@ export const T = {
   keyInvalid: message => `This key doesn't fit this ciphertext: ${stripDot(message)}.`,
   kp1Invalid: message => `This short key can't be read: ${stripDot(message)}.`,
   notCarried: what => `This key needs dictionary data this page doesn't carry (${stripDot(what)}).`,
+  // Greek into any other language goes through the Greek-to-English lists, which the page never ships (docs/10 §9.7)
+  routeOffEl: "From Greek, this page types on the Greek keyboard only. Typing Greek on another keyboard needs the Greek-to-English dictionary, which this page doesn't carry.",
+  elOut: "This key translates Greek through the Greek-to-English dictionary, which this page doesn't carry.",
   tier2: "This page can't read free-translation keys.",
   encodeError: "This message can't be walked here.",
   copied: "Copied.",

@@ -17,7 +17,7 @@ export const SHAPE_LAYOUTS = new Set(["zh_cangjie", "zh_quick"]);
 /** Vietnamese layouts: a letter's keys are its base, then a modifier key, then a tone key (docs/10 §6.3). */
 export const VI_LAYOUTS = new Set(["vi_telex", "vi_vni"]);
 /** The lang tag of a key's legend on each layout. */
-const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", es_accent: "es", vi_telex: "vi", vi_vni: "vi", ja_kana: "ja" };
+const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", es_accent: "es", vi_telex: "vi", vi_vni: "vi", ja_kana: "ja", el_greek: "el" };
 /** Characters typed with Shift (capitals, shifted punctuation), from the one US shift map (docs/10 §9.7). */
 const SHIFTED = new Set(Object.values(US_SHIFT));
 const FAN_MAX = 10;
@@ -39,6 +39,10 @@ export function makeLegends(layouts) {
   // JIS kana: each key's kana (the shift layer included); [ and ] show the voicing marks
   const kanaLegend = layouts.kanaLegend();
   const kana = new Map([...kanaLegend.oneKey, ...kanaLegend.marks]);
+  // Greek: each key's letter, and the dead keys (; : W) the accent each adds
+  const elLegend = layouts.elLegend();
+  const elDead = new Map(elLegend.dead.map(([key, accent]) => [key, accent]));
+  const el = new Map([...elLegend.oneKey, ...elDead]);
   const pinyinTones = new Map(L.zh_pinyin.toneDigits.map(([, digit]) => [digit, PINYIN_TONE[digit]]));
   const jyutpingKeys = new Set([...LETTERS, ...L.zh_jyutping.toneDigits]);
   // the tone keys of each layout that has them, from its table
@@ -54,7 +58,8 @@ export function makeLegends(layouts) {
    * `layout`, as the keyboard picture labels it (docs/10 §8.4's legends: the
    * tables' own maps; Pinyin's tone digits show their marks), or "".  Kana's
    * voicing keys [ and ] are their own §8.4 legends; the picture shows the
-   * marks ゛ ゜ they add, as keypath's own kana picture does.
+   * marks ゛ ゜ they add, as keypath's own kana picture does.  Greek's dead
+   * keys show the accent they add to the vowel typed next.
    */
   function keyLegend(layout, ch) {
     switch (layout) {
@@ -66,18 +71,21 @@ export function makeLegends(layouts) {
       case "ko_dubeolsik": return ko.get(ch) || "";
       case "ru_jcuken": return ru.get(ch) || "";
       case "ja_kana": return kana.get(ch) || "";
+      case "el_greek": return el.get(ch) || "";
       default: return "";
     }
   }
   /** Whether `ch` is a tone key on `layout`. */
   const isTone = (layout, ch) => !!toneKeys[layout] && toneKeys[layout].has(ch);
+  /** Whether `ch` is a dead key on `layout` (Greek's accents, typed before their vowel). */
+  const isDead = (layout, ch) => layout === "el_greek" && elDead.has(ch);
 
-  /** keys (string) on a layout -> [{key, legend, mis, shift}] */
+  /** keys (string) on a layout -> [{key, legend, mis, shift, dead}] (`dead`: the legend is the accent a dead key adds) */
   function legends(layout, keys) {
     if (VI_LAYOUTS.has(layout)) return viLegends(layout, keys);
     const ks = cps(keys);
     return ks.map((key, i) => {
-      let legend = "", mis = false, shift = false;
+      let legend = "", mis = false, shift = false, dead = false;
       if (layout === "zh_daqian" || layout === "zh_eten") { legend = keyLegend(layout, key); mis = US_PUNCT.test(key); }
       else if (layout === "zh_pinyin") legend = PINYIN_TONE[key] || "";
       else if (layout === "ko_dubeolsik") { legend = ko.get(key) || ""; shift = SHIFTED.has(key); }
@@ -86,7 +94,9 @@ export function makeLegends(layouts) {
       else if (SHAPE_LAYOUTS.has(layout)) legend = shape.get(key) || "";
       // a digit or punctuation key that types a kana (or a voicing mark) is misdirection
       else if (layout === "ja_kana") { legend = kana.get(key) || ""; mis = US_PUNCT.test(key); shift = SHIFTED.has(key); }
-      return { key, legend, mis, shift };
+      // Greek: a letter's key, or a dead key and the accent it adds (; and : are misdirection)
+      else if (layout === "el_greek") { legend = el.get(key) || ""; mis = US_PUNCT.test(key); shift = SHIFTED.has(key); dead = elDead.has(key); }
+      return { key, legend, mis, shift, dead };
     });
   }
   /**
@@ -96,10 +106,10 @@ export function makeLegends(layouts) {
    */
   function viLegends(layout, keys) {
     let letters;
-    try { letters = layouts.viLetters(layout, keys); } catch { return cps(keys).map(key => ({ key, legend: "", mis: false, shift: false })); }
-    return letters.flatMap(l => l.keys.map(k => ({ key: k.key, legend: k.shows, mis: k.role !== "letter" && k.key >= "0" && k.key <= "9", shift: false })));
+    try { letters = layouts.viLetters(layout, keys); } catch { return cps(keys).map(key => ({ key, legend: "", mis: false, shift: false, dead: false })); }
+    return letters.flatMap(l => l.keys.map(k => ({ key: k.key, legend: k.shows, mis: k.role !== "letter" && k.key >= "0" && k.key <= "9", shift: false, dead: false })));
   }
-  return { legends, keyLegend, isTone, dq, et, ko, ru, es, shape, kana, layouts };
+  return { legends, keyLegend, isTone, isDead, dq, et, ko, ru, es, shape, kana, el, layouts };
 }
 
 // ------------------------------------------------------------ model
@@ -181,12 +191,12 @@ function band(name, bi, ...children) {
 }
 
 function keycaps(legend, layout) {
-  const caps = legend.map(({ key, legend: leg, mis, shift }) => {
+  const caps = legend.map(({ key, legend: leg, mis, shift, dead }) => {
     const title = mis && leg ? T.misdirection(key, leg) : null;
     return h("span.kc", h("kbd", { lang: "en", translate: "no", title, class: mis ? "mis" : null },
       shift ? h("span.shift", { "aria-hidden": "true" }, "⇧") : null,
       h("span.main", shift ? key : key),
-      leg ? h("span.leg", { lang: LEGEND_LANG[layout] || "zh-Hant", "aria-hidden": "true" }, leg) : null,
+      leg ? h("span.leg", { lang: LEGEND_LANG[layout] || "zh-Hant", "aria-hidden": "true", class: dead ? "leg acc" : null }, leg) : null,
       mis ? h("span.dot", { "aria-hidden": "true" }) : null));
   });
   return h("span.keyrow", { style: { "--n": String(legend.length) } }, caps);
@@ -378,13 +388,15 @@ export function renderWalk(host, trace, ctx) {
       li.setAttribute("aria-label", `${unit.out}, keys ${keysText}`);
       if (hasHomophone) li.append(h("div.band.b-upper-rest", { style: { "--bi": String(bandIndex.get("char")) } }));
       // one pair per letter: the letter over its key(s), wrapping together
-      // (a Vietnamese letter over its base, modifier and tone keys)
+      // (a Vietnamese letter over its base, modifier and tone keys; an
+      // accented Greek letter over its dead key and its vowel's key)
       const letters = cps(unit.out);
-      const viKeyCounts = VI_LAYOUTS.has(layout) ? ctx.layouts.viLetters(layout, unit.keys).map(l => l.keys.length) : null;
+      const keyCounts = VI_LAYOUTS.has(layout) ? ctx.layouts.viLetters(layout, unit.keys).map(l => l.keys.length)
+        : layout === "el_greek" ? ctx.layouts.elLetters(unit.keys).map(l => l.keys.length) : null;
       const pairs = h("div.pairs", { style: { "--bi": String(bandIndex.get(hasHomophone ? "sound" : "letters")) } });
       let k = 0;
       for (const [li, letter] of letters.entries()) {
-        const n = viKeyCounts ? viKeyCounts[li]
+        const n = keyCounts ? keyCounts[li]
           : layout === "es_accent" && k + 1 < legend.length && /[0-9]/.test(legend[k + 1].key) ? 2 : 1;
         const caps = legend.slice(k, k + n);
         k += n;

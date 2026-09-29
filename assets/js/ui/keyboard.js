@@ -17,24 +17,27 @@ const SHIFTED_PUNCT = {
 /**
  * The one US shift map (docs/10 §9.7): what each key types with Shift (a
  * letter: its capital).  Every layout with a shift layer (Dubeolsik, JIS
- * kana) reads its shifted legends through it.
+ * kana, Greek) reads its shifted legends through it.
  */
 export const US_SHIFT = Object.freeze(Object.fromEntries(ROWS.flat().map(key => [key, SHIFTED_PUNCT[key] ?? key.toUpperCase()])));
 /** Layouts drawn as a key grid (the others get a list or no picture). */
 export const GRID_LAYOUTS = new Set(["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick",
-  "ko_dubeolsik", "ru_jcuken", "ja_kana"]);
+  "ko_dubeolsik", "ru_jcuken", "ja_kana", "el_greek"]);
 const SHAPE = new Set(["zh_cangjie", "zh_quick"]);
-const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", zh_pinyin: "en", zh_jyutping: "en", ja_kana: "ja" };
+const LEGEND_LANG = { ru_jcuken: "ru", ko_dubeolsik: "ko", zh_pinyin: "en", zh_jyutping: "en", ja_kana: "ja", el_greek: "el" };
+/** The US key that types `ch` with Shift, or null. */
+const unshifted = ch => ROWS.flat().find(key => US_SHIFT[key] === ch && key !== ch) ?? null;
 
 /**
- * The grid for `layout`: rows of {key, typed, legend, tone}, where `typed` is
- * what the key types (with `shift`, through US_SHIFT) and `legend` what that
- * means on the layout ("" for a key the layout does not use).
+ * The grid for `layout`: rows of {key, typed, legend, tone, dead}, where
+ * `typed` is what the key types (with `shift`, through US_SHIFT), `legend`
+ * what that means on the layout ("" for a key the layout does not use), and
+ * `dead` whether it is a dead key (Greek's accents).
  */
 export function keyboardModel(legends, layout, shift = false) {
   return ROWS.map(row => row.map(key => {
     const typed = shift ? US_SHIFT[key] : key;
-    return { key, typed, legend: legends.keyLegend(layout, typed), tone: legends.isTone(layout, typed) };
+    return { key, typed, legend: legends.keyLegend(layout, typed), tone: legends.isTone(layout, typed), dead: legends.isDead(layout, typed) };
   }));
 }
 
@@ -65,6 +68,24 @@ export function kanaNotes(legends) {
   const shifted = ROWS.flat().filter(key => legends.keyLegend("ja_kana", US_SHIFT[key]))
     .map(key => ({ typed: US_SHIFT[key], kana: legends.keyLegend("ja_kana", US_SHIFT[key]), key }));
   return { voicing, shifted };
+}
+
+/** What each Greek accent is called (the table gives the marks, docs/10 §7.1). */
+export const GREEK_ACCENTS = { "\u0384": "tonos", "\u00a8": "dialytika", "\u0385": "dialytika and tonos" };
+
+/**
+ * The Greek notes, from the table: the dead keys in table order, each with
+ * the accent it adds, its name, the US key it is typed with Shift on (or
+ * null) and the letters it makes ([keys, letter]), and the letter keys of
+ * the US rows that type no letter (q).
+ */
+export function greekNotes(legends) {
+  const { dead } = legends.layouts.elLegend();
+  return {
+    dead: dead.map(([key, accent, vowels]) => ({ key, accent, name: GREEK_ACCENTS[accent], shiftOf: unshifted(key),
+      letters: vowels.map(([vowel, letter]) => [key + vowel, letter]) })),
+    unused: ROWS.flat().filter(key => /^[a-z]$/.test(key) && !legends.keyLegend("el_greek", key)),
+  };
 }
 
 const VI = new Set(["vi_telex", "vi_vni"]);
@@ -146,10 +167,10 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
     els.clear();
     keyboardModel(legends, layout, shift).forEach((row, r) => {
       const rowEl = h("div.kb-row", { style: { "--indent": String(INDENT[r]) } });
-      for (const { key, typed, legend, tone } of row) {
+      for (const { key, typed, legend, tone, dead } of row) {
         const n = counts.get(typed) || 0;
         const el = h("span.kb-key", {
-          class: `kb-key${legend ? "" : " unused"}${n ? " used" : ""}${tone ? " tone" : ""}`,
+          class: `kb-key${legend ? "" : " unused"}${n ? " used" : ""}${tone ? " tone" : ""}${dead ? " dead" : ""}`,
           "data-key": key,
         }, h("span.us", { lang: "en" }, typed === key ? key : `⇧${typed}`),
         legend ? h("span.sym", { lang: legendLang }, legend) : null,
@@ -183,6 +204,17 @@ export function renderKeyboard(host, layout, ciphertext, legends, extra = {}) {
     h("p.kb-note", "With Shift:"),
     h("ul.kb-es", { "aria-label": "Kana typed with Shift" }, shifted.map(x => h("li", { class: counts.has(x.typed) ? "used" : null },
       kbd(x.typed), " ", ja(x.kana), ` (Shift+${x.key})`))));
+  }
+  if (layout === "el_greek") {
+    const { dead, unused } = greekNotes(legends);
+    const kbd = text => h("kbd", { lang: "en" }, text);
+    const el = text => h("span", { lang: "el" }, text);
+    parts.push(h("p.kb-note", "Each letter key types one Greek letter. The accents are dead keys, typed before their vowel: ",
+      dead.flatMap((d, i) => [i ? ", " : "", kbd(d.key), " ", el(d.accent), ` (${d.name}${d.shiftOf ? `, Shift+${d.shiftOf}` : ""})`]), "."),
+    h("ul.kb-es", { "aria-label": "Accented letters" }, dead.flatMap(d => d.letters).map(([keys, letter]) =>
+      h("li", { class: ciphertext.includes(keys) ? "used" : null }, kbd(keys), " ", el(letter)))),
+    h("p.kb-note", unused.map((key, i) => [i ? ", " : "", kbd(key)]),
+      ` types the Greek question mark, not a letter, so it never appears in the keys.`));
   }
   if (SHAPE.has(layout)) {
     parts.push(h("p.kb-note", "Each letter stands for a shape, its radical; a character's code spells its parts (codes from Unihan). ",

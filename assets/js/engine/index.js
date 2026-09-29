@@ -135,7 +135,8 @@ export async function createEngine({ fetchText } = {}) {
   function refusal(e) {
     if (e instanceof LoadError) return { ok: false, reason: "loadFailed", message: e.message };
     if (e instanceof Tier2Error) return { ok: false, reason: "tier2", message: e.message };
-    if (e instanceof NotCarried) return { ok: false, reason: "notCarried", message: e.message };
+    // a refused hop (docs/10 §9.7) is named, so the page can say why in its own words
+    if (e instanceof NotCarried) return { ok: false, reason: "notCarried", message: e.message, ...(e.hop ? { hop: e.hop } : {}) };
     if (e instanceof KeyError || e instanceof PickError) return { ok: false, reason: "keyInvalid", message: e.message };
     throw e;
   }
@@ -172,7 +173,7 @@ export async function createEngine({ fetchText } = {}) {
     try {
       checkKey(key, registry);
       const refused = refusedHop(key);
-      if (refused) throw new NotCarried(REFUSED_WHAT[refused] || `the lists of ${refused}`);
+      if (refused) throw Object.assign(new NotCarried(REFUSED_WHAT[refused] || `the lists of ${refused}`), { hop: refused });
       await prefetch(key, ciphertext, withRows);
       const { text, trace } = walkKey({ registry, layouts, lists, siteId }, ciphertext, key);
       const dumped = dumpsKeyWithSpans(key);

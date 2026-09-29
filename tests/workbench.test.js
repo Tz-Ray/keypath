@@ -37,10 +37,10 @@ function blocks(text) {
 
 test("the workbench keyboards are docs/10 §9.7's, each with its surfaces in registry order", () => {
   assert.deepEqual(registry.workbench.map(w => w.layout), rules.layouts);
-  // M14's keyboards, Vietnamese Telex and VNI (M15), and ETen and Jyutping
-  // (M16), each after its twin as on the page's chips; no Japanese
+  // M14's keyboards, Vietnamese Telex and VNI (M15), ETen and Jyutping
+  // (M16), each after its twin as on the page's chips, and Greek (M17); no Japanese
   assert.deepEqual(rules.layouts, ["zh_daqian", "zh_eten", "zh_pinyin", "zh_jyutping", "zh_cangjie", "zh_quick", "ko_dubeolsik",
-    "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni"]);
+    "ru_jcuken", "es_accent", "en_identity", "vi_telex", "vi_vni", "el_greek"]);
   for (const { layout, surfaces } of registry.workbench) {
     assert.deepEqual(surfaces, registry.kp1Surfaces.filter(([, l]) => l === layout), layout);
     assert.ok(surfaces.every(([language]) => language !== "ja"), layout);
@@ -128,6 +128,19 @@ test("docs/10 §8.2-§8.3 goldens", async () => {
   assert.match(await look("zh_jyutping", "nei"), /\n {2}violated rule: unit 'nei' does not end in a tone digit 1-6$/);
   assert.equal(await typed("zh_eten", "你好"), "(zh, zh_eten)\n你 ne3 0/32\n好 hz3 0/4");
   assert.equal(await typed("zh_jyutping", "你好"), "(zh, zh_jyutping)\n你 nei5 0/14\n好 hou2 0/2");
+  // docs/10 §7.1: Greek reads a word left to right; a dead key must be followed by a vowel it accents
+  assert.equal(await look("el_greek", "kalhm;era"), "kalhm;era · (el, el_greek) · well-formed: yes\n  reading: καλημέρα\n"
+    + "  candidates: 1 (identity: the unit is its reading; a key carries no homophone_index)\n  0:καλημέρα");
+  const rule = "on el_greek it must be followed by a vowel key it combines with";
+  assert.match(await look("el_greek", "kal;b"), new RegExp(`\n {2}violated rule: dead key ';' \\(΄\\) at position 3 of unit 'kal;b' is followed by 'b'; ${rule} \\(a e h i o y v\\)$`));
+  assert.match(await look("el_greek", "W"), new RegExp(`\n {2}violated rule: dead key 'W' \\(΅\\) at position 0 of unit 'W' ends the unit; ${rule} \\(i y\\)$`));
+  assert.match(await look("el_greek", "q"), /\n {2}violated rule: unit 'q' contains 'q', which is outside the el_greek alphabet$/);
+  for (const [word, keys] of [["καλημέρα", "kalhm;era"], ["ευχαριστώ", "eyxarist;v"], ["θάλασσα", "u;alassa"], ["ωραίος", "vra;iow"],
+    ["καΐκι", "kaWiki"], ["ψυχή", "cyx;h"], ["σκύλος", "sk;ylow"], ["προϊόν", "pro:i;on"]]) {
+    assert.equal(await typed("el_greek", word), `(el, el_greek)\n${word} ${keys} -`, word);
+    assert.match(await look("el_greek", keys), new RegExp(`\n {2}reading: ${word}\n`), keys);
+  }
+  assert.equal(await typed("el_greek", "ΟΔΟΣ"), "(el, el_greek)\nοδος odow -");
 });
 
 test("a chunk is printable ASCII other than space; anything else is refused, naming the code point", async () => {

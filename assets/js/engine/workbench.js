@@ -38,6 +38,8 @@ export function createWorkbench({ registry, layouts, native, siteId, firstNewer 
   const identity = {
     ko_dubeolsik: layouts.koUnit, ru_jcuken: layouts.ruWord, es_accent: layouts.esWord, en_identity: layouts.enWord,
     vi_telex: chunk => layouts.viSyllable("vi_telex", chunk), vi_vni: chunk => layouts.viSyllable("vi_vni", chunk),
+    // docs/10 §7.1: a word, read left to right (a dead key must be followed by a vowel it accents)
+    el_greek: layouts.elWord,
   };
 
   /**

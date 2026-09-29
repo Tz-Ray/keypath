@@ -686,8 +686,10 @@ button.sense:hover { background: color-mix(in srgb, var(--hop) 18%, transparent)
 .walk kbd .leg, .fig kbd .leg {
   position: absolute; right: 3px; bottom: 1px; font-size: 10px; line-height: 1.1; color: var(--ink-2); font-family: var(--font-tc);
 }
-.walk kbd .leg:lang(ru), .walk kbd .leg:lang(es) { font-family: var(--font-ui); }
+.walk kbd .leg:lang(ru), .walk kbd .leg:lang(es), .walk kbd .leg:lang(el) { font-family: var(--font-ui); }
 .walk kbd .leg:lang(ko) { font-family: var(--font-ko); }
+/* a dead key's accent (Greek ΄ ¨ ΅) sits high in its glyph box: drawn larger, and lower */
+.walk kbd .leg.acc { font-size: 15px; right: 1px; bottom: -6px; color: var(--choice); font-weight: 700; }
 .walk kbd .shift { position: absolute; left: 2px; top: 2px; font-size: 8px; color: var(--ink-2); font-family: var(--font-ui); }
 .walk kbd:has(.shift) .main { left: 10px; }
 .walk kbd .dot, .fig kbd .dot {
@@ -697,6 +699,7 @@ button.sense:hover { background: color-mix(in srgb, var(--hop) 18%, transparent)
   .walk kbd .main { font-size: 13px; top: 3px; }
   .walk kbd:has(.leg) .main { left: 3px; top: 2px; }
   .walk kbd .leg { font-size: 9px; right: 2px; }
+  .walk kbd .leg.acc { font-size: 13px; right: 1px; bottom: -5px; }
 }
 .walk kbd.press { transform: translateY(2px); border-bottom-width: 1px; background: var(--choice-fill); }
 kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border-bottom-width: 2px; vertical-align: 1px; }
@@ -831,7 +834,9 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 }
 .kb-key .us { position: absolute; left: 3px; top: 1px; font-size: 9px; color: var(--ink-2); font-family: var(--font-mono); line-height: 1.2; }
 .kb-key .sym { position: absolute; inset: 0; display: grid; place-items: center; padding-top: 5px; font-size: min(16px, calc(var(--kbw) * .45)); line-height: 1; }
-.kb-key.tone .sym { color: var(--choice); font-weight: 700; }
+.kb-key.tone .sym, .kb-key.dead .sym { color: var(--choice); font-weight: 700; }
+/* a dead key's accent (Greek ΄ ¨ ΅) is a small mark: drawn larger */
+.kb-key.dead .sym { font-size: min(24px, calc(var(--kbw) * .62)); padding-top: .55em; }
 .kb-key.unused { opacity: .38; }
 .kb-key .cnt {
   position: absolute; right: -4px; bottom: -5px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px;
@@ -850,6 +855,7 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
   .kb-key { border-radius: 4px; height: calc(var(--kbw) * 1.2); }
   .kb-key .us { left: 2px; top: 0; font-size: 8px; line-height: 1.1; }
   .kb-key .sym { inset: auto 1px 1px auto; display: block; padding: 0; font-size: min(12px, calc(var(--kbw) * .52)); }
+  .kb-key.dead .sym { font-size: min(16px, calc(var(--kbw) * .7)); padding: 0; bottom: -.3em; }
   .kb-key.unused .sym { display: none; }
   .kb-key .cnt { right: 1px; top: 1px; bottom: auto; min-width: 0; width: 5px; height: 5px; padding: 0; font-size: 0; }
 }
