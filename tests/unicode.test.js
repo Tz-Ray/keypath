@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readJson } from "./helpers.js";
 import { FINAL_SIGMA_RANGES, normalize, pyLower } from "../assets/js/engine/normalize.js";
+import { answerNorm } from "../assets/js/engine/hash.js";
 import { makeUnicodeGuard, cpCompare, cpLength, formatCodePoint } from "../assets/js/engine/unicode.js";
 
 const fixture = readJson("tests/fixtures/unicode.json");
@@ -33,6 +34,21 @@ test("lowercase agrees in context (final sigma, dotted I)", () => {
   // Unicode 16.0 changed these two: ʕ is cased and U+1171E case-ignorable in 14.0
   assert.equal(pyLower("ΑʕΣ ΑΣʕ Α\u{1171e}Σ ΑΣ\u{1171e}Α"), "αʕς ασʕ α\u{1171e}ς ασ\u{1171e}α");
   assert.equal(normalize("ΟΔΟΣʕ ΑΣ\u{1171e}Α", "el"), "οδοσʕ ασ\u{1171e}α");
+});
+
+// U+1E030 is unassigned in Unicode 14.0, so neither cased nor case-ignorable,
+// and Python 3.11 ends the sigma there. Unicode 15.0 made it a cased,
+// case-ignorable letter, so the runtime's own toLowerCase reads past it to
+// the cased Α. The page reads Unicode 14.0's properties and follows 3.11.
+// Encoding refuses the text (the guard); answer checking still lowercases it.
+test("ΑΣ + U+1E030 + Α lowercases with ς, as in Python 3.11, not as the runtime would", () => {
+  const text = "ΑΣ\u{1e030}Α";
+  assert.equal(makeUnicodeGuard(ranges)(text), 0x1e030);
+  assert.equal(pyLower(text), "ας\u{1e030}α");
+  assert.equal(normalize(text, "el"), "ας\u{1e030}α");
+  assert.ok(answerNorm(text).startsWith("ας"), answerNorm(text));
+  if (Number(process.versions.unicode.split(".")[0]) >= 15)
+    assert.equal(text.toLowerCase(), "ασ\u{1e030}α");
 });
 
 // docs/10 §3.2: Final_Sigma results are part of the contract whenever every
