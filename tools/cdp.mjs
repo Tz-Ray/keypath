@@ -62,6 +62,26 @@ const b = await launch({ chrome, fontsConf });
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const js = v => JSON.stringify(v);
+// Walk timing.  walkBack (assets/js/ui/walk.js) adds "walking" to the walk,
+// then lights its n parts 0, 140, …, (n - 1) × 140 ms later; a timer never
+// fires early, so the last part lights at least (n - 1) × 140 ms after
+// "walking" was added, however late the first one fires on a busy page.
+// WALK_HOOK logs both as they happen, from classList.add itself (a
+// MutationObserver's callback runs after the timers are set, too late to
+// bound them).
+const WALK_HOOK = `if (!window.__walkLog) { window.__walkLog = []; const add = DOMTokenList.prototype.add;
+  DOMTokenList.prototype.add = function (...tokens) {
+    for (const t of tokens) if (t === "walking" || t === "lit") window.__walkLog.push([t, performance.now()]);
+    return add.apply(this, tokens);
+  }; }`;
+/** The last walk in WALK_HOOK's log lit two or more parts, 140 ms apart. */
+function animated(log) {
+  const at = log.map(e => e[0]).lastIndexOf("walking");
+  if (at < 0) return false;
+  const lit = log.slice(at + 1).filter(e => e[0] === "lit").map(e => e[1]);
+  // 1 ms for performance.now()'s coarsened clock
+  return lit.length >= 2 && lit[lit.length - 1] - log[at][1] >= (lit.length - 1) * 140 - 1;
+}
 const q = sel => `document.querySelector(${js(sel)})`;
 
 async function open(width = 1280, height = 800, { dark = false, reduced = false, hash = "" } = {}) {
@@ -249,12 +269,12 @@ await attempt("vietnamese", async () => {
     [["c", ["c"]], ["ó", ["o", "só"]]], [["g", ["g"]], ["ì", ["i", "fì"]]]]), js(pairs));
   check("walk: the band is labelled Letters", await b.evaluate(`[...document.querySelectorAll("#walk .walk-gutter span")].some(s => s.textContent === "Letters") && !document.querySelector("#walk .b-sound")`));
   // walk back animates, unit by unit, and reads the message back
-  await b.evaluate(`window.__litVi = []; window.__obsVi = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litVi.push(performance.now()); });
+  await b.evaluate(`${WALK_HOOK} window.__litVi = []; window.__obsVi = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litVi.push(performance.now()); });
     window.__obsVi.observe(${q("#walk")}, { subtree: true, attributes: true, attributeFilter: ["class"] });`);
   await b.evaluate(`${q("#walk-back")}.click()`);
   await b.waitFor(`!${q("#walked")}.hidden`);
-  const lit = await b.evaluate("window.__obsVi.disconnect(), window.__litVi");
-  check("walk back on Telex animates, unit by unit", lit.length >= 6 && lit[lit.length - 1] - lit[0] >= 500, lit.length);
+  const [lit, log] = await b.evaluate("window.__obsVi.disconnect(), [window.__litVi, window.__walkLog]");
+  check("walk back on Telex animates, unit by unit", lit.length >= 6 && animated(log), js([lit.length, log]));
   check("walk back on Telex reads the message back",
     await b.evaluate(`${q("#walked")}.textContent === "Walked back: “tôi có gì”, identical to your message."`), await b.evaluate(`${q("#walked")}.textContent`));
   // the keyboard picture: the modifier and tone legend, read from the table
@@ -374,7 +394,7 @@ await attempt("ETen, Jyutping and kana", async () => {
   // a #walk link on a new keyboard (the kana golden, its key as kp1) decodes and animates
   const kp1 = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(kanaGolden.expect.keyText)})`);
   check("kana: the golden key has a kp1 form", kp1.ok && kp1.text.startsWith("kp1."), js(kp1));
-  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `${WALK_HOOK} window.__lit = [];
     new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
       .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
   for (const [name, body] of [["kana", { c: kanaGolden.expect.ciphertext, k: kp1.text }],
@@ -385,10 +405,10 @@ await attempt("ETen, Jyutping and kana", async () => {
     await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
     // every unit, then its word, lit
     await b.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && [...document.querySelectorAll("#dec-walk .unit, #dec-walk .wg")].every(e => e.classList.contains("lit"))`);
-    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__lit.length ? window.__lit[window.__lit.length - 1] - window.__lit[0] : 0]`);
+    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__walkLog]`);
     const want = name === "kana" ? "ありがとう" : "你好";
     // unit by unit, then the word: each lights up 140 ms after the one before
-    check(`walk link on ${name}: decodes and animates`, got[0] === want && got[1] && got[2] >= 2 && got[3] >= (got[2] - 1) * 120, js(got));
+    check(`walk link on ${name}: decodes and animates`, got[0] === want && got[1] && got[2] >= 2 && animated(got[3]), js(got));
   }
   await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: watch.identifier });
 
@@ -494,12 +514,12 @@ await attempt("greek", async () => {
     await b.evaluate(`[...document.querySelectorAll("#walk .walk-gutter span")].some(s => s.textContent === "Letters") && !document.querySelector("#walk .b-sound")
       && document.querySelector("#walk kbd.mis").title === 'On this keyboard ":" types ¨.'`), await b.evaluate(`document.querySelector("#walk kbd.mis").title`));
   // walk back animates, unit by unit, and reads the message back
-  await b.evaluate(`window.__litEl = []; window.__obsEl = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litEl.push(performance.now()); });
+  await b.evaluate(`${WALK_HOOK} window.__litEl = []; window.__obsEl = new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__litEl.push(performance.now()); });
     window.__obsEl.observe(${q("#walk")}, { subtree: true, attributes: true, attributeFilter: ["class"] });`);
   await b.evaluate(`${q("#walk-back")}.click()`);
   await b.waitFor(`!${q("#walked")}.hidden`);
-  const lit = await b.evaluate("window.__obsEl.disconnect(), window.__litEl");
-  check("walk back on Greek animates, unit by unit", lit.length >= 4 && lit[lit.length - 1] - lit[0] >= 400, lit.length);
+  const [lit, log] = await b.evaluate("window.__obsEl.disconnect(), [window.__litEl, window.__walkLog]");
+  check("walk back on Greek animates, unit by unit", lit.length >= 4 && animated(log), js([lit.length, log]));
   check("walk back on Greek reads the message back",
     await b.evaluate(`${q("#walked")}.textContent === "Walked back: “προϊόν καλημέρα”, identical to your message."`), await b.evaluate(`${q("#walked")}.textContent`));
   // ΟΔΟΣ is lowercased with the final sigma (docs/10 §3.2), and the walk back says so
@@ -553,7 +573,7 @@ await attempt("greek", async () => {
     await b.evaluate(`${q("#dec-err")}.textContent`));
 
   // a #walk link on the Greek keyboard (native καλημέρα as kp1, English cat as JSON) decodes and animates
-  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+  const watch = await b.send("Page.addScriptToEvaluateOnNewDocument", { source: `${WALK_HOOK} window.__lit = [];
     new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
       .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
   const kalimera = golden("el", "καλημέρα"), cat = golden("en", "cat");
@@ -565,9 +585,9 @@ await attempt("greek", async () => {
     await b.waitFor("document.documentElement.classList.contains('ready')");
     await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
     await b.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && [...document.querySelectorAll("#dec-walk .unit, #dec-walk .wg")].every(e => e.classList.contains("lit"))`);
-    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__lit.length ? window.__lit[window.__lit.length - 1] - window.__lit[0] : 0,
+    const got = await b.evaluate(`[${q("#dec-text")}.textContent, ${q("#dec-err")}.hidden, window.__lit.length, window.__walkLog,
       [...document.querySelectorAll("#dec-walk .seg-badge, #dec-walk .lcell")].map(e => e.textContent).join("")]`);
-    check(`walk link on Greek (${name}): decodes and animates`, kalimeraKp1.ok && got[0] === want && got[1] && got[2] >= 2 && got[3] >= (got[2] - 1) * 120
+    check(`walk link on Greek (${name}): decodes and animates`, kalimeraKp1.ok && got[0] === want && got[1] && got[2] >= 2 && animated(got[3])
       && got[4] === (name === "cat" ? "γάτα" : "καλημέρα"), js(got));
   }
   await b.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: watch.identifier });
@@ -1006,7 +1026,7 @@ await attempt("walk links", async () => {
   try {
     await b2.viewport(1280, 800);
     // record when each part of the walk lights up
-    await b2.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__lit = [];
+    await b2.send("Page.addScriptToEvaluateOnNewDocument", { source: `${WALK_HOOK} window.__lit = [];
       new MutationObserver(ms => { for (const m of ms) if (m.target.classList && m.target.classList.contains("lit")) window.__lit.push(performance.now()); })
         .observe(document, { subtree: true, attributes: true, attributeFilter: ["class"] });` });
     await b2.navigate(link);
@@ -1017,8 +1037,8 @@ await attempt("walk links", async () => {
     check("walk link in a fresh browser: walks the message back", got[0] === message && got[1] === "true" && got[2] && got[3] === shortKey, got);
     check("walk link in a fresh browser: says anyone with the link can read the message", /anyone with the link can read the message/.test(got[4]), got[4]);
     await b2.waitFor(`document.querySelectorAll("#dec-walk .unit").length > 0 && document.querySelectorAll("#dec-walk .unit").length === document.querySelectorAll("#dec-walk .unit.lit").length`);
-    const lit = await b2.evaluate("window.__lit");
-    check("walk link in a fresh browser: the walk animates, unit by unit", lit.length >= 6 && lit[lit.length - 1] - lit[0] >= 500, lit.length);
+    const [lit, log] = await b2.evaluate("[window.__lit, window.__walkLog]");
+    check("walk link in a fresh browser: the walk animates, unit by unit", lit.length >= 6 && animated(log), js([lit.length, log]));
     const origin2 = srv.origin + "/";
     const req2 = b2.events.filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
     check("walk link in a fresh browser: every request stays on the page's origin",

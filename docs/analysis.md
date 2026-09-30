@@ -81,9 +81,9 @@ rewrites the blocks. With no flag the script prints them.
   number of ways its keystrokes split into well-formed units of its
   surface.
 - **Test corpora.** The texts the round-trip tests already use,
-  imported from the test modules and never copied: the zh, ja, es and
-  en round-trip corpora, the ko and ru golden vectors, and the
-  translation routes of the ko and ru tests. Each native corpus is
+  imported from the test modules and never copied: the zh, ja, es, en,
+  vi and el round-trip corpora, the ko and ru golden vectors, and the
+  translation routes of the ko, ru and el tests. Each native corpus is
   encoded with default settings on every layout its language has, and
   the en corpus is also routed to Chinese in both translation modes,
   as its test does. Two further rows are shown as controls. The frozen

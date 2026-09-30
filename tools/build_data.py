@@ -1392,7 +1392,6 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     el_words = sorted(el_en().translations_by_el)
     long_el = " ".join(random.Random(SEED + 17).choice(el_words) for _ in range(40))[:200].rstrip()
     vec.add("edge", long_el, "el", "el_greek")
-    out.jsonl_gz("tests/fixtures/vectors.jsonl.gz", vec.records)
 
     # traces: site, challenges, sample
     traces = []
@@ -1449,6 +1448,13 @@ def build_fixtures(out: Out, vocab: list[str], rows: dict[str, dict[str, tuple]]
     out.jsonl_gz("tests/fixtures/traces.jsonl.gz", traces)
 
     out.jsonl_gz("tests/fixtures/decode-errors.jsonl.gz", tampered(rng, vec.valid, shipped))
+    # docs/10 §3.2: Final_Sigma next to the two code points whose case
+    # properties Unicode 16.0 changed (ʕ, U+1171E).  Added last, after the
+    # traces and the tampered keys are drawn, so no earlier vector is
+    # renumbered and no sample is redrawn
+    for text in SIGMA_DRIFT:
+        vec.add("edge", text, "el", "el_greek")
+    out.jsonl_gz("tests/fixtures/vectors.jsonl.gz", vec.records)
     print(f"[fixtures] {len(vec.records)} vectors ({len(vec.valid)} carried), {len(traces)} traces")
 
 
@@ -2107,9 +2113,69 @@ def unicode_fixture(out: Out) -> None:
         "̈́", "क़", "ｶﾞ", "각", "Ạ̊", "ΣΑΣ", "ΟΔΟΣ", "İ", "ǅ", "ﬀ",
     ]
     samples = [[s, unicodedata.normalize("NFC", s)] for s in samples_in]
-    lowers = [[s, s.lower()] for s in ["ΟΔΟΣ ΣΑΣ", "Σ", "ΑΣ.", "İSTANBUL", "ǅemal", "ΣΑΣ", "ABCΣ1", "aΣb"]]
-    out.json("tests/fixtures/unicode.json", {"lower": lower, "samples": samples, "lowerStrings": lowers})
-    print(f"[unicode] {len(lower)} code points lowercase differently")
+    lowers = [[s, s.lower()] for s in ["ΟΔΟΣ ΣΑΣ", "Σ", "ΑΣ.", "İSTANBUL", "ǅemal", "ΣΑΣ", "ABCΣ1", "aΣb",
+                                       "ΑʕΣ", "ΑΣʕ", "Α\U0001171eΣ", "ΑΣ\U0001171eΑ", "ΟΔΟΣʕ ΑΣ\U0001171eΑ"]]
+    sigma = final_sigma_fixture()
+    out.json("tests/fixtures/unicode.json", {"lower": lower, "samples": samples, "lowerStrings": lowers,
+                                             "finalSigma": sigma})
+    print(f"[unicode] {len(lower)} code points lowercase differently; Final_Sigma: "
+          f"{sum(b - a + 1 for a, b in sigma['caseIgnorable'])} case-ignorable, "
+          f"{sum(b - a + 1 for a, b in sigma['cased'])} other cased, {sigma['count']} code points in "
+          f"{len(sigma['contexts'])} contexts")
+
+
+# docs/10 §3.2: Final_Sigma's results are part of the contract whenever every
+# code point around a Σ is assigned in Unicode 14.0, the Unicode of Python
+# 3.11.  The page cannot take Cased and Case_Ignorable from its JS runtime,
+# whose Unicode is newer (Unicode 16.0 made U+0295 ʕ Lo, so not cased, and
+# U+1171E Mc, so not case-ignorable), so normalize.js carries Unicode 14.0's.
+SIGMA_CONTEXTS = ["Α{}Σ", "ΑΣ{}", "ΑΣ{}Α", "{}Σ", "{}ΣΑ"]
+SIGMA_DRIFT = ["ΑʕΣ", "ΑΣʕ", "ΑΣ\U0001171eΑ", "ΟΔΟΣʕ ΑΣ\U0001171eΑ"]
+
+
+def final_sigma_fixture() -> dict[str, Any]:
+    """`caseIgnorable` and `cased` (cased and not case-ignorable, the only
+    cased code points Final_Sigma's scan ever reads) as [first, last] ranges,
+    read off Python's own str.lower: Python exposes neither property, but
+    c + "Σ" lowercases to ς exactly when c is cased and not case-ignorable,
+    and "ΑΣ" + c + "Α" exactly when c is neither.  And the digest of
+    str.lower over every assigned code point c in SIGMA_CONTEXTS: one line
+    per c, "hex\\tlower(context)..." in code point order."""
+    assert unicodedata.unidata_version == "14.0.0", unicodedata.unidata_version
+    ranges: dict[str, list[list[int]]] = {"caseIgnorable": [], "cased": []}
+    lines: list[str] = []
+    finals = [0] * len(SIGMA_CONTEXTS)
+    for first, last in unicode14_ranges():
+        for cp in range(first, last + 1):
+            ch = chr(cp)
+            lowered = [ctx.format(ch).lower() for ctx in SIGMA_CONTEXTS]
+            for i, low in enumerate(lowered):
+                finals[i] += "ς" in low
+            lines.append(f"{cp:x}\t" + "\t".join(lowered) + "\n")
+            cased = (ch + "Σ").lower().endswith("ς")
+            neither = ("ΑΣ" + ch + "Α").lower()[1] == "ς"
+            assert not (cased and neither), hex(cp)
+            # the third reading agrees: "Α" + c + "Σ" ends in ς unless c is neither
+            assert (("Α" + ch + "Σ").lower().endswith("ς")) == (not neither), hex(cp)
+            kind = None if neither else "cased" if cased else "caseIgnorable"
+            if kind is None:
+                continue
+            spans = ranges[kind]
+            if spans and spans[-1][1] == cp - 1:
+                spans[-1][1] = cp
+            else:
+                spans.append([cp, cp])
+    ignorable = ranges["caseIgnorable"]
+
+    def member(spans: list[list[int]], cp: int) -> bool:
+        return any(a <= cp <= b for a, b in spans)
+
+    # Case_Ignorable includes every Mn, Me, Cf, Lm and Sk (UAX #44)
+    assert all(member(ignorable, cp) for cp in range(0x110000)
+               if unicodedata.category(chr(cp)) in ("Mn", "Me", "Cf", "Lm", "Sk"))
+    assert member(ranges["cased"], 0x295) and member(ignorable, 0x1171E)
+    return {**ranges, "contexts": SIGMA_CONTEXTS, "count": len(lines), "finals": finals,
+            "sha256": sha("".join(lines))}
 
 
 def static_fixture(out: Out, hero: dict[str, Any], vec_rows: dict[str, dict[str, tuple]]) -> None:
@@ -2473,7 +2539,7 @@ def wb_type_texts(rng: random.Random, corpora: dict[str, list[str]]) -> dict[str
             own += some(corpora["EL_CORPUS"], 10) + [
                 "καλημέρα", "ευχαριστώ", "θάλασσα", "ωραίος", "καΐκι", "ψυχή", "σκύλος", "προϊόν", "ΟΔΟΣ",
                 "ΣΟΦΟΣ Α.Σ. ΑΣ1", "ΚΑ\u03aa\u0301ΚΙ", "\u03ab\u0301", "Καλημέρα, κόσμε!", "τι κάνεις;",
-                "τι κάνεις\u037e", "ἀγάπη", "ϐϑϕ", "γάτα cat", "φίλος · άνθρωπος", "qW;:"]
+                "τι κάνεις\u037e", "ἀγάπη", "ϐϑϕ", "γάτα cat", "φίλος · άνθρωπος", "qW;:", *SIGMA_DRIFT]
         if layout in VI:
             own += some(corpora["VI_CORPUS"], 10) + [
                 "việt", "Việt Nam", "tôi có gì", "hòa hoà thủy thuỷ", "the man can sing", "the cat sat on the mat",
@@ -2557,6 +2623,7 @@ def workbench_fixtures(out: Out, corpora: dict[str, list[str]]) -> None:
     assert one("el_greek", ["q"]).endswith("  violated rule: unit 'q' contains 'q', which is outside the el_greek "
                                            "alphabet")
     assert typed[("el_greek", "ΟΔΟΣ")] == "(el, el_greek)\nοδος odow -"
+    assert typed[("el_greek", "ΟΔΟΣʕ ΑΣ\U0001171eΑ")].split("\n")[1] == "οδοσ odos -"
     assert typed[("el_greek", "καΐκι")] == "(el, el_greek)\nκαΐκι kaWiki -"
     assert typed[("el_greek", "προϊόν")] == "(el, el_greek)\nπροϊόν pro:i;on -"
 
