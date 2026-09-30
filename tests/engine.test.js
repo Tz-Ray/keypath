@@ -48,7 +48,8 @@ test("every shipped challenge decodes to its plaintext on a fresh engine", async
   }
 });
 
-test("answer hashes reproduce for all six challenges", async () => {
+test("answer hashes reproduce for all twelve challenges", async () => {
+  assert.equal(index.length, 12);
   for (const item of index) {
     const c = readJson(`data/challenges/${String(item.n).padStart(2, "0")}.json`);
     assert.equal(await sha256Hex(answerNorm(c.plaintext)), item.hash);

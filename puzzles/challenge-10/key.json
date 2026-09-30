@@ -1,0 +1,142 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "zh_cangjie",
+      "route": [
+        "shape:zh_cangjie",
+        "keystroke:zh_cangjie"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            },
+            {
+              "len": 1,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            },
+            {
+              "len": 1,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 5,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 1,
+              "homophone_index": 0
+            }
+          ]
+        }
+      ],
+      "hint": "易經. The second line was typed in a hurry."
+    },
+    {
+      "language": "zh",
+      "layout": "zh_quick",
+      "route": [
+        "shape:zh_quick",
+        "keystroke:zh_quick"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            },
+            {
+              "len": 1,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 7
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

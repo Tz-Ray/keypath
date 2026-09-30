@@ -9,6 +9,8 @@ import { parseHtml, walk, ancestors, elements } from "./html.js";
 
 const html = readFileSync(join(ROOT, "index.html"), "utf8");
 const doc = parseHtml(html);
+const CARDS = JSON.parse(readFileSync(join(ROOT, "data/challenges/index.json"), "utf8"));
+const pad = n => String(n).padStart(2, "0");
 
 const BANNED = ["demo", "wip", "placeholder", "todo", "tbd", "fixme", "lorem", "coming soon", "beta", "claude", "note to self"];
 const bannedRe = new RegExp(`(?<![\\p{L}\\p{N}_])(${BANNED.join("|")})(?![\\p{L}\\p{N}_])`, "iu");
@@ -166,15 +168,16 @@ test("the page names itself honestly", () => {
 test("nothing links to the private cipher-project repository", () => {
   const files = ["index.html", "README.md", "DATA-LICENSES.md", "puzzles/README.md", "docs/analysis.md",
     ...readdirSync(join(ROOT, "assets/js/ui")).map(f => `assets/js/ui/${f}`),
-    ...[1, 2, 3, 4, 5, 6].map(n => `puzzles/challenge-0${n}/solve-path.md`)];
+    ...CARDS.map(c => `puzzles/challenge-${pad(c.n)}/solve-path.md`)];
   for (const f of files) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), /github\.com\/Tz-Ray\/cipher-project/i, f);
 });
 
 test("the solve-path links after a reveal name files in this repository", () => {
   const js = readFileSync(join(ROOT, "assets/js/ui/challenges.js"), "utf8");
   const tpl = js.match(/const SOLVE_PATH = n => `([^`]+)`/)[1];
-  for (let n = 1; n <= 6; n++) {
-    const path = repoPath(tpl.replace("${n}", String(n)));
+  assert.equal(CARDS.length, 12);
+  for (const { n } of CARDS) {
+    const path = repoPath(tpl.replace("${pad(n)}", pad(n)));
     assert.ok(path && existsSync(join(ROOT, path)), `solve path ${n}: ${path}`);
   }
 });
@@ -182,13 +185,18 @@ test("the solve-path links after a reveal name files in this repository", () => 
 test("the copied puzzles match the page's challenges, and the provenance is the edition's", async () => {
   const { createHash } = await import("node:crypto");
   const index = JSON.parse(readFileSync(join(ROOT, "data/challenges/index.json"), "utf8"));
-  assert.equal(index.length, 6);
+  assert.equal(index.length, 12);
   for (const c of index) {
-    const dir = join(ROOT, `puzzles/challenge-0${c.n}`);
-    const data = JSON.parse(readFileSync(join(ROOT, `data/challenges/0${c.n}.json`), "utf8"));
+    const dir = join(ROOT, `puzzles/challenge-${pad(c.n)}`);
+    const data = JSON.parse(readFileSync(join(ROOT, `data/challenges/${pad(c.n)}.json`), "utf8"));
     assert.equal(readFileSync(join(dir, "ciphertext.txt"), "utf8"), data.ciphertext, `${c.n} ciphertext`);
     assert.equal(readFileSync(join(dir, "key.json"), "utf8"), data.keyText, `${c.n} key`);
     assert.equal(readFileSync(join(dir, "plaintext.txt"), "utf8"), data.plaintext, `${c.n} plaintext`);
+    // the hints the page shows one per click are the puzzle's hints.json, in order
+    const hints = Array.from({ length: c.hints || 0 }, (_, i) =>
+      JSON.parse(readFileSync(join(ROOT, `data/challenges/hints/${pad(c.n)}-${i + 1}.json`), "utf8")));
+    if (c.n >= 7) assert.deepEqual(JSON.parse(readFileSync(join(dir, "hints.json"), "utf8")), hints, `${c.n} hints`);
+    else assert.ok(!existsSync(join(dir, "hints.json")) && hints.length === 0, `${c.n} has no hints`);
   }
   const manifest = JSON.parse(readFileSync(join(ROOT, "data/manifest.json"), "utf8"));
   const sha = createHash("sha256").update(readFileSync(join(ROOT, "docs/VERSIONS.md"))).digest("hex");
@@ -200,8 +208,10 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
   const readme = readFileSync(join(ROOT, "puzzles/README.md"), "utf8");
   for (const c of index) {
     assert.ok(readme.includes(c.blurb) && readme.includes(c.title), `puzzles/README.md: #${c.n}`);
-    const md = readFileSync(join(ROOT, `puzzles/challenge-0${c.n}/solve-path.md`), "utf8");
-    assert.match(md, /^# Challenge #\d[^\n]*\n\n> \*\*Spoilers\.\*\*/, `#${c.n}: title, then the preface`);
+    const md = readFileSync(join(ROOT, `puzzles/challenge-${pad(c.n)}/solve-path.md`), "utf8");
+    assert.match(md, /^# Challenge #\d+[^\n]*\n\n> \*\*Spoilers\.\*\*/, `#${c.n}: title, then the preface`);
+    // the release each was set in (1-6 in 2.0, 7-12 in 2.6)
+    assert.ok(md.includes(c.n <= 6 ? "(from KeyPath 2.0, tag `v2.0`)" : "(from KeyPath 2.6, tag `v2.6`)"), `#${c.n}: its release`);
     // the setter's notes cite unpublished documents; #4's once gave away #5
     assert.doesNotMatch(md, /^## (Leakage|How it was minted|Fairness checklist|Playtest)/m, `#${c.n}`);
     assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);

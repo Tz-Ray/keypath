@@ -1,0 +1,67 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "zh_cangjie",
+      "route": [
+        "shape:zh_cangjie",
+        "keystroke:zh_cangjie"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 5,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 5,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            },
+            {
+              "len": 5,
+              "homophone_index": 0
+            }
+          ]
+        }
+      ],
+      "hint": "日月金木水火土"
+    }
+  ]
+}

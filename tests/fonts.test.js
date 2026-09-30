@@ -11,6 +11,7 @@ const size = f => readFileSync(join(ROOT, "fonts", f)).length;
 const parse = text => text.split(", ").map(r => r.slice(2).split("-").map(h => parseInt(h, 16)))
   .map(([a, b = a]) => [a, b]);
 const covers = (list, cp) => list.some(([a, b]) => cp >= a && cp <= b);
+const cards = readJson("data/challenges/index.json");
 
 test("font budget: each at most 70 KB, both at most 90 KB", () => {
   assert.ok(size("glyphs-tc.woff2") <= 70 * 1024);
@@ -41,21 +42,44 @@ test("no character found only in challenge answers is in a font", () => {
     readFileSync(join(ROOT, "data/layouts.json"), "utf8"),
     ...readJsonl("tests/fixtures/traces.jsonl.gz").filter(t => siteIds.has(t.id)).map(t => JSON.stringify(t.trace)),
     ...["index.html", "assets/js/ui/text.js"].map(f => { try { return readFileSync(join(ROOT, f), "utf8"); } catch { return ""; } }),
+    ...cards.map(c => [c.title, c.blurb, c.keyboards || ""].join("")),
   ].join(""));
-  for (let n = 1; n <= 6; n++) {
-    for (const ch of readJson(`data/challenges/0${n}.json`).plaintext) {
+  assert.equal(cards.length, 12);
+  for (const { n } of cards) {
+    for (const ch of readJson(`data/challenges/${String(n).padStart(2, "0")}.json`).plaintext) {
       if (curated.has(ch)) continue;
       assert.ok(!covers(all, ch.codePointAt(0)), `challenge ${n}: ${ch}`);
     }
   }
 });
 
-test("the fonts cover every CJK character the page's own text shows", () => {
+test("the fonts cover every CJK character the page's own text and cards show", () => {
   const all = [...parse(ranges["glyphs-tc.woff2"]), ...parse(ranges["glyphs-kr.woff2"])];
   const cjk = /[ぁ-ゖㄅ-ㄯㄱ-ㆎ㐀-䶿一-鿿가-힣]/u;
   for (const f of ["index.html", "assets/js/ui/text.js"])
     for (const ch of new Set(readFileSync(join(ROOT, f), "utf8")))
       if (cjk.test(ch)) assert.ok(covers(all, ch.codePointAt(0)), `${f}: ${ch}`);
+  let n = 0;
+  for (const c of cards)
+    for (const ch of [c.title, c.blurb, c.keyboards || ""].join(""))
+      if (cjk.test(ch)) { n++; assert.ok(covers(all, ch.codePointAt(0)), `card #${c.n}: ${ch}`); }
+  assert.ok(n >= 9, n);   // 日月金木水火土 (#7) and 易經 (#10)
+});
+
+// The hints of 7-12 show only when asked, and some hold an answer's
+// characters: the fonts carry none that is not also shown before a click.
+test("no character found only in the hints is in a font", () => {
+  const all = [...parse(ranges["glyphs-tc.woff2"]), ...parse(ranges["glyphs-kr.woff2"])];
+  const shown = new Set([readFileSync(join(ROOT, "data/hero.json"), "utf8"), readFileSync(join(ROOT, "data/layouts.json"), "utf8"),
+    readFileSync(join(ROOT, "index.html"), "utf8"), readFileSync(join(ROOT, "assets/js/ui/text.js"), "utf8"),
+    ...cards.map(c => [c.title, c.blurb, c.keyboards || ""].join("")),
+    ...readJsonl("tests/fixtures/traces.jsonl.gz").filter(t => !t.id.startsWith("challenge-")).map(t => JSON.stringify(t.trace))].join(""));
+  const pad = n => String(n).padStart(2, "0");
+  for (const c of cards.filter(c => c.hints))
+    for (let k = 1; k <= c.hints; k++)
+      for (const ch of readJson(`data/challenges/hints/${pad(c.n)}-${k}.json`))
+        if (/[\p{Script=Han}\p{Script=Hangul}]/u.test(ch) && !shown.has(ch))
+          assert.ok(!covers(all, ch.codePointAt(0)), `hint ${k} of #${c.n}: ${ch}`);
 });
 
 test("the fonts cover every legend the keyboard pictures draw", async () => {

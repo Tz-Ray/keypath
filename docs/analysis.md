@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.5 (tag `v2.5`). The scripts, tests and design documents
+> From KeyPath 2.6 (tag `v2.6`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -42,7 +42,7 @@ rewrites the blocks. With no flag the script prints them.
 - On the zh round-trip corpus, 73.4% of the 154 Dàqiān (and Pinyin) choices are rank 0 (73.4% of the 154 made from a set of two or more); typed as hanja on Dubeolsik, 41.6%. On the ja corpus, 40.0% of the 15 keyed choices are rank 0.
 - Across the round-trip corpora and routes, 72.8% of the 224 translation-hop choices are rank 0. The frozen v1.0 keys, whose texts were picked to select non-zero candidates, have 37.1% of their 256 translation-hop choices at rank 0.
 - A zh message costs 5.41 key bits per character on Dàqiān and 7.00 as hanja on Dubeolsik; an en message routed to Chinese costs 3.55 per character by lexicon and 4.02 in free mode, where 71.3% of the bits are tier-2 patch text.
-- The 6 shipped challenges carry 273.69 key bits between them; the largest, challenge-06, carries 113.63.
+- The 12 shipped challenges carry 436.25 key bits between them; the largest, challenge-06, carries 113.63.
 <!-- END GENERATED: headline -->
 
 ## Definitions
@@ -116,7 +116,7 @@ rewrites the blocks. With no flag the script prints them.
 | ru routes | `test_ru: ROUTES` | each row's route and layout | 12 | 233 |
 | el routes | `test_el: ROUTES` | each row's route, default layout | 6 | 98 |
 | frozen v1.0 | `tests/golden/keys-v1.0 (test_frozen_v1: CASES)` | each key as minted | 100 | 1,781 |
-| challenges | `puzzles/challenge-*` | each shipped key | 6 | 168 |
+| challenges | `puzzles/challenge-*` | each shipped key | 12 | 327 |
 <!-- END GENERATED: corpora -->
 
 ## 1. Candidate sets per layout
@@ -324,12 +324,19 @@ and the tables show how far each one does:
 | frozen v1.0 | each key as minted | (en, en_identity) | 0 | 0 | — | — | — | — |
 | frozen v1.0 | each key as minted | (es, es_accent) | 0 | 0 | — | — | — | — |
 | frozen v1.0 | each key as minted | (ja, ja_romaji) | 57 | 57 | 40.4% | 40.4% | 33.07 | 238 |
-| challenges | each shipped key | (zh, zh_daqian) | 9 | 9 | 44.4% | 44.4% | 0.56 | 1 |
+| challenges | each shipped key | (zh, zh_daqian) | 14 | 14 | 35.7% | 35.7% | 0.93 | 3 |
 | challenges | each shipped key | (es, es_accent) | 0 | 0 | — | — | — | — |
 | challenges | each shipped key | (ko, ko_dubeolsik) | 0 | 0 | — | — | — | — |
 | challenges | each shipped key | (ru, ru_jcuken) | 0 | 0 | — | — | — | — |
 | challenges | each shipped key | (zh, zh_pinyin) | 19 | 19 | 52.6% | 52.6% | 1.84 | 12 |
 | challenges | each shipped key | (zh, ko_dubeolsik) | 17 | 17 | 29.4% | 29.4% | 2.76 | 19 |
+| challenges | each shipped key | (zh, zh_cangjie) | 15 | 1 | 100.0% | 100.0% | 0.00 | 0 |
+| challenges | each shipped key | (vi, vi_telex) | 0 | 0 | — | — | — | — |
+| challenges | each shipped key | (zh, zh_eten) | 8 | 8 | 50.0% | 50.0% | 0.50 | 1 |
+| challenges | each shipped key | (zh, zh_quick) | 13 | 12 | 53.8% | 50.0% | 2.15 | 9 |
+| challenges | each shipped key | (el, el_greek) | 0 | 0 | — | — | — | — |
+| challenges | each shipped key | (zh, zh_jyutping) | 1 | 1 | 100.0% | 100.0% | 0.00 | 0 |
+| challenges | each shipped key | (ja, ja_kana) | 1 | 1 | 100.0% | 100.0% | 0.00 | 0 |
 <!-- END GENERATED: rank0-surfaces -->
 
 The same measure for every translation hop, per corpus and over all
@@ -365,14 +372,16 @@ of them:
 | frozen v1.0 | each key as minted | `translate:ja>en` | 23 | 23 | 0.0% | 0.0% | 14.57 | 34 |
 | frozen v1.0 | each key as minted | `translate:es>en` | 65 | 48 | 46.2% | 27.1% | 1.25 | 11 |
 | frozen v1.0 | each key as minted | `translate:en>es` | 35 | 19 | 57.1% | 21.1% | 2.40 | 13 |
-| challenges | each shipped key | `translate:en>zh` | 4 | 3 | 50.0% | 33.3% | 1.00 | 2 |
+| challenges | each shipped key | `translate:en>zh` | 6 | 5 | 66.7% | 60.0% | 0.67 | 2 |
 | challenges | each shipped key | `translate:es>en` | 3 | 2 | 66.7% | 50.0% | 0.33 | 1 |
 | challenges | each shipped key | `translate:ru>en` | 1 | 1 | 100.0% | 100.0% | 0.00 | 0 |
 | challenges | each shipped key | `translate:en>ru` | 2 | 1 | 100.0% | 100.0% | 0.00 | 0 |
 | challenges | each shipped key | `translate:zh>en` | 2 | 2 | 0.0% | 0.0% | 2.50 | 4 |
-| all corpora |  | `translate:en>zh` | 136 | 105 | 47.8% | 32.4% | 2.75 | 31 |
+| challenges | each shipped key | `translate:en>el` | 11 | 6 | 81.8% | 66.7% | 0.45 | 4 |
+| challenges | each shipped key | `translate:en>ja` | 1 | 1 | 100.0% | 100.0% | 0.00 | 0 |
+| all corpora |  | `translate:en>zh` | 138 | 107 | 48.6% | 33.6% | 2.71 | 31 |
 | all corpora |  | `translate:zh>en` | 49 | 49 | 34.7% | 34.7% | 2.33 | 17 |
-| all corpora |  | `translate:en>ja` | 52 | 51 | 36.5% | 35.3% | 7.27 | 65 |
+| all corpora |  | `translate:en>ja` | 53 | 52 | 37.7% | 36.5% | 7.13 | 65 |
 | all corpora |  | `translate:ja>en` | 25 | 25 | 0.0% | 0.0% | 13.64 | 34 |
 | all corpora |  | `translate:es>en` | 81 | 57 | 53.1% | 33.3% | 1.04 | 11 |
 | all corpora |  | `translate:en>es` | 35 | 19 | 57.1% | 21.1% | 2.40 | 13 |
@@ -380,7 +389,7 @@ of them:
 | all corpora |  | `translate:ko>en` | 20 | 20 | 95.0% | 95.0% | 0.05 | 1 |
 | all corpora |  | `translate:en>ru` | 23 | 12 | 95.7% | 91.7% | 0.04 | 1 |
 | all corpora |  | `translate:ru>en` | 30 | 25 | 93.3% | 92.0% | 0.13 | 3 |
-| all corpora |  | `translate:en>el` | 14 | 10 | 85.7% | 80.0% | 0.14 | 1 |
+| all corpora |  | `translate:en>el` | 25 | 16 | 84.0% | 75.0% | 0.28 | 4 |
 | all corpora |  | `translate:el>en` | 3 | 2 | 66.7% | 50.0% | 0.33 | 1 |
 <!-- END GENERATED: rank0-hops -->
 
@@ -421,7 +430,7 @@ apart from the key size, the unit-boundary bits per character:
 | ru routes | each row's route and layout | 12 | 33.48 | 25.93 | 140.32 | 1.72 | 35.8% | 0.63 |
 | el routes | each row's route, default layout | 6 | 9.21 | 7.22 | 24 | 0.56 | 43.4% | 0.90 |
 | frozen v1.0 | each key as minted | 97 | 45.41 | 39.97 | 136 | 2.47 | 46.0% | 0.74 |
-| challenges | each shipped key | 6 | 45.62 | 21.33 | 113.63 | 1.63 | 5.8% | 0.63 |
+| challenges | each shipped key | 12 | 36.35 | 27.44 | 113.63 | 1.33 | 9.2% | 0.68 |
 <!-- END GENERATED: key-size -->
 
 Per shipped challenge:
@@ -435,6 +444,12 @@ Per shipped challenge:
 | challenge-04 | (ru, ru_jcuken), (zh, zh_pinyin) | 56 | 3 | 7.11 | 8 | 15.11 | 40.00 |
 | challenge-05 | (zh, zh_pinyin), (zh, ko_dubeolsik), (ru, ru_jcuken) | 21 | 22 | 110.40 | 0 | 110.40 | 3.00 |
 | challenge-06 | (zh, ko_dubeolsik), (zh, zh_pinyin), (ru, ru_jcuken), (zh, zh_daqian) | 21 | 21 | 113.63 | 0 | 113.63 | 7.00 |
+| challenge-07 | (zh, zh_cangjie) | 7 | 7 | 0.00 | 0 | 0.00 | 19.36 |
+| challenge-08 | (vi, vi_telex) | 52 | 0 | 0.00 | 0 | 0.00 | 11.34 |
+| challenge-09 | (zh, zh_eten), (zh, zh_daqian) | 11 | 11 | 45.11 | 0 | 45.11 | 11.00 |
+| challenge-10 | (zh, zh_cangjie), (zh, zh_quick) | 16 | 16 | 40.05 | 0 | 40.05 | 24.48 |
+| challenge-11 | (el, el_greek), (zh, zh_jyutping), (ja, ja_kana), (zh, zh_eten) | 68 | 18 | 26.07 | 24 | 50.07 | 46.00 |
+| challenge-12 | (zh, zh_quick) | 5 | 5 | 27.31 | 0 | 27.31 | 6.48 |
 <!-- END GENERATED: challenges -->
 
 Reading the table:

@@ -1,18 +1,39 @@
-// The six challenge cards: copy, answer check (hashes only), and a
+// The challenge cards: copy, answer check (hashes only), the hints of
+// challenges 7-12 (each fetched only when the visitor asks for it), and a
 // confirmed "Reveal the walk" that decodes the published key.
-import { h, $, copyText, toast, storage } from "./dom.js";
+import { h, $, copyText, toast, storage, announce } from "./dom.js";
 import { T, LANG_TAGS } from "./text.js";
 import { checkAnswer } from "../engine/hash.js";
 import { mountFigure } from "./figure.js";
 import { renderKeyText } from "./keypanel.js";
 
-const SOLVE_PATH = n => `https://github.com/Tz-Ray/keypath/blob/main/puzzles/challenge-0${n}/solve-path.md`;
+const pad = n => String(n).padStart(2, "0");
+const SOLVE_PATH = n => `https://github.com/Tz-Ray/keypath/blob/main/puzzles/challenge-${pad(n)}/solve-path.md`;
+const HINT_FILE = (n, k) => `data/challenges/hints/${pad(n)}-${k}.json`;
 const TITLE_LANG = { 2: "es" };
+// the difficulty label's colour (warm-up plain)
+const LEVEL = { Easy: "lv-easy", Medium: "lv-medium", Hard: "lv-hard", Expert: "lv-expert", Meta: "lv-meta" };
 
-/** Wrap Cyrillic runs in <span lang="ru"> so screen readers switch voice. */
+// Runs of another script, wrapped in <span lang> so screen readers switch
+// voice: Cyrillic (with the punctuation inside a phrase), Han and Bopomofo
+// with its tone marks, kana, Greek.
+const RUNS = [
+  [/[Ѐ-ӿ][Ѐ-ӿ\s,.\-…]*[Ѐ-ӿ.]/u, "ru"],
+  [/[\p{Script=Han}\p{Script=Bopomofo}ˇˊˋ˙]+/u, "zh-Hant"],
+  [/[\p{Script=Hiragana}\p{Script=Katakana}]+/u, "ja"],
+  [/\p{Script=Greek}+/u, "el"],
+];
 function withLang(text) {
-  const parts = text.split(/([Ѐ-ӿ][Ѐ-ӿ\s,.\-…]*[Ѐ-ӿ.])/u);
-  return parts.map((p, i) => (i % 2 ? h("span", { lang: "ru" }, p) : p));
+  const all = new RegExp(RUNS.map(([re]) => `(${re.source})`).join("|"), "gu");
+  const out = [];
+  let at = 0;
+  for (const m of text.matchAll(all)) {
+    if (m.index > at) out.push(text.slice(at, m.index));
+    out.push(h("span", { lang: RUNS[m.slice(1).findIndex(g => g !== undefined)][1] }, m[0]));
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push(text.slice(at));
+  return out;
 }
 
 function solvedSet() {
@@ -45,13 +66,15 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
       h("div.answer-row", input, h("button.btn.primary", { type: "submit" }, T.check)),
       verdict);
     const art = h("article.chal", { id: `challenge-${c.n}`, "data-n": String(c.n) },
-      h("div.chal-top", h("span.chal-n", `#${c.n}`), h("span", { class: `diff d${c.n}` }, c.difficulty), badge),
+      h("div.chal-top", h("span.chal-n", `#${c.n}`), h("span", { class: `diff ${LEVEL[c.difficulty] || ""}`.trim() }, c.difficulty), badge),
       h("h3", { lang: TITLE_LANG[c.n] || null }, c.title),
       h("p.blurb", withLang(c.blurb)),
       c.keyboards ? h("p.kbds", c.keyboards) : null);
     const copyBtn = h("button.btn.small", { type: "button", "aria-label": `Copy ciphertext of challenge ${c.n}` }, T.copy);
     copyBtn.addEventListener("click", async () => { if (await copyText(c.ciphertext)) toast(T.copied); });
-    art.append(h("div.chal-cipher", h("code", { lang: "en", translate: "no" }, c.ciphertext), copyBtn), form);
+    art.append(h("div.chal-cipher", h("code", { lang: "en", translate: "no" }, c.ciphertext), copyBtn));
+    if (c.hints) art.append(hints(c));
+    art.append(form);
 
     form.addEventListener("submit", async ev => {
       ev.preventDefault();
@@ -89,11 +112,55 @@ export async function initChallenges({ host, getEngine, registry, layouts, legen
     return art;
   }
 
+  /**
+   * The challenge's hints, one per click: nothing of a hint is on the page,
+   * or fetched, before the click that asks for it.
+   */
+  function hints(c) {
+    const list = h("ol.hint-list", { hidden: true });
+    const btn = h("button.btn.small.hint-btn", { type: "button" }, T.hintNext(1, c.hints));
+    const err = h("p.error.hint-error", { role: "status", hidden: true });
+    let shown = 0, busy = false;
+    btn.addEventListener("click", async () => {
+      if (busy || shown >= c.hints) return;
+      busy = true;
+      btn.setAttribute("aria-busy", "true");
+      let text;
+      try {
+        const e = await getEngine();
+        text = await e._internal.data.json(HINT_FILE(c.n, shown + 1));
+        if (typeof text !== "string") throw new Error("not a hint");
+      } catch {
+        busy = false;
+        btn.removeAttribute("aria-busy");
+        err.textContent = T.hintFailed;
+        err.hidden = false;
+        return;
+      }
+      err.hidden = true;
+      shown++;
+      const item = h("li", { tabindex: "-1" }, h("span.hint-n", T.hintLabel(shown)), " ", withLang(text));
+      list.append(item);
+      list.hidden = false;
+      busy = false;
+      btn.removeAttribute("aria-busy");
+      if (shown < c.hints) {
+        btn.textContent = T.hintNext(shown + 1, c.hints);
+        announce(`${T.hintLabel(shown)}: ${text}`);
+      } else {
+        // the last one: the button goes, and focus moves to the hint
+        btn.hidden = true;
+        item.focus();
+      }
+    });
+    return h("div.hints", list, btn, err);
+  }
+
   async function reveal(c, art, out) {
     let data, r;
     try {
       const e = await getEngine();
-      data = await e._internal.data.json(`data/challenges/${String(c.n).padStart(2, "0")}.json`);
+      data = await e._internal.data.json(`data/challenges/${pad(c.n)}.json`);
       r = await e.decode({ ciphertext: data.ciphertext, keyText: data.keyText });
     } catch {
       r = { ok: false };

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generate the site's data/ and tests/fixtures/ from keypath 2.5.0.
+"""Generate the site's data/ and tests/fixtures/ from keypath 2.6.0.
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v2.5); the cipher project
+site's own venv (from the cipher project at tag v2.6); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
 docs/09) and never imported from, executed or written to.  The walks the
 page draws come from keypath.trace (trace/1), mapped to the site's surface
@@ -80,10 +80,10 @@ from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v2.5; by default next to this repository
+# a checkout of the cipher project at tag v2.6; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-VERSION = "2.5.0"
-TAG = "v2.5"
+VERSION = "2.6.0"
+TAG = "v2.6"
 EDITION = "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2"
 VOCAB_SIZE = 10_000
 SEED = 20260924
@@ -243,7 +243,30 @@ CHALLENGE_COPY = {
     5: ("Hard", "A Friend from Afar",
         "The Master said it. Seoul recites it. One word came from even farther away.", "Three keyboards"),
     6: ("Expert", "Each in Its Own Way", "…несчастлива по-своему.", "Four keyboards"),
+    # pack II (KeyPath 2.6): each blurb is the key's hint and the README's
+    # framing; the three hints of each come from its hints.json
+    7: ("Easy", "Every Key a Shape",
+        "日月金木水火土. Seven characters; every letter on this keyboard stands for a shape.", "One keyboard"),
+    8: ("Medium", "A Question from Hanoi",
+        "Typed in Hanoi with Telex: a question, and a borrowed phrase. One Vietnamese sentence, but not every "
+        "syllable in it is Vietnamese. Keep the borrowed phrase as it was typed: it is part of the answer.",
+        "One keyboard"),
+    9: ("Medium", "One Handover",
+        "The keyboard of #1 has a twin in Taipei. One passed the message to the other, once. The line comes "
+        "from a hillside town nearby.", "Two keyboards"),
+    10: ("Hard", "Metal and Orchids",
+         "易經. The second line was typed in a hurry. Two lines, eight characters each.", "Two keyboards"),
+    11: ("Expert", "Digits, Three Ways",
+         "Greek first. Then three keyboards on which a digit means three different things. An English message: "
+         "most of it went through Greek, and each of its last three words through a keyboard of its own.",
+         "Four keyboards"),
+    12: ("Meta", "The Key You Carried",
+         "This one came without a key. You have been carrying it: one number from each of #7 to #11, in order. "
+         "Five characters, two keys each, on a keyboard of #10.", "One keyboard"),
 }
+# challenges with hints.json (pack II): its hints, revealed one per click,
+# each in a file of its own so that none is fetched before it is asked for
+HINT_COUNT = 3
 
 
 # ================================================================ helpers
@@ -818,6 +841,8 @@ def challenge_files() -> list[dict[str, Any]]:
             "ciphertext": (folder / "ciphertext.txt").read_text(encoding="utf-8"),
             "keyText": (folder / "key.json").read_text(encoding="utf-8"),
             "plaintext": (folder / "plaintext.txt").read_text(encoding="utf-8"),
+            "hints": (json.loads((folder / "hints.json").read_text(encoding="utf-8"))
+                      if (folder / "hints.json").is_file() else []),
         })
     return out
 
@@ -879,14 +904,24 @@ def list_slices(ciphertext: str, key: dict[str, Any]) -> dict[str, dict[str, lis
 def challenges_data(out: Out) -> list[dict[str, Any]]:
     index = []
     shipped = challenge_files()
-    assert [c["n"] for c in shipped] == [1, 2, 3, 4, 5, 6]
+    assert [c["n"] for c in shipped] == list(range(1, 13))
     for c in shipped:
         key = json.loads(c["keyText"])
         assert decode(c["ciphertext"], key) == c["plaintext"], c["n"]
         difficulty, title, blurb, keyboards = CHALLENGE_COPY[c["n"]]
-        index.append({"n": c["n"], "difficulty": difficulty, "title": title, "blurb": blurb,
-                      "keyboards": keyboards, "ciphertext": c["ciphertext"],
-                      "hash": sha(answer_norm(c["plaintext"])), "fold": sha(answer_fold(c["plaintext"]))})
+        entry = {"n": c["n"], "difficulty": difficulty, "title": title, "blurb": blurb,
+                 "keyboards": keyboards, "ciphertext": c["ciphertext"],
+                 "hash": sha(answer_norm(c["plaintext"])), "fold": sha(answer_fold(c["plaintext"]))}
+        # pack I (1-6) has no hints; pack II (7-12) has exactly three each,
+        # and the card knows only how many there are
+        hints = c["hints"]
+        assert len(hints) == (HINT_COUNT if c["n"] >= 7 else 0), c["n"]
+        assert all(isinstance(h, str) and h.strip() == h and h for h in hints), c["n"]
+        if hints:
+            entry["hints"] = len(hints)
+        index.append(entry)
+        for i, hint in enumerate(hints, 1):
+            out.json(f"data/challenges/hints/{c['n']:02d}-{i}.json", hint)
         out.json(f"data/challenges/{c['n']:02d}.json", {
             "ciphertext": c["ciphertext"], "keyText": c["keyText"], "plaintext": c["plaintext"],
             "lists": list_slices(c["ciphertext"], key)})
@@ -2700,6 +2735,8 @@ _SKK = {"skk": ("2026-07-10", "2026-09-24")}
 _SKK_JA = {"skk": ("2026-07-10", "2026-09-29")}   # the Japanese example readings' whole lists
 _SPA = {"spa": ("2026-07-10", "2026-09-24")}
 _KENG = {"keng": ("2026-09-23", "2026-09-24")}
+PACK2 = "2026-09-30"   # challenges 7-12 (KeyPath 2.6)
+_PACK2_SHAPE = {"chewing": _CHEWING_SHAPE["chewing"] + (PACK2,)}   # a Cangjie or Quick challenge
 _ = ()
 SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/registry.json", None, {"keypath": _}),
@@ -2727,13 +2764,26 @@ SOURCES: list[tuple[str, str | None, dict[str, tuple[str, ...]]]] = [
     ("data/en/el_greek/*.json", None, {"ell": _, "wordfreq": _}),
     ("data/en/es_accent/*.json", "data/en/es_accent", {**_SPA, "wordfreq": _}),
     ("data/challenges/02.json", "data/challenges", {"keypath": _, "cedict": _, **_SPA, **_CHEWING, "wordfreq": _}),
+    # pack II (2026-09-30): each key's tables, and for 11 the entries it reads
+    ("data/challenges/07.json", "data/challenges", {"keypath": _, "unihan": _, **_PACK2_SHAPE}),
+    ("data/challenges/08.json", None, {"keypath": _}),
+    ("data/challenges/09.json", "data/challenges", {"keypath": _, "chewing": _CHEWING["chewing"] + (PACK2,)}),
+    ("data/challenges/10.json", "data/challenges", {"keypath": _, "unihan": _, **_PACK2_SHAPE}),
+    ("data/challenges/11.json", "data/challenges",
+     {"keypath": _, "cedict": _, "jmdict": _, "skk": _SKK["skk"] + ("2026-09-29", PACK2), "ell": _,
+      "chewing": tuple(sorted(set(_CHEWING["chewing"] + _CHEWING_JYUTPING["chewing"]))) + (PACK2,),
+      "unihan": _, "wordfreq": _}),
+    ("data/challenges/12.json", "data/challenges", {"keypath": _, "unihan": _, **_PACK2_SHAPE}),
+    # the hints are the setter's own words
+    ("data/challenges/hints/*.json", None, {"keypath": _}),
     ("data/challenges/*.json", "data/challenges",
      {"keypath": _, "cedict": _, "rus": _, **_CHEWING, "hanja": _, "wordfreq": _}),
     # (2026-09-28: Cangjie and Quick; 2026-09-29: Jyutping, and SKK readings
-    # typed on the JIS kana keys)
+    # typed on the JIS kana keys; 2026-09-30: the keys and walks of challenges 7-12)
     ("tests/fixtures/*", "tests/fixtures",
-     {"keypath": _, "cedict": _, "jmdict": _, "skk": _SKK["skk"] + ("2026-09-29",), **_KENG, "hanja": _, "rus": _,
-      "ell": _, **_SPA, "chewing": _CHEWING["chewing"] + ("2026-09-28", "2026-09-29"), "unihan": _, "wordfreq": _, "ucd": _}),
+     {"keypath": _, "cedict": _, "jmdict": _, "skk": _SKK["skk"] + ("2026-09-29", PACK2), **_KENG, "hanja": _,
+      "rus": _, "ell": _, **_SPA, "chewing": _CHEWING["chewing"] + ("2026-09-28", "2026-09-29", PACK2), "unihan": _,
+      "wordfreq": _, "ucd": _}),
 ]
 
 

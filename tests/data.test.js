@@ -16,8 +16,8 @@ const dataFiles = files(join(ROOT, "data")).map(p => relative(ROOT, p).split("\\
 const manifest = readJson("data/manifest.json");
 
 test("data/manifest.json lists every data file with its size and sha256", () => {
-  assert.equal(manifest.keypath, "2.5.0");
-  assert.equal(manifest.tag, "v2.5");
+  assert.equal(manifest.keypath, "2.6.0");
+  assert.equal(manifest.tag, "v2.6");
   assert.equal(manifest.edition, "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2");
   assert.deepEqual(Object.keys(manifest.files).sort(), dataFiles.filter(f => f !== "data/manifest.json"));
   for (const [path, { bytes, sha256 }] of Object.entries(manifest.files)) {
@@ -48,7 +48,7 @@ test("first-view data (registry, layouts, unicode14, hero) stays small", () => {
   assert.ok(gz <= 20 * 1024, `${gz} bytes gzipped`);
 });
 
-test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 6 challenges", () => {
+test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 12 challenges", () => {
   assert.equal(dataFiles.filter(f => f.startsWith("data/zh/p/")).length, 256);
   assert.equal(dataFiles.filter(f => f.startsWith("data/en/vocab/")).length, 26);
   const reg = readJson("data/registry.json");
@@ -75,8 +75,15 @@ test("shapes: 256 phrase shards, 26 vocabulary files, 26 row files per surface, 
   assert.equal(dataFiles.filter(f => /^data\/en\/el_greek\/[a-z]\.json$/.test(f)).length, 26);
   assert.deepEqual(dataFiles.filter(f => /el_en|el>en|el-en/.test(f)), []);
   const index = readJson("data/challenges/index.json");
-  assert.deepEqual(index.map(c => c.n), [1, 2, 3, 4, 5, 6]);
-  for (const c of index) assert.equal(readJson(`data/challenges/0${c.n}.json`).ciphertext, c.ciphertext);
+  assert.deepEqual(index.map(c => c.n), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const pad = n => String(n).padStart(2, "0");
+  for (const c of index) assert.equal(readJson(`data/challenges/${pad(c.n)}.json`).ciphertext, c.ciphertext);
+  // docs/10 §10 M18: three hints for each of 7-12, one file per hint; none for 1-6
+  assert.deepEqual(index.map(c => c.hints ?? 0), [0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 3, 3]);
+  assert.deepEqual(dataFiles.filter(f => f.startsWith("data/challenges/hints/")),
+    index.filter(c => c.hints).flatMap(c => [1, 2, 3].map(k => `data/challenges/hints/${pad(c.n)}-${k}.json`)));
+  assert.deepEqual(dataFiles.filter(f => /^data\/challenges\/[^/]+$/.test(f)),
+    ["data/challenges/NOTICE", ...index.map(c => `data/challenges/${pad(c.n)}.json`), "data/challenges/index.json"].sort());
   const vocab = dataFiles.filter(f => f.startsWith("data/en/vocab/")).flatMap(f => readJson(f));
   assert.equal(vocab.length, 10000);
   assert.ok(vocab.includes("welcome") && vocab.includes("home") && vocab.includes("alison"));

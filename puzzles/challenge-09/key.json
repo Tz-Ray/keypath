@@ -1,0 +1,98 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "zh_eten",
+      "route": [
+        "homophone:zh",
+        "keystroke:zh_eten"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 4,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 1
+            }
+          ]
+        }
+      ],
+      "hint": "The keyboard of #1 has a twin in Taipei. One passed the message to the other, once."
+    },
+    {
+      "language": "zh",
+      "layout": "zh_daqian",
+      "route": [
+        "homophone:zh",
+        "keystroke:zh_daqian"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 3
+            },
+            {
+              "len": 3,
+              "homophone_index": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 1
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

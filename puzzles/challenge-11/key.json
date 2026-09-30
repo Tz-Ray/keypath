@@ -1,0 +1,234 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "en",
+  "segments": [
+    {
+      "language": "el",
+      "layout": "el_greek",
+      "route": [
+        "translate:en>el",
+        "keystroke:el_greek"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 7
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 6
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 8
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 1
+          }
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 4
+          }
+        },
+        {
+          "literal": {
+            "tier": 3,
+            "text": " "
+          }
+        }
+      ],
+      "hint": "Greek first. Then three keyboards on which a digit means three different things."
+    },
+    {
+      "language": "zh",
+      "layout": "zh_jyutping",
+      "route": [
+        "translate:en>zh",
+        "homophone:zh_jyutping",
+        "keystroke:zh_jyutping"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "literal": {
+            "tier": 3,
+            "text": " "
+          }
+        }
+      ]
+    },
+    {
+      "language": "ja",
+      "layout": "ja_kana",
+      "route": [
+        "translate:en>ja",
+        "homophone:ja",
+        "keystroke:ja_kana"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        },
+        {
+          "literal": {
+            "tier": 3,
+            "text": " "
+          }
+        }
+      ]
+    },
+    {
+      "language": "zh",
+      "layout": "zh_eten",
+      "route": [
+        "translate:en>zh",
+        "homophone:zh",
+        "keystroke:zh_eten"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 3,
+              "homophone_index": 0
+            },
+            {
+              "len": 3,
+              "homophone_index": 0
+            }
+          ],
+          "translation": {
+            "tier": 1,
+            "index": 0
+          }
+        }
+      ]
+    }
+  ]
+}

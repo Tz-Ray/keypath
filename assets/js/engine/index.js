@@ -1,5 +1,5 @@
 // The in-browser KeyPath engine: encodes the site's live routes exactly like
-// keypath 2.5.0 and decodes keys, returning the Trace the page draws.
+// keypath 2.6.0 and decodes keys, returning the Trace the page draws.
 //
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })
@@ -29,7 +29,11 @@ export { answerNorm, answerFold, sha256Hex, checkAnswer } from "./hash.js";
 export { dumpsKey, dumpsKeyWithSpans } from "./dumps.js";
 export { trimAscii, KP1_PREFIX } from "./kp1.js";
 
-const CHALLENGE_COUNT = 6;
+// The challenges whose files carry list slices: 1-6, whose keys read hops
+// the page ships no rows for.  Never more: each file holds its answer, so
+// a walk over a pasted key must not fetch the files of challenges 7-12
+// (their keys read only rows the page ships, and need no slices).
+const SLICE_CHALLENGES = 6;
 /** The SKK candidate lists of the Japanese example readings (a kana unit's Trace carries its list). */
 const JA_LISTS = "data/ja/lists.json";
 
@@ -61,7 +65,7 @@ export async function createEngine({ fetchText } = {}) {
   let challengeLists = null;
   function loadChallengeLists() {
     if (!challengeLists) {
-      challengeLists = Promise.all(Array.from({ length: CHALLENGE_COUNT }, (_, i) =>
+      challengeLists = Promise.all(Array.from({ length: SLICE_CHALLENGES }, (_, i) =>
         data.json(`data/challenges/${String(i + 1).padStart(2, "0")}.json`))).then(all => {
         for (const c of all) registerSlices(c.lists);
       });

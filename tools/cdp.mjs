@@ -36,7 +36,12 @@ const vectors = readJsonl("tests/fixtures/vectors.jsonl.gz");
 const decodeErrors = readJsonl("tests/fixtures/decode-errors.jsonl.gz");
 const traces = readJsonl("tests/fixtures/traces.jsonl.gz");
 const layoutsJson = readJson("data/layouts.json");
-const challenges = [1, 2, 3, 4, 5, 6].map(n => readJson(`data/challenges/0${n}.json`));
+const pad = n => String(n).padStart(2, "0");
+const chalIndex = readJson("data/challenges/index.json");
+const challenges = chalIndex.map(c => readJson(`data/challenges/${pad(c.n)}.json`));
+// challenges 7-12: their hints, which the page fetches one per click
+const hintsOf = c => Array.from({ length: c.hints || 0 }, (_, i) => readJson(`data/challenges/hints/${pad(c.n)}-${i + 1}.json`));
+const CARDS_READY = `document.querySelectorAll('.chal').length === ${chalIndex.length}`;
 const kp1Fixtures = readJson("tests/fixtures/kp1.json");
 const wbLookups = readJsonl("tests/fixtures/workbench-lookup.jsonl.gz");
 const wbTypes = readJsonl("tests/fixtures/workbench-type.jsonl.gz");
@@ -838,21 +843,95 @@ await attempt("share links", async () => {
 });
 
 await attempt("challenges", async () => {
+  const from = b.events.length;
   await open(1280, 800);
-  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.waitFor(CARDS_READY);
+  // what the page fetched since it opened, and all the text it holds (hidden text included)
+  const fetched = () => b.events.slice(from).filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
+  const pageText = () => b.evaluate("document.documentElement.textContent");
+  const got = (url, rel) => url.split("?")[0].endsWith(`/keypath/${rel}`);
+  const allHints = chalIndex.flatMap(c => hintsOf(c));
+  check("challenges: all twelve cards render, in order",
+    js(await b.evaluate("[...document.querySelectorAll('.chal')].map(a => a.id)")) === js(chalIndex.map(c => `challenge-${c.n}`)));
+  const text0 = await pageText();
+  check("challenges: no hint and no answer is on the page before a click",
+    allHints.length === 18 && allHints.every(t => !text0.includes(t)) && challenges.every(c => !text0.includes(c.plaintext)));
+  check("challenges: no hint and no challenge's own file is fetched before a click",
+    !fetched().some(u => /\/data\/challenges\/(hints\/|\d\d\.json)/.test(u)), fetched().filter(u => u.includes("/challenges/")));
+  // first, every card as a visitor meets it: its hints, a wrong answer, the right one
   for (const [i, c] of challenges.entries()) {
-    const n = i + 1;
+    const card = chalIndex[i], n = card.n;
     const sel = `#challenge-${n}`;
     check(`challenge ${n}: ciphertext`, await b.evaluate(`${q(`${sel} .chal-cipher code`)}.textContent === ${js(c.ciphertext)}`));
-    await b.evaluate(`(() => { ${q(`${sel} input`)}.value = ${js(c.plaintext)}; ${q(`${sel} form`)}.requestSubmit(); })()`);
+    check(`challenge ${n}: level, title and blurb`, js(await b.evaluate(`[${q(`${sel} .diff`)}.textContent, ${q(`${sel} h3`)}.textContent,
+      ${q(`${sel} .blurb`)}.textContent]`)) === js([card.difficulty, card.title, card.blurb]));
+    // the hints of 7-12: one per click, nothing of a hint before its click
+    const hints = hintsOf(card);
+    check(`challenge ${n}: ${hints.length ? "three hints, none shown" : "no hints"}`, hints.length
+      ? await b.evaluate(`${q(`${sel} .hint-btn`)}.textContent === "Show a hint (1 of 3)" && ${q(`${sel} .hint-list`)}.hidden && !${q(`${sel} .hint-list li`)}`)
+      : await b.evaluate(`!${q(`${sel} .hints`)}`));
+    for (const [k, hint] of hints.entries()) {
+      const later = hints.slice(k);
+      const text = await pageText();
+      check(`challenge ${n}: hint ${k + 1} is neither on the page nor fetched before its click`,
+        later.every(t => !text.includes(t)) && !fetched().some(u => later.some((_, j) => got(u, `data/challenges/hints/${pad(n)}-${k + j + 1}.json`))));
+      await b.evaluate(`${q(`${sel} .hint-btn`)}.click()`);
+      await b.waitFor(`document.querySelectorAll(${js(`${sel} .hint-list li`)}).length === ${k + 1}`);
+      const shown = await b.evaluate(`[...document.querySelectorAll(${js(`${sel} .hint-list li`)})].map(li => li.textContent)`);
+      check(`challenge ${n}: hint ${k + 1} shows after its click, and only it`,
+        shown[k] === `Hint ${k + 1} ${hint}` && hints.slice(k + 1).every(t => !shown.join("").includes(t))
+        && !fetched().some(u => got(u, `data/challenges/hints/${pad(n)}-${k + 2}.json`)), js(shown));
+    }
+    if (hints.length) {
+      check(`challenge ${n}: after the last hint the button goes and focus lands on the hint`,
+        await b.evaluate(`${q(`${sel} .hint-btn`)}.hidden && document.activeElement === document.querySelectorAll(${js(`${sel} .hint-list li`)})[2]`));
+    }
+    // a wrong answer neither solves nor reveals it
+    await b.evaluate(`(() => { ${q(`${sel} input`)}.value = "definitely not it"; ${q(`${sel} form`)}.requestSubmit(); })()`);
+    const wrong = await b.waitFor(`${q(`${sel} .verdict`)}.textContent`);
+    check(`challenge ${n}: a wrong answer does not solve or reveal it`,
+      wrong === "Not quite. Keep going." && await b.evaluate(`${q(`${sel} .badge-solved`)}.hidden && ${q(`${sel} .revealed`)}.hidden`)
+      && !(await pageText()).includes(c.plaintext), wrong);
+    await b.evaluate(`(() => { ${q(`${sel} .verdict`)}.textContent = ""; ${q(`${sel} input`)}.value = ${js(c.plaintext)}; ${q(`${sel} form`)}.requestSubmit(); })()`);
     const verdict = await b.waitFor(`${q(`${sel} .verdict`)}.textContent`);
-    check(`challenge ${n}: the answer checks`, verdict === "Solved.", verdict);
+    check(`challenge ${n}: the answer checks`, verdict === "Solved." && await b.evaluate(`!${q(`${sel} .badge-solved`)}.hidden`), verdict);
+  }
+  check("challenges: checking answers fetches no challenge's own file (answers are checked against hashes)",
+    !fetched().some(u => /\/data\/challenges\/\d\d\.json/.test(u)), fetched().filter(u => u.includes("/challenges/")));
+  // then every reveal: the plaintext, and the walk back
+  for (const [i, c] of challenges.entries()) {
+    const n = chalIndex[i].n;
+    const sel = `#challenge-${n}`;
+    // a key of 1-6 may load the slices of 1-6; nothing loads a file of 7-12 but its own reveal
+    if (n >= 7) check(`challenge ${n}: its file is fetched only by its reveal`, !fetched().some(u => got(u, `data/challenges/${pad(n)}.json`)));
     await b.evaluate(`${q(`${sel} .reveal .btn`)}.click()`);
     await b.evaluate(`${q(`${sel} .confirm .btn.primary`)}.click()`);
-    await b.waitFor(`${q(`${sel} .revealed .plain`)}`);
+    await b.waitFor(`${q(`${sel} .revealed .plain`)}`, 30000);
     const plain = await b.evaluate(`${q(`${sel} .revealed .plain`)}.textContent`);
     check(`challenge ${n}: reveal shows the plaintext`, plain === c.plaintext, plain);
+    // the walk back lights every part of the walk
+    await b.waitFor(`(() => { const u = document.querySelectorAll(${js(`${sel} .chal-walk .unit`)});
+      return u.length > 0 && u.length === document.querySelectorAll(${js(`${sel} .chal-walk .unit.lit`)}).length; })()`, 30000);
+    const href = await b.evaluate(`${q(`${sel} .solve a`)}.href`);
+    const path = `puzzles/challenge-${pad(n)}/solve-path.md`;
+    check(`challenge ${n}: the solve-path link names this repository's ${path}`,
+      href === `https://github.com/Tz-Ray/keypath/blob/main/${path}` && existsSync(join(ROOT, path)), href);
   }
+});
+
+// docs/10 §9.7, M18: walking back a key of challenges 1-6 loads the list
+// slices of 1-6 only; the files of 7-12 hold their answers
+await attempt("challenge slices", async () => {
+  const from = b.events.length;
+  await open(1280, 800);
+  await b.evaluate(`${q("#tab-dec")}.click()`);
+  await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(challenges[1].ciphertext)}; ${q("#dec-key")}.value = ${js(challenges[1].keyText)}; ${q("#dec-go")}.click(); })()`);
+  await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
+  const urls = b.events.slice(from).filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url.split("?")[0]);
+  const chal = urls.filter(u => u.includes("/data/challenges/")).map(u => u.slice(u.indexOf("/data/challenges/") + 17)).sort();
+  check("walk one back: challenge 2's key walks back over the slices of 1-6 and fetches nothing of 7-12",
+    await b.evaluate(`${q("#dec-text")}.textContent === ${js(challenges[1].plaintext)}`)
+    && js([...new Set(chal)]) === js(["01.json", "02.json", "03.json", "04.json", "05.json", "06.json", "index.json"]), js(chal));
 });
 
 await attempt("tampered keys", async () => {
@@ -937,7 +1016,7 @@ await attempt("long input stays in its box", async () => {
 
 await attempt("touch targets", async () => {
   await open(360, 780);
-  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.waitFor(CARDS_READY);
   await b.evaluate(`document.querySelector("#key-panel").open = true`);
   const small = await b.evaluate(`[...document.querySelectorAll("button, .btn, [role=tab], summary, .chip")]
     .filter(e => e.offsetParent && !e.closest(".walk, .walk-legend, .kb-pic, .popover"))
@@ -994,7 +1073,7 @@ await attempt("focus", async () => {
   check("popover: Shift+Tab from its first control closes it too",
     await b.evaluate("document.querySelector('.popover').hidden") && (await active()) === inv, await active());
   // reveal moves focus to the answer
-  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.waitFor(CARDS_READY);
   await b.evaluate(`${q("#challenge-3 .reveal .btn")}.focus()`);
   await press("Enter");
   await press("Enter");
@@ -1213,7 +1292,7 @@ check("console: no exceptions and no errors", errors.length === 0,
 
 await attempt("reveal retry", async () => {
   await open(1280, 800);
-  await b.waitFor("document.querySelectorAll('.chal').length === 6");
+  await b.waitFor(CARDS_READY);
   await b.send("Network.setBypassServiceWorker", { bypass: true });
   await b.send("Network.setCacheDisabled", { cacheDisabled: true });
   await b.send("Network.setBlockedURLs", { urls: ["*data/challenges/04.json"] });
@@ -1301,11 +1380,21 @@ if (SHOTS) {
           await sleep(500);
           await shot(`popover-${tag}`);
           await b.evaluate("document.querySelector('.popover .pop-close').click()");
-          await b.waitFor("document.querySelectorAll('.chal').length === 6");
+          await b.waitFor(CARDS_READY);
           await b.evaluate(`(() => { const a = ${q("#challenge-1")}; a.querySelector('.reveal .btn').click(); a.querySelector('.confirm .btn.primary').click(); })()`);
           await b.waitFor(`${q("#challenge-1 .revealed .plain")}`);
           await sleep(1500);
           await shotOf(`challenges-${tag}`, "#challenges");
+          // pack II: two hints of #7 asked for, and #11 revealed
+          await b.evaluate(`${q("#challenge-7 .hint-btn")}.click()`);
+          await b.waitFor(`document.querySelectorAll("#challenge-7 .hint-list li").length === 1`);
+          await b.evaluate(`${q("#challenge-7 .hint-btn")}.click()`);
+          await b.waitFor(`document.querySelectorAll("#challenge-7 .hint-list li").length === 2`);
+          await shotOf(`challenge-7-hints-${tag}`, "#challenge-7");
+          await b.evaluate(`(() => { const a = ${q("#challenge-11")}; a.querySelector('.reveal .btn').click(); a.querySelector('.confirm .btn.primary').click(); })()`);
+          await b.waitFor(`${q("#challenge-11 .revealed .plain")}`, 30000);
+          await sleep(4000);
+          await shotOf(`challenge-11-revealed-${tag}`, "#challenge-11");
           // Cangjie: the Shape band and the radical keyboard picture
           await b.evaluate(`${q("input[name=kbd][value=zh_cangjie]")}.click()`);
           await b.waitFor(cipherIs("tgnoyhvljmso"));

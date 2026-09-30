@@ -1,4 +1,4 @@
-// Ports of keypath/layouts/*.py (KeyPath 2.5.0), both directions, built
+// Ports of keypath/layouts/*.py (KeyPath 2.6.0), both directions, built
 // from data/layouts.json.  The keys -> text readers are adapted from
 // cipher-project scripts/build_demo.py (v2.0), MIT.  The Vietnamese
 // layouts (Telex, VNI) are written from KeyPath's specification (docs/10

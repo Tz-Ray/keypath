@@ -1,5 +1,6 @@
 // Spoiler guard (SPEC §11.4): nothing the page shows before a reveal gives
-// away a challenge.
+// away a challenge; for challenges 7-12 (docs/10 §10 M18) neither the cards
+// nor their hints, which the page fetches one per click.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -8,9 +9,15 @@ import { ROOT, readJson } from "./helpers.js";
 
 const S = readJson("tests/fixtures/static.json");
 const hero = readJson("data/hero.json");
-const challenges = [1, 2, 3, 4, 5, 6].map(n => readJson(`data/challenges/0${n}.json`));
+const pad = n => String(n).padStart(2, "0");
 const index = readJson("data/challenges/index.json");
+const challenges = index.map(c => readJson(`data/challenges/${pad(c.n)}.json`));
 const html = readFileSync(join(ROOT, "index.html"), "utf8");
+const textJs = readFileSync(join(ROOT, "assets/js/ui/text.js"), "utf8");
+const layoutsText = readFileSync(join(ROOT, "data/layouts.json"), "utf8");
+// what a card shows before any click: its title, blurb and keyboards line
+const cardText = c => [c.title, c.blurb, c.keyboards || ""].join("\n");
+const hintsOf = c => Array.from({ length: c.hints || 0 }, (_, i) => readJson(`data/challenges/hints/${pad(c.n)}-${i + 1}.json`));
 
 // Curated content (SPEC §11.4): the hero default, the example chips, the
 // how-it-works figures and the mixed strip.
@@ -33,7 +40,7 @@ const bigrams = t => {
 };
 
 test("the challenge data is the published set", () => {
-  assert.equal(challenges.length, 6);
+  assert.equal(challenges.length, 12);
   for (const [i, c] of challenges.entries()) assert.equal(index[i].ciphertext, c.ciphertext);
 });
 
@@ -58,8 +65,13 @@ test("no curated message shares a word or a CJK bigram with a challenge answer",
   }
 });
 
+// A character the page itself shows is not answer-only: the text of
+// index.html and text.js, the keyboard pictures' legends (data/layouts.json)
+// and the cards' own strings (fonts.test.js's set, plus the cards).  The
+// Cangjie chip's 倉 and the legends 人 心 金 are such characters.
 test("no challenge answer, or character only a challenge answer uses, is on the page or in the fallback fonts", () => {
-  const curatedChars = new Set([...curated.flatMap(c => Array.from(c.text)), ...Array.from(JSON.stringify(hero))]);
+  const curatedChars = new Set([...curated.flatMap(c => Array.from(c.text)), ...Array.from(JSON.stringify(hero)),
+    ...html, ...textJs, ...layoutsText, ...index.flatMap(c => Array.from(cardText(c)))]);
   const exclusive = new Set();
   for (const ch of challenges) {
     for (const c of ch.plaintext) if (/[\p{Script=Han}\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(c) && !curatedChars.has(c)) exclusive.add(c);
@@ -68,7 +80,10 @@ test("no challenge answer, or character only a challenge answer uses, is on the 
   for (const ch of challenges) {
     assert.ok(!html.includes(ch.plaintext), "a challenge answer is in index.html");
     assert.ok(!heroText.includes(ch.plaintext), "a challenge answer is in hero.json");
+    assert.ok(!textJs.includes(ch.plaintext), "a challenge answer is in text.js");
+    assert.ok(!index.some(c => cardText(c).includes(ch.plaintext)), "a challenge answer is on a card");
   }
+  assert.ok(exclusive.size > 20, exclusive.size);
   const ranges = readJson("fonts/ranges.json");
   const inFont = cp => Object.entries(ranges).filter(([k]) => k.endsWith(".woff2")).some(([, spec]) => spec.split(",").some(r => {
     const [a, b = a] = r.trim().replace(/^U\+/, "").split("-");
@@ -98,4 +113,90 @@ test("walk links say that anyone with the link can read the message", async () =
   // the challenges offer no walk link: a revealed walk stays on its card
   const challengesJs = readFileSync(join(ROOT, "assets/js/ui/challenges.js"), "utf8");
   assert.doesNotMatch(challengesJs, /#walk|walkBody|walkLinkOf|kp1/);
+});
+
+// docs/10 §10 M18's spoiler rule (KeyPath's scripts/check_spoilers.py): a
+// text leaks a 07-12 answer when it holds 4 or more consecutive characters
+// of one of its CJK runs, one of its words of 6 or more letters, or 3 or
+// more of its tokens in a row (a CJK run counts as one token).  Tokens are
+// read after NFC and case folding (lowercase, ς as σ, ß as ss): maximal runs
+// of Han, kana or Hangul, and maximal runs of Latin, Cyrillic or Greek
+// letters.
+const CJK_RANGES = [[0x1100, 0x11FF], [0x2E80, 0x2FDF], [0x3005, 0x3005], [0x3007, 0x3007], [0x3021, 0x3029],
+  [0x3038, 0x303B], [0x3040, 0x30FF], [0x3130, 0x318F], [0x31F0, 0x31FF], [0x3400, 0x4DBF], [0x4E00, 0x9FFF],
+  [0xA960, 0xA97F], [0xAC00, 0xD7FF], [0xF900, 0xFAFF], [0xFF66, 0xFF9F], [0xFFA0, 0xFFDC], [0x1AFF0, 0x1B16F],
+  [0x20000, 0x3FFFF]];
+const isCjk = ch => CJK_RANGES.some(([a, b]) => ch.codePointAt(0) >= a && ch.codePointAt(0) <= b);
+const isLetter = ch => /\p{L}/u.test(ch) && /[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}]/u.test(ch);
+function ruleTokens(text) {
+  const t = Array.from(text.normalize("NFC").toLowerCase().replace(/ς/g, "σ").replace(/ß/g, "ss"));
+  const out = [];
+  for (let i = 0; i < t.length;) {
+    const kind = isCjk(t[i]) ? "cjk" : isLetter(t[i]) ? "word" : null;
+    if (!kind) { i++; continue; }
+    let j = i + 1;
+    while (j < t.length && (kind === "cjk" ? isCjk(t[j]) : isLetter(t[j]))) j++;
+    out.push({ kind, text: t.slice(i, j).join("") });
+    i = j;
+  }
+  return out;
+}
+/** The longest common run of `a` and `b` (arrays), by length. */
+function longestCommon(a, b, eq = (x, y) => x === y) {
+  let best = 0;
+  for (let i = 0; i < a.length; i++)
+    for (let j = 0; j < b.length; j++) {
+      let n = 0;
+      while (i + n < a.length && j + n < b.length && eq(a[i + n], b[j + n])) n++;
+      best = Math.max(best, n);
+    }
+  return best;
+}
+function leaks(text, plaintext) {
+  const mine = ruleTokens(text), theirs = ruleTokens(plaintext);
+  const found = [];
+  for (const m of mine.filter(t => t.kind === "cjk"))
+    for (const r of theirs.filter(t => t.kind === "cjk"))
+      if (longestCommon(Array.from(m.text), Array.from(r.text)) >= 4) found.push(`CJK run in ${m.text}`);
+  const words = new Set(theirs.filter(t => t.kind === "word" && Array.from(t.text).length >= 6).map(t => t.text));
+  for (const m of mine) if (m.kind === "word" && words.has(m.text)) found.push(`word ${m.text}`);
+  if (longestCommon(mine, theirs, (x, y) => x.kind === y.kind && x.text === y.text) >= 3) found.push("three words in a row");
+  return found;
+}
+
+test("the spoiler rule catches a leak and passes an innocent line", () => {
+  const plain = "一二三四五 the quick brown fox";
+  assert.ok(leaks("x 二三四五 y", plain).length);
+  assert.ok(leaks("QUICK BROWN FOX", plain).length);
+  assert.ok(leaks("a brown hat", plain).length === 0);
+  assert.ok(leaks("the quick", plain).length === 0);
+});
+
+test("no card and no hint gives away an answer of 7-12 (docs/10 §10 M18's rule)", () => {
+  const pack = index.filter(c => c.n >= 7).map(c => [c.n, challenges[c.n - 1].plaintext]);
+  assert.equal(pack.length, 6);
+  const texts = [...index.map(c => [`card #${c.n}`, cardText(c)]),
+    ...index.flatMap(c => hintsOf(c).map((hint, i) => [`hint ${i + 1} of #${c.n}`, hint]))];
+  assert.equal(texts.length, 12 + 18);
+  for (const [what, text] of texts)
+    for (const [n, plain] of pack) assert.deepEqual(leaks(text, plain), [], `${what} and the answer of #${n}`);
+});
+
+test("the card data holds no hint and no answer: hints are fetched one per click", () => {
+  const raw = readFileSync(join(ROOT, "data/challenges/index.json"), "utf8");
+  for (const c of index) {
+    assert.deepEqual(Object.keys(c), ["n", "difficulty", "title", "blurb", "keyboards", "ciphertext", "hash", "fold",
+      ...(c.n >= 7 ? ["hints"] : [])], `#${c.n}`);
+    assert.equal(c.hints ?? 0, c.n >= 7 ? 3 : 0);
+    for (const hint of hintsOf(c)) {
+      assert.ok(hint.length > 20 && !raw.includes(hint), `#${c.n}: a hint is in index.json`);
+      assert.ok(!html.includes(hint) && !textJs.includes(hint), `#${c.n}: a hint is in the page`);
+    }
+    assert.ok(!raw.includes(challenges[c.n - 1].plaintext), `#${c.n}: its answer is in index.json`);
+  }
+  // the card script names a hint's file only where a click asks for it
+  const js = readFileSync(join(ROOT, "assets/js/ui/challenges.js"), "utf8");
+  assert.equal(js.match(/HINT_FILE\(/g).length, 1);
+  const click = js.slice(js.indexOf('btn.addEventListener("click"'), js.indexOf("return h(\"div.hints\""));
+  assert.match(click, /HINT_FILE\(c\.n, shown \+ 1\)/);
 });

@@ -1,0 +1,43 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "zh",
+  "segments": [
+    {
+      "language": "zh",
+      "layout": "zh_quick",
+      "route": [
+        "shape:zh_quick",
+        "keystroke:zh_quick"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 2,
+              "homophone_index": 0
+            },
+            {
+              "len": 2,
+              "homophone_index": 1
+            },
+            {
+              "len": 2,
+              "homophone_index": 9
+            },
+            {
+              "len": 2,
+              "homophone_index": 2
+            },
+            {
+              "len": 2,
+              "homophone_index": 5
+            }
+          ]
+        }
+      ],
+      "hint": "This one came without a key. You have been carrying it: one number from each of #7 to #11, in order."
+    }
+  ]
+}

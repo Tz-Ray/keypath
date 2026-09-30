@@ -1,5 +1,5 @@
 // The Trace (the walk the page draws) equals the Python walk, field for
-// field, for the site's examples, the six challenges and 400 sampled keys.
+// field, for the site's examples, the twelve challenges and 400 sampled keys.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { engine, readJsonl } from "./helpers.js";
@@ -7,7 +7,8 @@ import { engine, readJsonl } from "./helpers.js";
 const traces = readJsonl("tests/fixtures/traces.jsonl.gz");
 
 test("trace fixtures include the challenges and a broad sample", () => {
-  assert.ok(traces.filter(t => t.id.startsWith("challenge-")).length === 6);
+  assert.deepEqual(traces.filter(t => t.id.startsWith("challenge-")).map(t => t.id),
+    Array.from({ length: 12 }, (_, i) => `challenge-${String(i + 1).padStart(2, "0")}`));
   assert.ok(traces.length >= 400);
 });
 

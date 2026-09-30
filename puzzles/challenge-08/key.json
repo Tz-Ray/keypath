@@ -1,0 +1,109 @@
+{
+  "keypath": "1.1",
+  "tables_sha256": "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2",
+  "source_language": "vi",
+  "segments": [
+    {
+      "language": "vi",
+      "layout": "vi_telex",
+      "route": [
+        "keystroke:vi_telex"
+      ],
+      "selector_mode": "keyed",
+      "words": [
+        {
+          "units": [
+            {
+              "len": 5
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 8
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 2
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 4
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 6
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        },
+        {
+          "units": [
+            {
+              "len": 3
+            }
+          ]
+        }
+      ],
+      "hint": "Typed in Hanoi with Telex: a question, and a borrowed phrase."
+    }
+  ]
+}

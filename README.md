@@ -6,15 +6,15 @@ on a Chinese, Japanese, Korean, Russian, Vietnamese or Greek keyboard (or in a
 Spanish accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
-KeyPath's Python reference implementation (keypath 2.5.0, not published)
+KeyPath's Python reference implementation (keypath 2.6.0, not published)
 produces; the parity tests check this. Its workbench, for solving by hand,
 looks up keys and types text on a keyboard the visitor names, never
 guessing one, and prints exactly what KeyPath's own `lookup` and `type`
 tools print.
 KeyPath is a puzzle, not encryption.
 
-The data under `data/` is derived from the tables of keypath 2.5.0 (its tag
-`v2.5`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
+The data under `data/` is derived from the tables of keypath 2.6.0 (its tag
+`v2.6`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
 [DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
 [`LICENSES/`](LICENSES).
 
@@ -34,7 +34,7 @@ The data under `data/` is derived from the tables of keypath 2.5.0 (its tag
 | `tools/serve.mjs` | a static server that mounts the repo at `/keypath/`, like GitHub Pages |
 | `tools/cdp.mjs` | end-to-end checks in headless Chromium, and screenshots |
 | `tools/check_links.mjs` | checks the page's external links (network) |
-| `puzzles/` | the six challenges: ciphertext and, as spoilers, key, plaintext and solve path |
+| `puzzles/` | the twelve challenges: ciphertext and, as spoilers, key, plaintext and solve path (and the hints of 7 to 12) |
 | `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256; a byte-for-byte copy, so the scripts it names are KeyPath's unpublished ones) |
 | `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
 | `tests/` | `node --test` suites; `tests/fixtures/` is generated (`sources.json` says which sources every generated file derives from; the NOTICE files follow from it) |
@@ -42,21 +42,22 @@ The data under `data/` is derived from the tables of keypath 2.5.0 (its tag
 ## Rebuilding the data
 
 The build reads a checkout of KeyPath's Python implementation at tag
-`v2.5` (its repository is not published), given by `KEYPATH_PROJECT`
+`v2.6` (its repository is not published), given by `KEYPATH_PROJECT`
 (default: `../cipher-project`, next to this repository), as files and uses
 its `keypath` package, installed into a local virtual environment:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.5
+uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.6
 uv pip install --python .venv/bin/python -r tools/requirements.txt
 .venv/bin/python tools/build_data.py            # data/ and tests/fixtures/
 .venv/bin/python tools/copy_docs.py            # puzzles/ and docs/
 .venv/bin/python tools/build_fonts.py           # fonts/ (downloads to tools/.cache/)
 ```
 
-`tools/copy_docs.py` reads git tags of that checkout: the puzzles from
-`v2.0`, where they were set, and the analysis and `VERSIONS.md` from `v2.5`.
+`tools/copy_docs.py` reads git tags of that checkout: puzzles 1 to 6 from
+`v2.0` and puzzles 7 to 12 from `v2.6`, where each set was made, and the
+analysis and `VERSIONS.md` from `v2.6`.
 The scripts are deterministic; `--check` rebuilds into a temporary
 directory and fails if anything differs from the committed files.
 
@@ -123,7 +124,10 @@ ways to split it, and the workbench answers nothing without a keyboard.
 The page suites check the copy (no leftover development text, honest
 wording, only relative or credited links), that every figure hard-coded in
 `index.html` matches the build's output, that nothing shown before a reveal
-spoils a challenge, the payload budget, and colour contrast in both themes.
+spoils a challenge (no card and no hint of challenges 7 to 12 breaks their
+setter's spoiler rule, and no hint is in the page or the card data: the
+page fetches each one, from a file of its own, when the visitor asks for
+it), the payload budget, and colour contrast in both themes.
 `tests/keyboard.test.js` holds the keyboard pictures to KeyPath's own
 legends (`tests/fixtures/legends.json`, from its tables): the US rows with
 `=` and `\`, one US shift map, and on every keyboard drawn as keys exactly
@@ -135,7 +139,12 @@ the dialytika ¨ and Shift+`W` for both, ΅, and `q` types no letter).
 (Playwright's cache, or `KEYPATH_CHROME`) and is skipped otherwise: it
 serves the site under `/keypath/`, types messages on every keyboard and
 compares the rendered ciphertext and key with the fixtures, clicks the
-examples, reveals every challenge, walks tampered keys, checks keyboard
+examples, renders all twelve challenges and checks a right and a wrong
+answer on each, keeps every hint of challenges 7 to 12 off the page and
+off the network until the click that asks for it, reveals every challenge
+and walks it back (each card's solve-path link names a file this
+repository has), checks that walking back a key of challenges 1 to 6
+fetches nothing of 7 to 12, walks tampered keys, checks keyboard
 navigation, IME composition, share links, reduced motion, offline reload,
 horizontal overflow from 360 px up (long literals, long words and error
 paths included), the Cangjie radicals on the keyboard picture and the walk,

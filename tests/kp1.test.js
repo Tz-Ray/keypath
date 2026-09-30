@@ -21,9 +21,10 @@ const keyTexts = {
 };
 const throwsKey = (fn, what) => assert.throws(fn, e => e instanceof KeyError, what);
 
-test("the goldens: kp1.jsonl's 8 lines in order, unpacked to their keys and packed back", () => {
-  assert.deepEqual(F.accepted.map(g => g.source), [1, 2, 3, 4, 5, 6].map(n => `puzzles/challenge-0${n}/key.json`)
-    .concat(["tests/golden/ko_mixed_message.json", "tests/golden/ru_mixed_message.json"]));
+test("the goldens: kp1.jsonl's 14 lines in order, unpacked to their keys and packed back", () => {
+  const puzzle = n => `puzzles/challenge-${String(n).padStart(2, "0")}/key.json`;
+  assert.deepEqual(F.accepted.map(g => g.source), [1, 2, 3, 4, 5, 6].map(puzzle)
+    .concat(["tests/golden/ko_mixed_message.json", "tests/golden/ru_mixed_message.json"], [7, 8, 9, 10, 11, 12].map(puzzle)));
   assert.equal(F.accepted[0].kp1, "kp1.AQAujFMFrFIAAQAAAAEAAgcABwAIwvM");
   for (const g of F.accepted) {
     const key = kp1.unpack(g.kp1, R);

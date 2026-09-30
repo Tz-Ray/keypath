@@ -12,13 +12,16 @@ page has no system font.  The subsets cover the curated content only:
                    page reads from the kana table), and every Han character in
                    index.html, assets/js/ui/text.js, data/hero.json (with
                    its candidate lists), data/layouts.json (the keyboard
-                   pictures' legends) and the Python traces of the site's
-                   examples (tests/fixtures/traces.jsonl.gz, class "site")
+                   pictures' legends), the challenge cards (the titles,
+                   blurbs and keyboard lines of data/challenges/index.json)
+                   and the Python traces of the site's examples
+                   (tests/fixtures/traces.jsonl.gz, class "site")
   glyphs-kr.woff2  compatibility jamo U+3131-318E and the Hangul syllables
                    in those same sources
 
 Characters found only in challenge plaintexts are never included (they
-would give answers away through the font's character map).
+would give answers away through the font's character map), nor are the
+hints of challenges 7-12, which the page shows only when asked.
 
     .venv/bin/python tools/build_fonts.py          # (re)write fonts/
     .venv/bin/python tools/build_fonts.py --check  # rebuild in a temp dir, byte-compare
@@ -94,6 +97,8 @@ def curated_text() -> str:
         path = SITE / rel
         if path.is_file():
             parts.append(path.read_text(encoding="utf-8"))
+    for card in json.loads((SITE / "data" / "challenges" / "index.json").read_text(encoding="utf-8")):
+        parts += [card["title"], card["blurb"], card["keyboards"] or ""]
     traces = SITE / "tests" / "fixtures" / "traces.jsonl.gz"
     vectors = SITE / "tests" / "fixtures" / "vectors.jsonl.gz"
     site_ids = {json.loads(line)["id"] for line in gzip.open(vectors, "rt", encoding="utf-8")

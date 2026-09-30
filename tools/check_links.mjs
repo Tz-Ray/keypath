@@ -8,7 +8,8 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const html = readFileSync(`${ROOT}index.html`, "utf8");
 const urls = new Set([...html.matchAll(/href="(https:[^"]+)"/g)].map(m => m[1].replace(/&amp;/g, "&")));
 // the challenge write-ups linked after a reveal (assets/js/ui/challenges.js)
-for (let n = 1; n <= 6; n++) urls.add(`https://github.com/Tz-Ray/keypath/blob/main/puzzles/challenge-0${n}/solve-path.md`);
+for (const { n } of JSON.parse(readFileSync(`${ROOT}data/challenges/index.json`, "utf8")))
+  urls.add(`https://github.com/Tz-Ray/keypath/blob/main/puzzles/challenge-${String(n).padStart(2, "0")}/solve-path.md`);
 
 let failed = 0;
 for (const url of [...urls].sort()) {

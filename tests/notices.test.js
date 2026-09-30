@@ -177,3 +177,28 @@ test("Greek: the en→el rows are credited to FreeDict ell-eng and carry no NOTI
   assert.ok(layoutsRow.includes("`el_greek.tsv`") && section("Sources").includes("`el_greek.tsv`"));
   assert.deepEqual(copyleft(entryOf("data/layouts.json")), ["chewing"], "the Greek key table adds no copyleft source");
 });
+
+// docs/10 §9.2, §10 M18: challenges 7-12.  Challenge 11's key reads the
+// SKK lists (a kana word) and FreeDict ell-eng (its Greek), 7 and 10-12 the
+// Unihan codes and readings; 8 reads only KeyPath's Vietnamese tables.  So
+// data/challenges/NOTICE gains SKK-JISYO.L, and the DATA-LICENSES row of the
+// challenge files names SKK-JISYO.L, JMdict, Unihan (with the V3 notice)
+// and FreeDict ell-eng.  The hints are the setter's own words (MIT).
+test("challenges 7-12: SKK-JISYO.L in data/challenges/NOTICE, and every source they read credited", () => {
+  const src = file => Object.keys(entryOf(file).sources).sort();
+  assert.deepEqual(src("data/challenges/11.json"), ["cedict", "chewing", "ell", "jmdict", "keypath", "skk", "unihan", "wordfreq"]);
+  for (const n of ["07", "10", "12"]) assert.deepEqual(src(`data/challenges/${n}.json`), ["chewing", "keypath", "unihan"], n);
+  assert.deepEqual(src("data/challenges/09.json"), ["chewing", "keypath"]);
+  assert.deepEqual(src("data/challenges/08.json"), ["keypath"]);
+  assert.equal(entryOf("data/challenges/08.json").notice, null);
+  const hints = files.filter(f => f.startsWith("data/challenges/hints/"));
+  assert.equal(hints.length, 18);
+  for (const f of hints) assert.deepEqual([src(f), entryOf(f).notice], [["keypath"], null], f);
+  const notice = readFileSync(join(ROOT, "data/challenges/NOTICE"), "utf8");
+  assert.match(notice, /^- SKK-JISYO\.L \(GPL-2\.0-or-later, \.\.\/\.\.\/LICENSES\/GPL-2\.0\.txt\), changed by the KeyPath project on [^\n]*2026-09-30$/m);
+  assert.ok(!notice.split("\n")[0].includes("08.json"), "08.json derives from no copyleft source");
+  const row = md.split("\n").find(l => l.startsWith("| `data/challenges/*.json`"));
+  for (const name of ["SKK-JISYO.L", "JMdict", "FreeDict ell-eng", "Unihan `kCangjie` and `kCantonese`", "[Unicode License V3](LICENSES/Unicode-3.0.txt)"])
+    assert.ok(row.includes(name), `DATA-LICENSES data/challenges row: ${name}`);
+  assert.ok(md.split("\n").some(l => l.startsWith("| `data/challenges/hints/*.json`") && l.endsWith("| MIT |")));
+});
