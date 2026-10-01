@@ -255,8 +255,8 @@ CHALLENGE_COPY = {
         "One keyboard"),
     9: ("Medium", "One Handover",
         "The keyboard of #1 has a twin in Taipei. One passed the message to the other, once. The line comes "
-        "from a hillside town nearby. The answer uses the standard Traditional forms of its characters, not "
-        "their variants.", "Two keyboards"),
+        "from a hillside town nearby, and each keyboard typed one of its doubled words. The answer uses the "
+        "standard Traditional forms of its characters, not their variants.", "Two keyboards"),
     10: ("Hard", "Metal and Orchids",
          "易經. The second line was typed in a hurry. Two lines, eight characters each.", "Two keyboards"),
     11: ("Expert", "Digits, Three Ways",

@@ -12,7 +12,8 @@
 
 Ciphertext: `gey3f94dr1mzx03x03x03x03g94w94u;6` · hint: *"The keyboard of #1
 has a twin in Taipei. One passed the message to the other, once."* ·
-framing: "The line comes from a hillside town near Taipei."
+framing: "The line comes from a hillside town near Taipei, and each
+keyboard typed one of its doubled words."
 
 Every step uses a tool of the public site: a keyboard picture, the
 workbench (Look up keys and Type a guess, on the keyboard you name) or
@@ -212,14 +213,16 @@ one of them. Put it after the first k units:
   "lazy" and no row for 懶懶; "lazily" is the setter's gloss.
 - k = 1 and k = 3 read as no words.
 - k = 0 and k = 4 put the handover at the edge of the run and double a
-  doubled word: 懶懶懶懶, 往往往往.
+  doubled word: 懶懶懶懶, 往往往往. One keyboard then types the whole run
+  and the other none of it, so the card's "each keyboard typed one of
+  its doubled words" excludes both.
 - A handover inside an `x03` gives the other four places, such as
   九份的貓於俺懶懶懶曬太陽, and none of them reads as words.
 
 A Dàqiān-to-ETen handover never parses. The reverse order, 懶懶 then
 往往, types the same 33 keys, but it needs three handovers (ETen,
-Dàqiān, ETen, Dàqiān) where the card allows one, and 往往, a word of
-frequency, goes before the manner word 懶懶.
+Dàqiān, ETen, Dàqiān), and the card's "once" excludes it; 往往, a word
+of frequency, also goes before the manner word 懶懶.
 
 ## Step 5 — Coherence
 
@@ -277,5 +280,6 @@ Both readings, recorded:
   where 懶懶 is 懶 (rank 3 of 25) twice. The first pair makes sense only
   on ETen and the second only on Dàqiān.
 - The neighbours settle it: `gey3` and `mz` fail on Dàqiān, `g94`,
-  `w94` and `u;6` fail on ETen, the card allows one handover, and
-  neither 往往往往 nor 懶懶懶懶 is a sentence.
+  `w94` and `u;6` fail on ETen, the card allows one handover and has
+  each keyboard type one doubled word, and neither 往往往往 nor 懶懶懶懶
+  is a sentence.
