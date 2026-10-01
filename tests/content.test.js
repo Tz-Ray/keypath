@@ -164,12 +164,45 @@ test("the page names itself honestly", () => {
   assert.match(html, /puzzle cipher/i);
 });
 
-// The cipher project's repository is private: nothing public may link to it.
+// The cipher project's repository is private: nothing public may link to it,
+// in any form (a web URL, an SSH or raw-file address, any capitalization).
+const PRIVATE_REPO = /Tz-Ray\/cipher-project/i;
+const filesUnder = dir => readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap(e =>
+  e.isDirectory() ? filesUnder(`${dir}/${e.name}`) : [`${dir}/${e.name}`]);
+
+test("the private-repository check catches every form of the link", () => {
+  for (const leak of ["https://github.com/Tz-Ray/cipher-project", "github.com/tz-ray/Cipher-Project/blob/main/README.md",
+    "git@github.com:Tz-Ray/cipher-project.git", "https://raw.githubusercontent.com/Tz-Ray/cipher-project/v3.0/docs/09-analysis.md"])
+    assert.match(leak, PRIVATE_REPO, leak);
+  assert.doesNotMatch("https://github.com/Tz-Ray/keypath/blob/main/docs/catalog-entry.md", PRIVATE_REPO);
+});
+
 test("nothing links to the private cipher-project repository", () => {
-  const files = ["index.html", "README.md", "DATA-LICENSES.md", "puzzles/README.md", "docs/analysis.md",
-    ...readdirSync(join(ROOT, "assets/js/ui")).map(f => `assets/js/ui/${f}`),
-    ...CARDS.map(c => `puzzles/challenge-${pad(c.n)}/solve-path.md`)];
-  for (const f of files) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), /github\.com\/Tz-Ray\/cipher-project/i, f);
+  // the page, its scripts and notices, and every document tools/copy_docs.py copies
+  const copied = [...filesUnder("docs"), ...filesUnder("puzzles")];
+  for (const f of ["docs/analysis.md", "docs/catalog-entry.md", "docs/VERSIONS.md", "puzzles/README.md",
+    ...CARDS.map(c => `puzzles/challenge-${pad(c.n)}/solve-path.md`)]) assert.ok(copied.includes(f), `copied: ${f}`);
+  const files = ["index.html", "README.md", "DATA-LICENSES.md", "sw.js", ...filesUnder("assets/js"), ...copied];
+  for (const f of files) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), PRIVATE_REPO, f);
+});
+
+// docs/catalog-entry.md: KeyPath's catalog entry, copied with a preface for
+// strangers; its links lead only to public places (this site and its files).
+test("the copied catalog entry links only to public places", () => {
+  const md = readFileSync(join(ROOT, "docs/catalog-entry.md"), "utf8");
+  const tag = readFileSync(join(ROOT, "tools/build_data.py"), "utf8").match(/^TAG = "(v\d+\.\d+)"$/m)[1];
+  assert.match(md, /^# KeyPath cipher — catalog entry\n\n> From KeyPath \d+\.\d+ \(tag `v\d+\.\d+`\)\. /, "title, then the preface");
+  assert.ok(md.includes(`(tag \`${tag}\`)`), `the preface names the tag the data is built from (${tag})`);
+  assert.doesNotMatch(md, PRIVATE_REPO);
+  // the reference implementation is private, and the entry says so
+  assert.match(md, /reference implementation[^.]*private|implementation\s+is not published/i);
+  assert.ok(md.includes("https://tz-ray.github.io/keypath/"), "names the public site");
+  const links = [...md.matchAll(/\]\(([^)\s]+)\)|<(https?:[^>\s]+)>|(?<![(<])\b(https?:\/\/[^\s)>]+)/g)].map(m => m[1] || m[2] || m[3]);
+  assert.ok(links.length >= 4, `links: ${links}`);
+  for (const link of links) {
+    if (/^https?:/.test(link)) assert.match(link, /^https:\/\/(tz-ray\.github\.io\/keypath\/|github\.com\/Tz-Ray\/keypath(\/|$))/, link);
+    else assert.ok(existsSync(join(ROOT, "docs", link.split("#")[0])), `relative link ${link} names a file here`);
+  }
 });
 
 test("the solve-path links after a reveal name files in this repository", () => {
@@ -210,8 +243,9 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
     assert.ok(readme.includes(c.blurb) && readme.includes(c.title), `puzzles/README.md: #${c.n}`);
     const md = readFileSync(join(ROOT, `puzzles/challenge-${pad(c.n)}/solve-path.md`), "utf8");
     assert.match(md, /^# Challenge #\d+[^\n]*\n\n> \*\*Spoilers\.\*\*/, `#${c.n}: title, then the preface`);
-    // the release each was set in (1-6 in 2.0, 7-12 in 2.6)
-    assert.ok(md.includes(c.n <= 6 ? "(from KeyPath 2.0, tag `v2.0`)" : "(from KeyPath 2.6, tag `v2.6`)"), `#${c.n}: its release`);
+    // the release each was set in (1-6 in 2.0, copied from v2.0; 7-12 in 2.6, copied from v3.0)
+    assert.ok(md.includes(c.n <= 6 ? "(from KeyPath 2.0, tag `v2.0`)" : "(from KeyPath 3.0, tag `v3.0`, as set for KeyPath 2.6)"),
+      `#${c.n}: its release`);
     // the setter's notes cite unpublished documents; #4's once gave away #5
     assert.doesNotMatch(md, /^## (Leakage|How it was minted|Fairness checklist|Playtest)/m, `#${c.n}`);
     assert.doesNotMatch(md, /Note for later|the README/i, `#${c.n}`);

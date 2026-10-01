@@ -1,4 +1,4 @@
-// Hop-free encoders, ported from keypath 2.6.0:
+// Hop-free encoders, ported from keypath 3.0.0:
 //   zh on Dàqiān / ETen / Pinyin - zh.greedy_segment + make_surface.encode_native + word_units
 //   zh on Cangjie / Quick / Jyutping - the same segmentation + zh_coded.make_surface's encode_word
 //   zh on Dubeolsik (hanja) - zh_ko_hanja.encode_native / encode_word

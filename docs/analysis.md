@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 2.6 (tag `v2.6`). The scripts, tests and design documents
+> From KeyPath 3.0 (tag `v3.0`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -16,6 +16,11 @@ questions of docs/07 §10 (M12):
 - how often the chosen candidate is the first one (rank 0) on the test
   corpora;
 - how many bits a key carries per message.
+
+`docs/10-v3-spec.md` §10 (M19) adds where that ambiguity lives: how
+each Chinese keyboard divides it between the key and the unit
+boundaries, how compact a key's `kp1` string is beside its JSON, and
+which keys give a keyboard away.
 
 **Every number here is generated.** Each table and figure sits between
 `<!-- BEGIN GENERATED: … -->` and `<!-- END GENERATED -->` markers and
@@ -484,7 +489,114 @@ Reading the table:
   all of its difficulty is recognising the keyboard and splitting the
   stream.
 
-## 5. Hand solving versus brute force
+## 5. Where the ambiguity lives
+
+A Chinese message hides its meaning in two places. The key's indices
+pick a character from each unit's candidate set, and the unit
+boundaries, which the key also records, are what a solver must recover
+from the ciphertext alone. Here the key bits count the indices alone:
+residual text is not ambiguity a keyboard adds. The same corpus typed on
+each Chinese keyboard shows how the layouts divide the two. Pinyin and
+Jyutping end every unit in a tone digit, and on these texts hanja on
+Dubeolsik splits only one way too, so all of their ambiguity is in the
+key. Dàqiān, ETen and Quick put most of it in the key and some in the
+boundaries. Cangjie turns the balance over: its codes almost never need
+an index, and most of its ambiguity is in where one code ends.
+
+<!-- BEGIN GENERATED: ambiguity-zh -->
+Source: the zh round-trip corpus (`test_walk_roundtrip_zh: corpus() + OOV_CASES`, 86 messages, 177 characters), encoded with default settings on each keyboard. Key bits: Σ log2(n) over the key's homophone indices, the homophone keyspace `keypath analyze` reports, in bits (residual text left out). Unit-boundary bits: Σ over segments of log2(the number of unit parses of its ciphertext). Both per plaintext character; boundary share = boundary bits / (key bits + boundary bits).
+
+| keyboard | layout | keyed choices | key bits / char | unit-boundary bits / char | boundary share |
+|---|---|---|---|---|---|
+| Dàqiān | (zh, zh_daqian) | 154 | 4.10 | 0.83 | 16.8% |
+| ETen | (zh, zh_eten) | 154 | 4.10 | 0.83 | 16.8% |
+| Pinyin | (zh, zh_pinyin) | 154 | 4.10 | 0.00 | 0.0% |
+| hanja | (zh, ko_dubeolsik) | 154 | 5.69 | 0.00 | 0.0% |
+| Jyutping | (zh, zh_jyutping) | 154 | 3.27 | 0.00 | 0.0% |
+| Quick | (zh, zh_quick) | 154 | 4.33 | 0.96 | 18.2% |
+| Cangjie | (zh, zh_cangjie) | 154 | 0.12 | 1.83 | 93.8% |
+<!-- END GENERATED: ambiguity-zh -->
+
+One phrase, 歡迎家 ("welcome home"), shows the same at a glance. The
+reading keyboards spend similar index bits, because the readings'
+candidate sets are alike, and hanja spends more. Dàqiān and ETen are
+twins: the same indices, and keystrokes that cut the same number of
+ways. Quick needs large indices and still leaves some doubt about the
+boundaries; Cangjie needs almost no index and leaves the most.
+
+<!-- BEGIN GENERATED: welcome-home -->
+Source: 歡迎家 encoded with default settings on each keyboard. Key bits: Σ log2(n) over its three homophone indices; parses: the number of ways the ciphertext splits into well-formed units; unit-boundary bits: log2(parses).
+
+| keyboard | layout | ciphertext | key bits | unit parses | unit-boundary bits |
+|---|---|---|---|---|---|
+| Dàqiān | (zh, zh_daqian) | `cj0u/6ru8` | 14.78 | 16 | 4.00 |
+| ETen | (zh, zh_eten) | `hx8e-2gea` | 14.78 | 16 | 4.00 |
+| Pinyin | (zh, zh_pinyin) | `huan1ying2jia1` | 14.78 | 1 | 0.00 |
+| hanja | (zh, ko_dubeolsik) | `ghksdudrk` | 21.06 | 1 | 0.00 |
+| Jyutping | (zh, zh_jyutping) | `fun1jing4gaa1` | 14.65 | 1 | 0.00 |
+| Quick | (zh, zh_quick) | `toyljo` | 15.99 | 13 | 3.70 |
+| Cangjie | (zh, zh_cangjie) | `tgnoyhvljmso` | 1.58 | 180 | 7.49 |
+<!-- END GENERATED: welcome-home -->
+
+## 6. Keys in transit: `kp1` against JSON
+
+A key's JSON is meant to be read, and its `kp1` string is meant to be
+pasted. The table compares the two for every shipped key. The compact
+form is a small fraction of the JSON, and the fraction is largest where
+a key carries long hint or literal text, which `kp1` stores as it is.
+
+<!-- BEGIN GENERATED: kp1-size -->
+Source: every line of `tests/golden/kp1.jsonl` (every shipped key), its key read from `source` at `path`. kp1: the characters of `keycodec.pack(key)` (ASCII, so also its bytes). Key JSON: the UTF-8 bytes of `keyspec.dumps_key(key)`, the canonical form `keypath encode` writes and each challenge's `key.json` holds.
+
+| key | kp1 chars | key-JSON bytes | kp1 / JSON |
+|---|---|---|---|
+| `puzzles/challenge-01/key.json` | 35 | 588 | 6.0% |
+| `puzzles/challenge-02/key.json` | 128 | 2,278 | 5.6% |
+| `puzzles/challenge-03/key.json` | 144 | 1,823 | 7.9% |
+| `puzzles/challenge-04/key.json` | 267 | 2,436 | 11.0% |
+| `puzzles/challenge-05/key.json` | 254 | 4,121 | 6.2% |
+| `puzzles/challenge-06/key.json` | 202 | 3,842 | 5.3% |
+| `tests/golden/ko_mixed_message.json` key | 106 | 2,694 | 3.9% |
+| `tests/golden/ru_mixed_message.json` key | 136 | 3,295 | 4.1% |
+| `puzzles/challenge-07/key.json` | 88 | 1,285 | 6.8% |
+| `puzzles/challenge-08/key.json` | 162 | 1,777 | 9.1% |
+| `puzzles/challenge-09/key.json` | 190 | 1,944 | 9.8% |
+| `puzzles/challenge-10/key.json` | 168 | 2,674 | 6.3% |
+| `puzzles/challenge-11/key.json` | 268 | 4,329 | 6.2% |
+| `puzzles/challenge-12/key.json` | 178 | 970 | 18.4% |
+| all 14 keys | 2,326 | 34,056 | 6.8% |
+<!-- END GENERATED: kp1-size -->
+
+## 7. Telltales the tables prove
+
+Some keys give a keyboard away before a single unit is read. Each row
+below is a fact about what a layout can type, checked over every unit
+its tables define, so it holds for any message, not just the test
+corpora. A stretch of ciphertext with a `z` is not Cangjie or Quick, one
+with a `5` or `6` is not ETen, one with a `'` or `=` is not Dàqiān, and
+one with a `q` is not Greek. A `\` points to kana, and a `[` or `]` there
+must follow a kana that takes the mark. Tone digits close every Pinyin
+and Jyutping unit, and a Telex `w` only ever follows the vowel it
+modifies.
+
+<!-- BEGIN GENERATED: telltales -->
+Source: the tables, not corpus observations. Each fact is checked over every unit of its surface's domain, `Surface.units()` (every code, reading, syllable or letter its tables define, typed on its layout), never over a sample; the `\` row over every registered surface.
+
+| layout | what the tables prove | checked over |
+|---|---|---|
+| (zh, zh_cangjie) | types only `a`–`y`; `x` is never a unit alone | 18,687 units |
+| (zh, zh_quick) | types only `a`–`y`; `x` is never a unit alone | 18,687 units |
+| (zh, zh_eten) | never types `5` `6` (Dàqiān types them) | 26,097 units |
+| (zh, zh_daqian) | never types `'` `=` (ETen types them) | 26,097 units |
+| (ja, ja_kana) | `[` follows only the key of a base kana with a voiced form (20 kana), `]` only that of one with a semi-voiced form (5); neither starts a unit | 130,697 units |
+| (ja, ja_kana) | `\` occurs only here: no other layout types it or has it in its alphabet | 657,284 units of 16 surfaces |
+| (zh, zh_jyutping) | every unit ends in `1`–`6`, its only digit | 18,378 units |
+| (zh, zh_pinyin) | every unit ends in `1`–`5`, its only digit | 26,097 units |
+| (el, el_greek) | never types `q`; `;` `:` `W` type no letter alone and precede only vowel keys (`;` α ε η ι ο υ ω; `:` ι υ; `W` ι υ) | 36 units |
+| (vi, vi_telex) | `w` follows only `a` `o` `u` | 111,003 units |
+<!-- END GENERATED: telltales -->
+
+## 8. Hand solving versus brute force
 
 KeyPath is a puzzle cipher, not a secure one (docs/03 §6). Under
 analysis it reduces to book-cipher-class structure. The measurements

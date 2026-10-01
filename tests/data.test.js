@@ -16,8 +16,8 @@ const dataFiles = files(join(ROOT, "data")).map(p => relative(ROOT, p).split("\\
 const manifest = readJson("data/manifest.json");
 
 test("data/manifest.json lists every data file with its size and sha256", () => {
-  assert.equal(manifest.keypath, "2.6.0");
-  assert.equal(manifest.tag, "v2.6");
+  assert.equal(manifest.keypath, "3.0.0");
+  assert.equal(manifest.tag, "v3.0");
   assert.equal(manifest.edition, "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2");
   assert.deepEqual(Object.keys(manifest.files).sort(), dataFiles.filter(f => f !== "data/manifest.json"));
   for (const [path, { bytes, sha256 }] of Object.entries(manifest.files)) {

@@ -6,15 +6,15 @@ on a Chinese, Japanese, Korean, Russian, Vietnamese or Greek keyboard (or in a
 Spanish accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
-KeyPath's Python reference implementation (keypath 2.6.0, not published)
+KeyPath's Python reference implementation (keypath 3.0.0, not published)
 produces; the parity tests check this. Its workbench, for solving by hand,
 looks up keys and types text on a keyboard the visitor names, never
 guessing one, and prints exactly what KeyPath's own `lookup` and `type`
 tools print.
 KeyPath is a puzzle, not encryption.
 
-The data under `data/` is derived from the tables of keypath 2.6.0 (its tag
-`v2.6`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
+The data under `data/` is derived from the tables of keypath 3.0.0 (its tag
+`v3.0`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
 [DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
 [`LICENSES/`](LICENSES).
 
@@ -29,26 +29,26 @@ The data under `data/` is derived from the tables of keypath 2.6.0 (its tag
 | `data/` | generated tables the engine loads on demand (never edit by hand) |
 | `fonts/` | fallback glyphs, used only when the system has no CJK font |
 | `tools/build_data.py` | writes `data/` and `tests/fixtures/` from the Python implementation |
-| `tools/copy_docs.py` | copies the puzzles, the analysis and the table provenance into `puzzles/` and `docs/` |
+| `tools/copy_docs.py` | copies the puzzles, the analysis, the catalog entry and the table provenance into `puzzles/` and `docs/` |
 | `tools/build_fonts.py` | writes `fonts/` from pinned Noto Sans CJK |
 | `tools/serve.mjs` | a static server that mounts the repo at `/keypath/`, like GitHub Pages |
 | `tools/cdp.mjs` | end-to-end checks in headless Chromium, and screenshots |
 | `tools/check_links.mjs` | checks the page's external links (network) |
 | `puzzles/` | the twelve challenges: ciphertext and, as spoilers, key, plaintext and solve path (and the hints of 7 to 12) |
-| `docs/` | `analysis.md` (the figures the page quotes) and `VERSIONS.md` (every table's upstream, pinned by sha256; a byte-for-byte copy, so the scripts it names are KeyPath's unpublished ones) |
+| `docs/` | `analysis.md` (the figures the page quotes, and where each keyboard's ambiguity lives), `catalog-entry.md` (KeyPath described as a cipher-catalog entry) and `VERSIONS.md` (every table's upstream, pinned by sha256; a byte-for-byte copy, so the scripts it names are KeyPath's unpublished ones) |
 | `LICENSES/` | the GPL, LGPL and Unicode license texts the data needs |
 | `tests/` | `node --test` suites; `tests/fixtures/` is generated (`sources.json` says which sources every generated file derives from; the NOTICE files follow from it) |
 
 ## Rebuilding the data
 
 The build reads a checkout of KeyPath's Python implementation at tag
-`v2.6` (its repository is not published), given by `KEYPATH_PROJECT`
+`v3.0` (its repository is not published), given by `KEYPATH_PROJECT`
 (default: `../cipher-project`, next to this repository), as files and uses
 its `keypath` package, installed into a local virtual environment:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v2.6
+uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v3.0
 uv pip install --python .venv/bin/python -r tools/requirements.txt
 .venv/bin/python tools/build_data.py            # data/ and tests/fixtures/
 .venv/bin/python tools/copy_docs.py            # puzzles/ and docs/
@@ -56,8 +56,9 @@ uv pip install --python .venv/bin/python -r tools/requirements.txt
 ```
 
 `tools/copy_docs.py` reads git tags of that checkout: puzzles 1 to 6 from
-`v2.0` and puzzles 7 to 12 from `v2.6`, where each set was made, and the
-analysis and `VERSIONS.md` from `v2.6`.
+`v2.0`, where they were set, and puzzles 7 to 12 (set at `v2.6`, and
+checked to be unchanged since), the analysis, the catalog entry and
+`VERSIONS.md` from `v3.0`.
 The scripts are deterministic; `--check` rebuilds into a temporary
 directory and fails if anything differs from the committed files.
 
@@ -122,7 +123,9 @@ it with an unsplit stream of keys and no keyboard: none may answer with
 ways to split it, and the workbench answers nothing without a keyboard.
 
 The page suites check the copy (no leftover development text, honest
-wording, only relative or credited links), that every figure hard-coded in
+wording, only relative or credited links, and no link to KeyPath's
+unpublished repository in the page, its scripts or any copied document,
+the catalog entry included), that every figure hard-coded in
 `index.html` matches the build's output, that nothing shown before a reveal
 spoils a challenge (no card and no hint of challenges 7 to 12 breaks their
 setter's spoiler rule, and no hint is in the page or the card data: the

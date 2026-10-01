@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Copy the puzzles, the analysis and the table provenance from KeyPath.
+"""Copy the puzzles, the analysis, the catalog entry and the table provenance from KeyPath.
 
 The cipher project's repository is not public, so the page links to these
 copies in this repository instead.  Files are read from the project's git
 tags, never its working tree: puzzles 1 to 6 from `v2.0`, where they were
 set (their solve paths describe that release's keyboards), and puzzles 7
-to 12, the analysis and the table provenance from `v2.6`, where the second
-pack was set and whose tables edition the data under data/ is built from.
-Until that tag is made, they are read from the checkout's committed HEAD,
-and only if that is the release candidate (its package version is 2.6.0).
-A solve path keeps its title and its solving steps (the setter's notes
-after them, which cite unpublished documents and tools, are left out) and
-gets a short preface; the analysis gets a preface too; everything else is
-copied byte for byte.
+to 12, the analysis, the catalog entry and the table provenance from
+`v3.0`, the release whose tables edition the data under data/ is built
+from.  Puzzles 7 to 12 were set at `v2.6`; the build asserts that their
+files are unchanged since.  Until `v3.0` is made, these are read from the
+checkout's committed HEAD, and only if that is the release candidate (its
+package version is 3.0.0).  A solve path keeps its title and its solving
+steps (the setter's notes after them, which cite unpublished documents and
+tools, are left out) and gets a short preface; the analysis and the
+catalog entry get a preface too; everything else is copied byte for byte.
 
     python3 tools/copy_docs.py            # (re)write docs/ and puzzles/
     python3 tools/copy_docs.py --check    # fail if any copy differs
@@ -30,10 +31,11 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parent.parent
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 PUZZLES_TAG = "v2.0"
-DOCS_TAG = "v2.6"
-DOCS_VERSION = "2.6.0"   # the package version of that tag (and of its candidate)
+DOCS_TAG = "v3.0"
+DOCS_VERSION = "3.0.0"   # the package version of that tag (and of its candidate)
+PACK_II_TAG = "v2.6"     # where puzzles 7 to 12 were set; copied from DOCS_TAG, unchanged since
 PACK_I = range(1, 7)     # set at PUZZLES_TAG
-PACK_II = range(7, 13)   # set at DOCS_TAG, each with its three hints
+PACK_II = range(7, 13)   # set at PACK_II_TAG, each with its three hints
 PAGE = "https://tz-ray.github.io/keypath/"
 RULES = "All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals."
 
@@ -64,9 +66,10 @@ SOLVE_PREFACE = """\
 # puzzles 7-12: every step uses the page's tools, and the command line answers the same
 SOLVE_PREFACE_II = """\
 > **Spoilers.** This is the setter's write-up of how to crack the puzzle
-> (from KeyPath 2.6, tag `v2.6`); it may also give away steps of other
-> puzzles. The public site it names is the [KeyPath page]({page}): its
-> keyboard pictures, its [workbench]({page}#workbench) and its playground.
+> (from KeyPath 3.0, tag `v3.0`, as set for KeyPath 2.6); it may also
+> give away steps of other puzzles. The public site it names is the
+> [KeyPath page]({page}): its keyboard pictures, its
+> [workbench]({page}#workbench) and its playground.
 > KeyPath's Python implementation, whose `$ keypath` output it quotes in
 > full, is not published; references such as "docs/08 §4" are to its
 > unpublished design documents, and paths such as `tables/…` and `tests/…`
@@ -76,12 +79,26 @@ SOLVE_PREFACE_II = """\
 """
 
 ANALYSIS_PREFACE = """\
-> From KeyPath 2.6 (tag `v2.6`). The scripts, tests and design documents
+> From KeyPath 3.0 (tag `v3.0`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
 > [`VERSIONS.md`](VERSIONS.md). The figures on the [KeyPath page]({page})
 > come from this document.
+
+"""
+
+CATALOG_PREFACE = """\
+> From KeyPath 3.0 (tag `v3.0`). KeyPath's Python reference implementation
+> is not published: the `keypath` commands and output this entry quotes,
+> its offline decoder, and the files it names in that repository (its
+> design documents, such as "docs/10 §3", and its `tables/…` and `*.tsv`
+> tables) are not public. Its `docs/09-analysis.md` is copied here as
+> [`analysis.md`](analysis.md) and its `tables/VERSIONS.md` as
+> [`VERSIONS.md`](VERSIONS.md), which pins every table's public source;
+> the licenses of the data this site ships are in
+> [`DATA-LICENSES.md`](../DATA-LICENSES.md). The [KeyPath page]({page})
+> encodes, decodes and walks keys in your browser.
 
 """
 
@@ -150,11 +167,19 @@ def build() -> dict[str, bytes]:
         src = f"puzzles/challenge-{n:02d}"
         tag, preface, names = ((PUZZLES_TAG, SOLVE_PREFACE, ("ciphertext.txt", "key.json", "plaintext.txt")) if n in PACK_I
                                else (ref, SOLVE_PREFACE_II, ("ciphertext.txt", "key.json", "plaintext.txt", "hints.json")))
+        for name in [*names, "solve-path.md"]:
+            if n in PACK_II:
+                assert show_bytes(f"{src}/{name}", tag) == show_bytes(f"{src}/{name}", PACK_II_TAG), \
+                    f"{src}/{name} changed since {PACK_II_TAG}"
         for name in names:
             files[f"{src}/{name}"] = show_bytes(f"{src}/{name}", tag)
         files[f"{src}/solve-path.md"] = solve_path(f"{src}/solve-path.md", tag, preface)
     files["puzzles/README.md"] = puzzles_index().encode("utf-8")
     files["docs/analysis.md"] = with_preface(show("docs/09-analysis.md", ref), ANALYSIS_PREFACE)
+    catalog = show("docs/catalog-entry.md", ref)
+    # public material links only public URLs: never the unpublished repository
+    assert not re.search(r"Tz-Ray/cipher-project", catalog, re.I), "the catalog links the private repository"
+    files["docs/catalog-entry.md"] = with_preface(catalog, CATALOG_PREFACE)
     # verbatim: its sha256 is the tables edition
     files["docs/VERSIONS.md"] = show_bytes("tables/VERSIONS.md", ref)
     return files
