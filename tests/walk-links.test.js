@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { ROOT, engine, readJson, readJsonl } from "./helpers.js";
-import { parseFragment, walkBody, walkLinkOf, toB64url, fromB64url, FRAGMENT_MAX } from "../assets/js/ui/share.js";
+import { parseFragment, walkBody, walkLinkOf, toB64url, fromB64url, FRAGMENT_MAX, MESSAGE_MAX, linkKind } from "../assets/js/ui/share.js";
 import { T } from "../assets/js/ui/text.js";
 
 const F = readJson("tests/fixtures/kp1.json");
@@ -56,6 +56,25 @@ test("anything else is a malformed fragment, and ignored", () => {
   // a JSON "__proto__" member is an ordinary field here, so a third field
   const proto = Buffer.from(`{"c":"a","k":"${good}","__proto__":{"j":"{}"}}`).toString("base64url");
   assert.equal(parse(proto), null);
+});
+
+// A share link that names its kind but can't be read is told apart from a
+// fragment that is no share link at all (the page says the first looks
+// incomplete, and ignores the second).
+test("linkKind names try, puzzle and walk links, readable or not", () => {
+  for (const [hash, kind] of [["#walk=", "walk"], ["#walk=eyJjIjoi", "walk"], ["#try=!!!", "try"], ["#puzzle=x", "puzzle"],
+    ["", null], ["#", null], ["#challenges", null], ["#walk", null], ["#Walk=abc", null], ["#tryx=abc", null], [undefined, null]])
+    assert.equal(linkKind(hash), kind, String(hash));
+  assert.equal(parseFragment("#walk=eyJjIjoi", ids), null);
+});
+
+test("a #try message is capped at the message box's own limit", () => {
+  const html = readFileSync(join(ROOT, "index.html"), "utf8");
+  assert.equal(MESSAGE_MAX, 200);
+  assert.match(html, new RegExp(`<textarea id="msg"[^>]* maxlength="${MESSAGE_MAX}"`));
+  const tryOf = t => parseFragment(`#try=${toB64url({ t, l: "en", s: "zh_daqian" })}`, ids);
+  assert.equal(tryOf("a".repeat(200)).try.t.length, 200);
+  assert.equal(tryOf("a".repeat(201)), null);
 });
 
 test("the link control: kp1 in k, never truncated; too long with j for the long zh_pinyin vector", async () => {

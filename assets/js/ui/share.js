@@ -16,6 +16,8 @@ import { answerNorm, answerFold, sha256Hex, checkAnswer } from "../engine/hash.j
 /** The longest fragment body any link carries: one constant for the parser and the link controls. */
 export const FRAGMENT_MAX = 8000;
 const BODY = new RegExp(`^[A-Za-z0-9_-]{1,${FRAGMENT_MAX}}$`);
+/** The longest #try message: the message box's own limit (index.html's maxlength). */
+export const MESSAGE_MAX = 200;
 /** A #walk ciphertext: 1 to 6,000 printable ASCII characters, no space. */
 const WALK_CIPHER = /^[\x21-\x7e]{1,6000}$/;
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -43,6 +45,12 @@ const base = () => location.href.split("#")[0];
 const HEX = /^[0-9a-f]{64}$/;
 const isLang = l => typeof l === "string" && Object.prototype.hasOwnProperty.call(LANG_NAMES, l);
 
+/** The kind of share link a fragment names ("try", "puzzle", "walk"), readable or not; else null. */
+export function linkKind(hash) {
+  const m = /^#(try|puzzle|walk)=/.exec(hash || "");
+  return m ? m[1] : null;
+}
+
 /** Parse the current fragment -> {try} | {puzzle} | {walk} | null (malformed: null). */
 export function parseFragment(hash, surfaceIds) {
   const m = /^#(try|puzzle|walk)=(.+)$/.exec(hash || "");
@@ -58,7 +66,7 @@ export function parseFragment(hash, surfaceIds) {
     return null;
   }
   if (m[1] === "try") {
-    if (typeof v.t !== "string" || v.t.length > 400) return null;
+    if (typeof v.t !== "string" || v.t.length > MESSAGE_MAX) return null;
     return { try: { t: v.t, l: typeof v.l === "string" ? v.l : null, s: surfaceIds.includes(v.s) ? v.s : null } };
   }
   if (typeof v.c !== "string" || !/^[\x21-\x7e]{1,2000}$/.test(v.c) || !HEX.test(v.h) || !HEX.test(v.f)) return null;

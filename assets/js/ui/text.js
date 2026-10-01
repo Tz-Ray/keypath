@@ -68,6 +68,11 @@ export const T = {
   newerUnicode: cp => `${cp} is newer than the Unicode version KeyPath uses. Remove it to continue.`,
   loadFailed: "Couldn't load part of the dictionary. Check your connection and try again.",
   retry: "Retry",
+  // the page's own data didn't load (app.js): the banner, and the puzzles on GitHub
+  bootFailed: "Couldn't load this page's data. Check your connection and try again.",
+  bootPuzzles: ["Meanwhile, the twelve puzzles are also in the ", "puzzles folder on GitHub", "."],
+  // a #try, #puzzle or #walk link that can't be read
+  linkIncomplete: "This link looks incomplete. It may have been cut off when it was shared.",
   badJson: "That key isn't valid JSON.",
   keyInvalid: message => `This key doesn't fit this ciphertext: ${stripDot(message)}.`,
   kp1Invalid: message => `This short key can't be read: ${stripDot(message)}.`,

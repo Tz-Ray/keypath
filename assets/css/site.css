@@ -1094,6 +1094,11 @@ kbd.inline { width: auto; height: auto; padding: 0 6px; font-size: .85em; border
 .puzzle-banner .pop-close { position: absolute; right: 12px; top: 10px; margin: 0; }
 .puzzle-banner .cipher.big { margin: 4px 0 8px; }
 .puzzle-banner .answer { margin-top: 12px; max-width: 520px; }
+/* the page's data didn't load; a share link that can't be read */
+.load-error { margin-bottom: 24px; border-color: var(--literal); overflow-wrap: anywhere; }
+.load-error p + p { margin-top: 8px; }
+.load-error .btn { margin-left: 4px; }
+.link-note { margin-bottom: 24px; padding: 12px 16px; font-size: 15px; color: var(--ink-2); }
 dialog {
   width: min(460px, calc(100vw - 32px)); padding: 22px; border-radius: 16px;
   border: 1px solid var(--hairline); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop);

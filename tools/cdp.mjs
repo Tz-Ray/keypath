@@ -842,6 +842,44 @@ await attempt("share links", async () => {
   }
 });
 
+// links pasted into a tab that is already open: the same dispatch as at boot
+await attempt("links pasted into an open tab", async () => {
+  await open(1280, 800);
+  const [c, k] = await b.evaluate(`window.__keypath.engine.encode({ text: "thank you", source: "en", surface: "zh_cangjie" })
+    .then(r => [r.ciphertext, window.__keypath.engine.kp1Pack(r.key).text])`);
+  await b.evaluate(`location.hash = ${js(`#walk=${b64url({ c, k })}`)}`);
+  await b.waitFor(`${q("#tab-dec")}.getAttribute("aria-selected") === "true" && !${q("#dec-out")}.hidden`, 20000);
+  check("hashchange: a #walk link pasted into an open tab walks it back", await b.evaluate(`${q("#dec-text")}.textContent === "thank you"`),
+    await b.evaluate(`${q("#dec-text")}.textContent`));
+  const chip = S.chips[4];
+  await b.evaluate(`location.hash = ${js(`#try=${b64url({ t: chip.text, l: chip.source, s: chip.surface })}`)}`);
+  let tried = false;
+  try { await b.waitFor(`${q("#tab-enc")}.getAttribute("aria-selected") === "true" && ${cipherIs(chip.ciphertext)}`); tried = true; } catch { tried = false; }
+  check("hashchange: a #try link fills the playground, back on Hide a message", tried && await b.evaluate(`${q("#msg")}.value === ${js(chip.text)}`));
+  await b.evaluate(`location.hash = ${js(`#puzzle=${b64url({ c: "abcdef", h: "0".repeat(64), f: "1".repeat(64) })}`)}`);
+  let puzzled = false;
+  try { await b.waitFor(`${q("#puzzle-h")} && ${q(".puzzle-banner .cipher")}.textContent === "abcdef"`); puzzled = true; } catch { puzzled = false; }
+  check("hashchange: a #puzzle link shows its banner", puzzled);
+  // a link that names a share kind but can't be read says so, politely, once
+  await b.evaluate(`location.hash = "#walk=eyJjIjoi"`);
+  let noted = false;
+  try { await b.waitFor(`${q("#puzzle-slot .link-note")}`); noted = true; } catch { noted = false; }
+  check("hashchange: an unreadable link says it looks incomplete", noted
+    && await b.evaluate(`${q("#puzzle-slot")}.textContent === "This link looks incomplete. It may have been cut off when it was shared." && !${q(".puzzle-banner")}`));
+  await b.evaluate(`location.hash = "#challenges"`);
+  await sleep(200);
+  check("hashchange: a section link changes nothing", await b.evaluate(`!!${q("#puzzle-slot .link-note")}`));
+  // the same at boot, for each kind; a #try longer than the message box allows is unreadable too
+  for (const [name, hash] of [["walk", "#walk=eyJjIjoi"], ["try", "#try=!!!"], ["puzzle", `#puzzle=${b64url({ c: "abc" })}`],
+    ["try over 200 characters", `#try=${b64url({ t: "a".repeat(201), l: "en", s: "zh_daqian" })}`]]) {
+    await open(1280, 800, { hash });
+    check(`boot: an unreadable #${name} link says it looks incomplete, and the hero still shows`,
+      await b.evaluate(`!!${q("#puzzle-slot .link-note")} && ${cipherIs(hero.ciphertext)}`));
+  }
+  await open(1280, 800, { hash: `#try=${b64url({ t: "a".repeat(200), l: "en", s: "en_identity" })}` });
+  check("boot: a #try link of 200 characters, the message box's limit, is read", await b.evaluate(`${q("#msg")}.value.length === 200 && !${q("#puzzle-slot .link-note")}`));
+});
+
 await attempt("challenges", async () => {
   const from = b.events.length;
   await open(1280, 800);
@@ -1289,6 +1327,33 @@ const errors = b.events.filter(e => e.method === "Runtime.exceptionThrown"
   || (e.method === "Log.entryAdded" && e.params.entry.level === "error"));
 check("console: no exceptions and no errors", errors.length === 0,
   errors.slice(0, 3).map(e => e.params.exceptionDetails?.exception?.description || e.params.entry?.text || js(e.params.args)));
+
+// the page's own data can't load: a banner with Retry and the puzzles on GitHub, and nothing unhandled
+await attempt("load failure", async () => {
+  await b.send("Network.setBypassServiceWorker", { bypass: true });
+  await b.send("Network.setCacheDisabled", { cacheDisabled: true });
+  await b.send("Network.setBlockedURLs", { urls: ["*data/registry.json"] });
+  const mark = b.events.length;
+  await b.viewport(1280, 800);
+  await b.navigate("about:blank");
+  await b.navigate(srv.url);
+  await b.waitFor(`${q("#load-error")}`);
+  const banner = await b.evaluate(`[${q("#load-error")}.getAttribute("role"), ${q("#load-error")}.textContent, ${q("#load-error a")}.href,
+    ${q("#load-error button")}.textContent, document.documentElement.classList.contains("ready")]`);
+  check("load failure: a banner says so, with Retry and the puzzles on GitHub", banner[0] === "alert"
+    && banner[1].startsWith("Couldn't load this page's data.") && banner[2] === "https://github.com/Tz-Ray/keypath/tree/main/puzzles"
+    && banner[3] === "Retry" && !banner[4], js(banner));
+  await sleep(300);
+  const thrown = b.events.slice(mark).filter(e => e.method === "Runtime.exceptionThrown");
+  check("load failure: nothing throws unhandled", thrown.length === 0, thrown.slice(0, 2).map(e => js(e.params).slice(0, 300)));
+  await b.send("Network.setBlockedURLs", { urls: [] });
+  await b.evaluate(`${q("#load-error button")}.click()`);
+  await sleep(300);
+  await b.waitFor("document.readyState === 'complete' && document.documentElement.classList.contains('ready')");
+  check("load failure: Retry loads the page", await b.evaluate(`!${q("#load-error")} && ${cipherIs(hero.ciphertext)}`));
+  await b.send("Network.setBypassServiceWorker", { bypass: false });
+  await b.send("Network.setCacheDisabled", { cacheDisabled: false });
+});
 
 await attempt("reveal retry", async () => {
   await open(1280, 800);

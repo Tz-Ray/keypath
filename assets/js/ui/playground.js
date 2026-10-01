@@ -455,13 +455,16 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     return same;
   }
 
+  /** Back to "Hide a message" (a #try link opened in this tab). */
+  const showEncode = () => selectTab(0, false);
+
   const initialOpen = () => {
     if (el.result.getBoundingClientRect().width >= 900) el.kbdPanel.open = true;
   };
 
   syncChips();
   return {
-    load, showPrecomputed, verifyHero, initialOpen, run, openWalk,
+    load, showPrecomputed, verifyHero, initialOpen, run, openWalk, showEncode,
     onResult: fn => resultListeners.push(fn),
     get state() { return { text: el.msg.value, lang: state.lang, surface: state.surface, result: state.result }; },
     surfaceName,
