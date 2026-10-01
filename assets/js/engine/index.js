@@ -148,7 +148,8 @@ export async function createEngine({ fetchText } = {}) {
   // A key is JSON text or a kp1 string (docs/10 §2.2).  format "auto" reads
   // kp1 when the text, trimmed of ASCII whitespace, starts with "kp1." in
   // any case (the codec itself then insists on lowercase), else JSON.
-  const isCompact = keyText => /^kp1\./i.test(kp1.trimAscii(keyText));
+  // only the leading part is tested, so a pasted JSON key is never trimmed whole
+  const isCompact = keyText => /^[\t\n\f\r ]*kp1\./i.test(keyText);
   const decode = ({ ciphertext, keyText, format = "auto" }) => decodeText(ciphertext, keyText, true, format);
 
   // docs/10 §9.7: the lists of these hops are never shipped (the el→en

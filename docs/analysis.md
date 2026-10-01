@@ -521,8 +521,10 @@ One phrase, 歡迎家 ("welcome home"), shows the same at a glance. The
 reading keyboards spend similar index bits, because the readings'
 candidate sets are alike, and hanja spends more. Dàqiān and ETen are
 twins: the same indices, and keystrokes that cut the same number of
-ways. Quick needs large indices and still leaves some doubt about the
-boundaries; Cangjie needs almost no index and leaves the most.
+ways. Quick's candidate sets are large too (the indices it picks are
+small), so it spends about as many index bits as the readings and still
+leaves some doubt about the boundaries; Cangjie spends almost no index
+bits and leaves the most.
 
 <!-- BEGIN GENERATED: welcome-home -->
 Source: 歡迎家 encoded with default settings on each keyboard. Key bits: Σ log2(n) over its three homophone indices; parses: the number of ways the ciphertext splits into well-formed units; unit-boundary bits: log2(parses).
@@ -546,7 +548,7 @@ form is a small fraction of the JSON, and the fraction is largest where
 a key carries long hint or literal text, which `kp1` stores as it is.
 
 <!-- BEGIN GENERATED: kp1-size -->
-Source: every line of `tests/golden/kp1.jsonl` (every shipped key), its key read from `source` at `path`. kp1: the characters of `keycodec.pack(key)` (ASCII, so also its bytes). Key JSON: the UTF-8 bytes of `keyspec.dumps_key(key)`, the canonical form `keypath encode` writes and each challenge's `key.json` holds.
+Source: every shipped key: each line of `tests/golden/kp1.jsonl`, its key read from `source` at `path`, then the 100 frozen v1.0 keys (which kp1.jsonl does not store) summed in one row. kp1: the characters of `keycodec.pack(key)` (ASCII, so also its bytes). Key JSON: the UTF-8 bytes of `keyspec.dumps_key(key)`, the canonical form `keypath encode` writes and each challenge's `key.json` holds.
 
 | key | kp1 chars | key-JSON bytes | kp1 / JSON |
 |---|---|---|---|
@@ -564,7 +566,8 @@ Source: every line of `tests/golden/kp1.jsonl` (every shipped key), its key read
 | `puzzles/challenge-10/key.json` | 168 | 2,674 | 6.3% |
 | `puzzles/challenge-11/key.json` | 268 | 4,329 | 6.2% |
 | `puzzles/challenge-12/key.json` | 178 | 970 | 18.4% |
-| all 14 keys | 2,326 | 34,056 | 6.8% |
+| `tests/golden/keys-v1.0/corpus.json` (all 100 keys) | 6,481 | 131,767 | 4.9% |
+| all 114 keys | 8,807 | 165,823 | 5.3% |
 <!-- END GENERATED: kp1-size -->
 
 ## 7. Telltales the tables prove

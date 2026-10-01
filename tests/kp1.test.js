@@ -156,6 +156,30 @@ test("kp1 in the engine: pack, unpack, auto-detection and refusals", async () =>
   assert.equal(e.kp1Pack(upperDigest).ok, false);
 });
 
+test("trimAscii is linear on a long whitespace run, and isCompact never trims a whole key", async () => {
+  // review fix (M19): the regex form retried `[ws]+$` inside every run, so a
+  // 100k-space paste froze 'Walk one back' for seconds
+  assert.equal(kp1.trimAscii(" \t\n\f\rkp1.x \r\n"), "kp1.x");
+  assert.equal(kp1.trimAscii("\u00a0x\u00a0"), "\u00a0x\u00a0");  // ASCII only
+  assert.equal(kp1.trimAscii(" \t "), "");
+  assert.equal(kp1.trimAscii("a  b"), "a  b");
+  const long = "kp1." + " ".repeat(200000) + "x";
+  let t = performance.now();
+  assert.equal(kp1.trimAscii(long), long);
+  assert.equal(kp1.trimAscii(" ".repeat(200000) + long + " ".repeat(200000)), long);
+  assert.ok(performance.now() - t < 100, `trimAscii took ${performance.now() - t} ms`);
+  const e = await engine();
+  assert.equal(e.isCompact("\r\n kp1.x"), true);
+  assert.equal(e.isCompact("KP1.x"), true);
+  assert.equal(e.isCompact("\u00a0kp1.x"), false);
+  const json = "{" + " ".repeat(200000) + "}";
+  t = performance.now();
+  assert.equal(e.isCompact(json), false);
+  const r = await e.decode({ ciphertext: "su3cl3", keyText: json });
+  assert.equal(r.ok, false);
+  assert.ok(performance.now() - t < 1000, `a long JSON key took ${performance.now() - t} ms`);
+});
+
 test("two accepted digests sharing their first 6 bytes: unpack names both", () => {
   const a = "ab".repeat(6) + "0".repeat(52), b = "ab".repeat(6) + "1".repeat(52);
   const key = { ...parseKeyJson(F.accepted[0].keyText), tables_sha256: a };

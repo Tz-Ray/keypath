@@ -34,11 +34,11 @@ would type to produce it. Each segment declares a language and a layout,
 and keystroke semantics are layout-local: on the Bopomofo Dàqiān layout
 digits `1 2 5 8 9 0` are phonetic symbols and `3 4 6 7` are tone marks;
 on the Spanish accent layout a digit selects an accent variant of the
-letter before it; on the Japanese layout a digit can be an inline
-candidate selector; on ЙЦУКЕН a comma is the letter б; on Cangjie each
-letter is a radical, a piece of a character's shape; on Vietnamese VNI
-a digit is a tone or a vowel mark; on Greek `;` is the tonos, typed
-before its vowel. Segments may route through another language via
+letter before it; on Japanese romaji a digit can be an inline
+candidate selector, and on JIS kana every digit is a kana; on ЙЦУКЕН a
+comma is the letter б; on Cangjie each letter is a radical, a piece of
+a character's shape; on Vietnamese VNI a digit is a tone or a vowel
+mark; on Greek `;` is the tonos, typed before its vowel. Segments may route through another language via
 public bilingual lexicons before hitting the keyboard. English is the
 pivot: every hop is to or from English, so Spanish reaches Russian as
 es → en → ru. The coherent reading may not be in the language the

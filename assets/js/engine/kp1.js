@@ -42,8 +42,16 @@ const utf8Decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const isInt = v => typeof v === "number" && Number.isInteger(v);
 const wellFormed = s => (typeof s.isWellFormed === "function" ? s.isWellFormed() : !/\p{Cs}/u.test(s));
 
-/** Trim ASCII whitespace only (TAB, LF, FF, CR, SPACE), as callers do before unpack. */
-export const trimAscii = s => s.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, "");
+/** Trim ASCII whitespace only (TAB, LF, FF, CR, SPACE), as callers do before unpack.
+ * Two index scans, linear in the text (a regex with an unanchored `[ws]+$`
+ * retries inside every whitespace run and is quadratic on a long one). */
+const ASCII_WS = new Set(["\t", "\n", "\f", "\r", " "]);
+export const trimAscii = s => {
+  let i = 0, j = s.length;
+  while (i < j && ASCII_WS.has(s[i])) i++;
+  while (j > i && ASCII_WS.has(s[j - 1])) j--;
+  return s.slice(i, j);
+};
 
 // ------------------------------------------------------------ base64url
 
