@@ -41,7 +41,13 @@ export function listAnd(items) {
   return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }
 
-const stripDot = s => String(s || "").replace(/[.\s]+$/, "");
+/** Drop trailing dots and whitespace (JS \s). An index scan, so a long run costs linear time. */
+export const stripDot = s => {
+  const t = String(s || "");
+  let j = t.length;
+  while (j > 0 && (t[j - 1] === "." || /\s/.test(t[j - 1]))) j--;
+  return t.slice(0, j);
+};
 
 /** 1 -> "1st", 2 -> "2nd", 11 -> "11th", 23 -> "23rd" */
 export function ordinal(n) {

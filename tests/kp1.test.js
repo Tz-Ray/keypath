@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, engine, freshEngine, readJson, readJsonl } from "./helpers.js";
 import * as kp1 from "../assets/js/engine/kp1.js";
+import { T, stripDot } from "../assets/js/ui/text.js";
 import { KeyError, parseKeyJson, validateKey, checkKey, checkDecodable } from "../assets/js/engine/keycheck.js";
 import { dumpsKey } from "../assets/js/engine/dumps.js";
 
@@ -178,6 +179,27 @@ test("trimAscii is linear on a long whitespace run, and isCompact never trims a 
   const r = await e.decode({ ciphertext: "su3cl3", keyText: json });
   assert.equal(r.ok, false);
   assert.ok(performance.now() - t < 1000, `a long JSON key took ${performance.now() - t} ms`);
+});
+
+test("the refusal text strips trailing dots in linear time on a long key value", async () => {
+  // review fix (M19, round 2): stripDot used the same unanchored `[.\s]+$`
+  // regex, so a 100k-dot `keypath` value echoed in the refusal froze
+  // 'Walk one back' for seconds
+  assert.equal(stripDot("bad key. \n"), "bad key");
+  assert.equal(stripDot("a.b"), "a.b");
+  assert.equal(stripDot("...  "), "");
+  assert.equal(stripDot("x\u00a0"), "x");  // \s covers NBSP, as the regex did
+  assert.equal(stripDot(undefined), "");
+  const e = await engine();
+  for (const fill of [".", " "]) {
+    const keyText = JSON.stringify({ keypath: fill.repeat(200000) + "x" + fill.repeat(200000), segments: [] });
+    const r = await e.decode({ ciphertext: "su3cl3", keyText });
+    assert.equal(r.ok, false);
+    const t = performance.now();
+    const text = T.keyInvalid(r.message) + T.kp1Invalid(r.message) + T.notCarried(r.message);
+    assert.ok(text.length > 0);
+    assert.ok(performance.now() - t < 100, `refusal text took ${performance.now() - t} ms`);
+  }
 });
 
 test("two accepted digests sharing their first 6 bytes: unpack names both", () => {
