@@ -244,7 +244,9 @@ CHALLENGE_COPY = {
         "The Master said it. Seoul recites it. One word came from even farther away.", "Three keyboards"),
     6: ("Expert", "Each in Its Own Way", "…несчастлива по-своему.", "Four keyboards"),
     # pack II (KeyPath 2.6): each blurb is the key's hint and the README's
-    # framing; the three hints of each come from its hints.json
+    # framing (9's also its line on the standard Traditional forms, since
+    # two variants type the same keys); the three hints of each come from
+    # its hints.json
     7: ("Easy", "Every Key a Shape",
         "日月金木水火土. Seven characters; every letter on this keyboard stands for a shape.", "One keyboard"),
     8: ("Medium", "A Question from Hanoi",
@@ -253,7 +255,8 @@ CHALLENGE_COPY = {
         "One keyboard"),
     9: ("Medium", "One Handover",
         "The keyboard of #1 has a twin in Taipei. One passed the message to the other, once. The line comes "
-        "from a hillside town nearby.", "Two keyboards"),
+        "from a hillside town nearby. The answer uses the standard Traditional forms of its characters, not "
+        "their variants.", "Two keyboards"),
     10: ("Hard", "Metal and Orchids",
          "易經. The second line was typed in a hurry. Two lines, eight characters each.", "Two keyboards"),
     11: ("Expert", "Digits, Three Ways",

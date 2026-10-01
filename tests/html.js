@@ -1,5 +1,6 @@
 // A small, dependency-free HTML walker for the page tests: enough to read
-// index.html (which the repo controls), not a general HTML parser.
+// index.html (which the repo controls), not a general HTML parser.  Also a
+// reader of the string literals of the page's own scripts (text.js).
 const VOID = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
 const RAW = new Set(["script", "style"]);
 
@@ -70,3 +71,61 @@ export const textOf = node => [...walk(node)].filter(n => n.text !== undefined &
 export const byId = (root, id) => elements(root).find(e => e.attrs.id === id) || null;
 
 export const query = (root, pred) => elements(root).filter(pred);
+
+/** The page's text nodes, one string each: no comment, script or style. */
+export const shownTexts = root => [...walk(root)].filter(n => n.text !== undefined && !n.raw).map(n => n.text);
+
+/**
+ * The string and template literals of a script (the template parts outside
+ * `${…}`, whose code is read in turn), without its comments and regular
+ * expressions: the text a script such as text.js can write into the page.
+ * Enough for the repo's own scripts, not a general JavaScript parser.
+ */
+export function jsStrings(src) {
+  const out = [];
+  let i = 0, prev = "";
+  // a `/` starts a regular expression where a value is expected, else it divides
+  const valueExpected = () => prev === "" || /[(,=:[!&|?{};+\-*%<>~^]/.test(prev)
+    || /\b(return|typeof|case|of|in)$/.test(src.slice(Math.max(0, i - 8), i).trimEnd());
+  const scan = inExpr => {
+    let depth = 0;
+    while (i < src.length) {
+      const c = src[i], d = src[i + 1];
+      if (c === "/" && d === "/") { i = src.indexOf("\n", i); if (i < 0) i = src.length; continue; }
+      if (c === "/" && d === "*") { i = src.indexOf("*/", i + 2) + 2; continue; }
+      if (c === "'" || c === '"') {
+        let j = i + 1, s = "";
+        while (src[j] !== c) { if (src[j] === "\\") { s += src[j] + src[j + 1]; j += 2; } else s += src[j++]; }
+        out.push(s); i = j + 1; prev = c; continue;
+      }
+      if (c === "`") {
+        let s = "";
+        i++;
+        while (src[i] !== "`") {
+          if (src[i] === "\\") { s += src[i] + src[i + 1]; i += 2; }
+          else if (src[i] === "$" && src[i + 1] === "{") { out.push(s); s = ""; i += 2; scan(true); i++; }
+          else s += src[i++];
+        }
+        out.push(s); i++; prev = "`"; continue;
+      }
+      if (c === "/" && valueExpected()) {
+        let j = i + 1, inClass = false;
+        while (inClass || src[j] !== "/") {
+          if (src[j] === "\\") j++;
+          else if (src[j] === "[") inClass = true;
+          else if (src[j] === "]") inClass = false;
+          j++;
+        }
+        i = j + 1;
+        while (/[a-z]/.test(src[i] || "")) i++;
+        prev = "/"; continue;
+      }
+      if (inExpr && c === "{") depth++;
+      else if (inExpr && c === "}") { if (depth === 0) return; depth--; }
+      if (!/\s/.test(c)) prev = c;
+      i++;
+    }
+  };
+  scan(false);
+  return out;
+}

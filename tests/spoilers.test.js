@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, readJson } from "./helpers.js";
+import { parseHtml, shownTexts, jsStrings } from "./html.js";
+import { GRID_LAYOUTS } from "../assets/js/ui/keyboard.js";
 
 const S = readJson("tests/fixtures/static.json");
 const hero = readJson("data/hero.json");
@@ -14,7 +16,13 @@ const index = readJson("data/challenges/index.json");
 const challenges = index.map(c => readJson(`data/challenges/${pad(c.n)}.json`));
 const html = readFileSync(join(ROOT, "index.html"), "utf8");
 const textJs = readFileSync(join(ROOT, "assets/js/ui/text.js"), "utf8");
-const layoutsText = readFileSync(join(ROOT, "data/layouts.json"), "utf8");
+// What the page shows, as opposed to its source: index.html's text nodes
+// (no comment, script or style), text.js's string literals (no comment) and
+// the legends the keyboard pictures draw (tests/fixtures/legends.json, which
+// keyboard.test.js holds to data/layouts.json), not every field of that file.
+const htmlShown = shownTexts(parseHtml(html)).join("\n");
+const textJsShown = jsStrings(textJs).join("\n");
+const legendsShown = [...GRID_LAYOUTS].flatMap(l => Object.values(readJson("tests/fixtures/legends.json").layouts[l])).join("\n");
 // what a card shows before any click: its title, blurb and keyboards line
 const cardText = c => [c.title, c.blurb, c.keyboards || ""].join("\n");
 const hintsOf = c => Array.from({ length: c.hints || 0 }, (_, i) => readJson(`data/challenges/hints/${pad(c.n)}-${i + 1}.json`));
@@ -65,13 +73,24 @@ test("no curated message shares a word or a CJK bigram with a challenge answer",
   }
 });
 
-// A character the page itself shows is not answer-only: the text of
-// index.html and text.js, the keyboard pictures' legends (data/layouts.json)
-// and the cards' own strings (fonts.test.js's set, plus the cards).  The
-// Cangjie chip's 倉 and the legends 人 心 金 are such characters.
+test("the page's shown text leaves out comments, attributes, scripts and a script's comments", () => {
+  const page = '<p title="甲">乙<!-- 丙 --><script>const x = "丁";</script><style>b::after{content:"戊"}</style>己</p>';
+  assert.equal(shownTexts(parseHtml(page)).join(""), "乙己");
+  const js = 'const a = "甲"; // "乙"\n/* 丙 */ const b = `丁${c ? "戊" : `己`}庚`; const r = /[辛"]/u; const d = e / 2 / f;';
+  assert.deepEqual(jsStrings(js), ["甲", "丁", "戊", "己", "庚"]);
+  // text.js's one comment in Han (a popover title's example) is not a string it writes
+  assert.ok(textJs.includes("廿土弓人") && !textJsShown.includes("廿土弓人"));
+});
+
+// A character the page itself shows is not answer-only: the text index.html
+// shows, text.js's strings, the legends the keyboard pictures draw and the
+// cards' own strings (above; never a comment, an attribute or a script).  The
+// Cangjie chip's 倉, the legends 人 心 ㅋ and 金 of #7's card are such
+// characters.  An answer-only character is then checked against the raw
+// files, so one in a comment or an attribute still fails.
 test("no challenge answer, or character only a challenge answer uses, is on the page or in the fallback fonts", () => {
   const curatedChars = new Set([...curated.flatMap(c => Array.from(c.text)), ...Array.from(JSON.stringify(hero)),
-    ...html, ...textJs, ...layoutsText, ...index.flatMap(c => Array.from(cardText(c)))]);
+    ...htmlShown, ...textJsShown, ...legendsShown, ...index.flatMap(c => Array.from(cardText(c)))]);
   const exclusive = new Set();
   for (const ch of challenges) {
     for (const c of ch.plaintext) if (/[\p{Script=Han}\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(c) && !curatedChars.has(c)) exclusive.add(c);
@@ -91,6 +110,7 @@ test("no challenge answer, or character only a challenge answer uses, is on the 
   }));
   for (const c of exclusive) {
     assert.ok(!html.includes(c), `answer-only character ${c} in index.html`);
+    assert.ok(!textJs.includes(c), `answer-only character ${c} in text.js`);
     assert.ok(!heroText.includes(c), `answer-only character ${c} in hero.json`);
     const cp = c.codePointAt(0);
     // Hangul jamo and syllables of the fallback font's range are generic; Han characters are not
@@ -172,12 +192,13 @@ test("the spoiler rule catches a leak and passes an innocent line", () => {
   assert.ok(leaks("the quick", plain).length === 0);
 });
 
-test("no card and no hint gives away an answer of 7-12 (docs/10 §10 M18's rule)", () => {
+test("no card, no hint and nothing the page shows gives away an answer of 7-12 (docs/10 §10 M18's rule)", () => {
   const pack = index.filter(c => c.n >= 7).map(c => [c.n, challenges[c.n - 1].plaintext]);
   assert.equal(pack.length, 6);
   const texts = [...index.map(c => [`card #${c.n}`, cardText(c)]),
-    ...index.flatMap(c => hintsOf(c).map((hint, i) => [`hint ${i + 1} of #${c.n}`, hint]))];
-  assert.equal(texts.length, 12 + 18);
+    ...index.flatMap(c => hintsOf(c).map((hint, i) => [`hint ${i + 1} of #${c.n}`, hint])),
+    ["index.html's text", htmlShown], ["text.js's strings", textJsShown]];
+  assert.equal(texts.length, 12 + 18 + 2);
   for (const [what, text] of texts)
     for (const [n, plain] of pack) assert.deepEqual(leaks(text, plain), [], `${what} and the answer of #${n}`);
 });

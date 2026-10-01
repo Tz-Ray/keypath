@@ -22,9 +22,11 @@ command-line tools the same question and shows their real output.
 ## Step 1 — Recognition
 
 The stream is 30 keys, all lowercase letters: no digit, no punctuation,
-and no `z`. Cangjie and Quick are the only keyboards of the pack that
-never type a `z` (docs/08 §4, fingerprints), and the card agrees:
-日月金木水火土 are the legends of the keys A to G on the Cangjie
+and no `z`. Cangjie and Quick are the only keyboards of the pack whose
+alphabet stops at `y` (docs/08 §4, fingerprints). The Vietnamese
+keyboards list a `z` but never type one, since no Vietnamese syllable
+holds it, so the missing `z` does not settle the keyboard; the card
+does: 日月金木水火土 are the legends of the keys A to G on the Cangjie
 keyboard, as the site's Cangjie keyboard picture shows. Quick has the
 same legends, but it types a character with one or two letters, so
 seven characters would take at most 14 keys, not 30. It is Cangjie.
@@ -47,9 +49,10 @@ zh_cangjie: Cangjie codes as in Unihan kCangjie (Unicode 18.0.0)
 
 Each key is a radical, a piece of a character's shape. Read the
 stream's keys off the picture: `h` 竹, `o` 人, `m` 一, `b` 月, `i` 戈,
-`a` 日, `n` 弓, `t` 廿, `v` 女, `r` 口, `d` 木, `g` 土 and `c` 金. A
-Chinese reader already sees 竹 over four 人 in `hoooo`, and 人戈日口 in
-`oiar`.
+`a` 日, `n` 弓, `t` 廿, `v` 女, `r` 口, `d` 木, `g` 土 and `c` 金.
+`hoooo` reads 竹人人人人 and `oiar` 人戈日口. A Cangjie radical need not
+be a part you can see: 竹 often stands for a short slanting stroke, such
+as the one at the top of 彳.
 
 ## Step 3 — The cut
 
@@ -186,8 +189,9 @@ leakage: 0.000 (0/7 chars)
 
 ## The aha
 
-The Latin letters are pictures. `hoooo` is bamboo over four people, 從,
-and the last nine keys spell the keyboard's own name, 倉頡. The message
+The Latin letters are pictures. `hoooo` spells 從 as Cangjie sees it:
+one slanting stroke (竹) and four 人 shapes. The last nine keys spell
+the keyboard's own name, 倉頡. The message
 says what the solver is doing: learning Cangjie from zero.
 
 No stretch here reads two ways, since every code has one candidate. A

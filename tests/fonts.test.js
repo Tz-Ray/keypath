@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT, readJson, readJsonl } from "./helpers.js";
+import { parseHtml, shownTexts, jsStrings } from "./html.js";
+import { GRID_LAYOUTS } from "../assets/js/ui/keyboard.js";
 
 const ranges = readJson("fonts/ranges.json");
 const size = f => readFileSync(join(ROOT, "fonts", f)).length;
@@ -64,6 +66,21 @@ test("the fonts cover every CJK character the page's own text and cards show", (
     for (const ch of [c.title, c.blurb, c.keyboards || ""].join(""))
       if (cjk.test(ch)) { n++; assert.ok(covers(all, ch.codePointAt(0)), `card #${c.n}: ${ch}`); }
   assert.ok(n >= 9, n);   // 日月金木水火土 (#7) and 易經 (#10)
+});
+
+// tools/build_fonts.py takes every CJK character of the raw index.html and
+// text.js, comments included; each must be text the page shows (or a legend
+// a keyboard picture draws), so no hidden character reaches a font.
+test("every CJK character the fonts take from index.html and text.js is shown", () => {
+  const cjk = /[ぁ-ゖㄅ-ㄯㄱ-ㆎ㐀-䶿一-鿿가-힣]/u;
+  const html = readFileSync(join(ROOT, "index.html"), "utf8");
+  const textJs = readFileSync(join(ROOT, "assets/js/ui/text.js"), "utf8");
+  const legends = readJson("tests/fixtures/legends.json").layouts;
+  const shown = new Set([...shownTexts(parseHtml(html)), ...jsStrings(textJs),
+    ...[...GRID_LAYOUTS].flatMap(l => Object.values(legends[l]))].join(""));
+  for (const [f, text] of [["index.html", html], ["assets/js/ui/text.js", textJs]])
+    for (const ch of new Set(text))
+      if (cjk.test(ch)) assert.ok(shown.has(ch), `${f}: ${ch} is in the source but not shown`);
 });
 
 // The hints of 7-12 show only when asked, and some hold an answer's

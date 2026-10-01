@@ -86,7 +86,8 @@ ETen has no `5` and no `6`, so the final `6` is Dàqiān's (the tone ˊ).
 
 On the workbench (keyboard: Bopomofo (Taiwan), which is Dàqiān), the
 last three units read ㄕㄞˋ ㄊㄞˋ ㄧㄤˊ, and 曬 太 陽 are among their
-first candidates. CC-CEDICT glosses 曬太陽 as "to be in the sun
+first candidates. The card asks for the standard Traditional forms, so
+the first is 曬 (rank 1), not its variant 晒 (rank 2). CC-CEDICT glosses 曬太陽 as "to be in the sun
 (getting warm or sunbathing etc)". The start does not read: `gey3`,
 `mz`, `f94` and `dr1` are no syllables there.
 
@@ -130,8 +131,9 @@ On the workbench with the keyboard Bopomofo ETen, the first four units
 read ㄐㄧㄡˇ ㄈㄣˋ ㄉㄜ˙ ㄇㄠ: 九份的貓. The hillside town is Jiufen, which
 CC-CEDICT glosses as "Jiufen (or Jioufen or Chiufen), mountainside town
 in north Taiwan, …", so the second character is 份 (rank 1), not the
-rank-0 分. ETen cannot read the tail: `g94` is ㄐㄣˋ and `w94` is ㄝㄣˋ,
-no syllables, and `u;6` holds a `6`, which ETen never types.
+rank-0 分, and ㄇㄠ is 貓 (rank 0), not its variant 猫 (rank 2). ETen
+cannot read the tail: `g94` is ㄐㄣˋ and `w94` is ㄝㄣˋ, no syllables,
+and `u;6` holds a `6`, which ETen never types.
 
 ```
 $ keypath lookup --layout zh_eten --top 4 gey3 f94 dr1 mz g94 w94 'u;6'

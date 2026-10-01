@@ -22,8 +22,9 @@ command-line tools the same question and shows their real output.
 ## Step 1 — Recognition
 
 The stream is 36 keys, all lowercase letters: no digit, no punctuation,
-and no `z`. As in #7, that points at the shape keyboards, Cangjie and
-Quick, the only ones that never type a `z`. The card promises sixteen
+and no `z`. As in #7, that fits the shape keyboards, Cangjie and Quick,
+whose alphabets stop at `y` (the Vietnamese keyboards never type a `z`
+either, but the card's 易經 points at Chinese). The card promises sixteen
 characters in two lines. Quick types a character with one or two keys,
 so sixteen characters on Quick alone would take at most 32 keys, not
 36: at least the first line is Cangjie, the keyboard of #7. The card
