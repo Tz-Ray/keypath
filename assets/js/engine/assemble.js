@@ -1,5 +1,5 @@
-// Ports of keypath/surfaces/base.py: regex_tokens, tokens_to_items and
-// assemble_words (the docs/07 §3 joiner rule).
+// Ported from KeyPath's reference implementation (unpublished): its
+// tokenizer, token items and word assembly (the docs/07 §3 joiner rule).
 
 /** Words are the regex's matches (a global, `u`-flag RegExp); the text between them is sep runs. */
 export function regexTokens(text, wordRe) {

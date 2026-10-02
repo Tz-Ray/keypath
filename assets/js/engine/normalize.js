@@ -1,5 +1,6 @@
-// Port of keypath/normalize.py (docs/10 §3.2, §9.7 "Text rules"): NFC
-// (never NFKC), then lowercase for en, es, ru, vi and el, then NFC again for
+// Ported from the normalization of KeyPath's reference implementation
+// (unpublished; docs/10 §3.2, §9.7 "Text rules"): NFC (never NFKC), then
+// lowercase for en, es, ru, vi and el, then NFC again for
 // el, then runs of two or more U+0020 collapse to one.  Tabs and newlines
 // are kept.  Lowercasing is toLowerCase(), never per code point: on a text
 // with no capital sigma, on the whole string; otherwise on each run between

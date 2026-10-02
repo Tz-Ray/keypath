@@ -1,6 +1,7 @@
-// Ports of keypath/layouts/*.py (KeyPath 3.0.0), both directions, built
-// from data/layouts.json.  The keys -> text readers are adapted from
-// cipher-project scripts/build_demo.py (v2.0), MIT.  The Vietnamese
+// The keyboard layouts, ported from KeyPath's reference implementation
+// (3.0.0, unpublished; MIT), both directions, built from
+// data/layouts.json; the keys -> text readers come from its offline
+// decoder (v2.0).  The Vietnamese
 // layouts (Telex, VNI) are written from KeyPath's specification (docs/10
 // §6): the syllable grammar, the canonical keystrokes and the decode pass;
 // ETen, Jyutping and JIS kana from its §4.3-§5; Greek from its §7.1.

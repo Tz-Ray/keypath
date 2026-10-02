@@ -96,7 +96,7 @@ export function createWorkbench({ registry, layouts, native, siteId, firstNewer 
     }));
   }
 
-  /** keypath.lookup's rendering of one (chunk, surface) entry. */
+  /** The reference's `lookup` rendering of one (chunk, surface) entry. */
   function entryLines(chunk, language, layout, top) {
     const head = `${chunk} · (${language}, ${layout}) · well-formed: `;
     let p;

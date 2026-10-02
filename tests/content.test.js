@@ -186,6 +186,31 @@ test("nothing links to the private cipher-project repository", () => {
   for (const f of files) assert.doesNotMatch(readFileSync(join(ROOT, f), "utf8"), PRIVATE_REPO, f);
 });
 
+// The page's own files may say they are ported from KeyPath's reference
+// implementation, but never name its unpublished repository's internals:
+// its scripts, its package's modules or their private functions.
+const PRIVATE_MODULES = "walk|keyspec|registry|lookup|layouts|surfaces|normalize|edges|tables|keycodec|trace|analyze|cli|editions|mockmt";
+const PRIVATE_NAMES = new RegExp(`cipher-project|build_demo|\\bscripts/[a-z_]+\\.py|\\bkeypath[./](${PRIVATE_MODULES})\\b|\\b(${PRIVATE_MODULES})\\._[a-z]|_emit_`, "i");
+
+test("the private-module check catches the names it is for, and passes the page's own", () => {
+  for (const leak of ["a port of keypath.walk.decode", "keypath/layouts/*.py", "walk._emit_literal_text", "keypath.keyspec._check",
+    "cipher-project scripts/build_demo.py", "keypath.registry.split_route", "scripts/analysis.py"])
+    assert.match(leak, PRIVATE_NAMES, leak);
+  for (const fine of ["e._internal.data", "https://github.com/Tz-Ray/keypath/tree/main/puzzles", "KeyPath's reference implementation",
+    "tools/build_data.py", "keypath 3.0.0"])
+    assert.doesNotMatch(fine, PRIVATE_NAMES, fine);
+});
+
+test("the page's scripts, styles and service worker name no private module", () => {
+  const files = ["index.html", "sw.js", "assets/css/site.css", ...filesUnder("assets/js")];
+  assert.ok(files.length > 30);
+  for (const f of files) {
+    const text = readFileSync(join(ROOT, f), "utf8");
+    const m = text.match(PRIVATE_NAMES);
+    assert.equal(m, null, `${f}: ${m && m[0]}`);
+  }
+});
+
 // docs/catalog-entry.md: KeyPath's catalog entry, copied with a preface for
 // strangers; its links lead only to public places (this site and its files).
 test("the copied catalog entry links only to public places", () => {

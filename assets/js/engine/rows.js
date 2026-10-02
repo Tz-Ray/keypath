@@ -1,5 +1,6 @@
-// English -> X over a bounded vocabulary (port of walk._encode_chain +
-// tokens_to_items + assemble_words for the source language en).
+// English -> X over a bounded vocabulary, ported from KeyPath's reference
+// implementation (unpublished): its English chain encoder, tokenizer and
+// word assembly, for the source language en.
 //
 // data/en/vocab/{a..z}.json lists the 10,000-word vocabulary.  For each
 // translated surface, data/en/{surface}/{a..z}.json maps every vocabulary

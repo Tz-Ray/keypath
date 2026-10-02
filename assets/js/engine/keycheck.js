@@ -1,9 +1,9 @@
 // Key parsing and validation.
 //
-// checkSchema / checkKey are adapted from cipher-project
-// scripts/build_demo.py (v2.0), MIT: a port of keypath.keyspec._check over
-// the structural KEY_SCHEMA plus the registry rules of validate_key and
-// decode's route and edition-table checks.  They are split as docs/10 §2.2
+// checkSchema / checkKey are ported from KeyPath's reference implementation
+// (unpublished; MIT), through its offline decoder (v2.0): its schema check
+// over the structural KEY_SCHEMA plus the registry rules of validate_key
+// and decode's route and edition-table checks.  They are split as docs/10 §2.2
 // requires: validateKey is validate_key (what kp1 unpack ends in), and
 // checkKey runs decode's own checks (checkDecodable) after it.
 //
@@ -124,7 +124,7 @@ export function parseKeyJson(text) {
   return out;
 }
 
-// keypath.keyspec._check, with Python's == for const/enum (true == 1,
+// The reference's schema check, with Python's == for const/enum (true == 1,
 // 1.0 == 1) and no bool or float integers.
 const IS_TYPE = {
   object: v => v !== null && typeof v === "object" && !Array.isArray(v) && !(v instanceof PyFloat),
@@ -162,7 +162,7 @@ export function checkSchema(value, schema, path) {
 
 export const HOP_PREFIX = "translate:";
 
-/** [leading translate:* steps, the surface tail] (keypath.registry.split_route). */
+/** [leading translate:* steps, the surface tail], as the reference splits a route. */
 export function splitRoute(route) {
   let i = 0;
   while (i < route.length && typeof route[i] === "string" && route[i].startsWith(HOP_PREFIX)) i++;
@@ -173,7 +173,7 @@ const surfaceOf = (R, lang, layout) => (has(R.surfaces, lang) && has(R.surfaces[
   ? R.surfaces[lang][layout] : null);
 
 /**
- * keypath.keyspec.validate_key: the schema and the registry rules, and
+ * The reference's validate_key: the schema and the registry rules, and
  * nothing that needs the tables (docs/10 §2.2).  kp1 unpack ends here;
  * checkKey runs decode's own checks after it.
  */

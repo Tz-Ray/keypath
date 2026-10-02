@@ -1,7 +1,7 @@
-// The decoder: a port of keypath.walk.decode that also builds the Trace
-// (the walk the page draws).  Adapted from cipher-project
-// scripts/build_demo.py (v2.0), MIT: decodeUnits / decodeKeypath and the
-// layout readers, extended with ja_romaji (keyed and inline selectors),
+// The decoder, which also builds the Trace (the walk the page draws).
+// Ported from KeyPath's reference implementation (unpublished; MIT), by way
+// of its offline decoder (v2.0): the unit and key decoders and the layout
+// readers, extended with ja_romaji (keyed and inline selectors),
 // en_identity, the Cangjie and Quick shape codes, the Vietnamese
 // syllables (Telex, VNI; docs/10 §6.5), ETen, Jyutping and JIS kana
 // (docs/10 §4.3-§5), Greek (docs/10 §7.1), and reading every
@@ -141,7 +141,7 @@ export function walkKey(ctx, cipher, key) {
     for (const word of seg.words) {
       if (has(word, "literal")) {
         const text = word.literal.text;
-        // walk._emit_literal_text: the text must be valid Unicode (no lone surrogate)
+        // as the reference emits a literal: the text must be valid Unicode (no lone surrogate)
         if (/\p{Cs}/u.test(text)) fail("tier-3 literal in key is not valid Unicode (a lone surrogate)");
         parts.push(["verbatim", text]);
         words.push({ literal: text });
