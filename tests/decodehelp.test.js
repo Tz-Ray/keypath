@@ -1,14 +1,16 @@
-// Help for a refused walk (assets/js/ui/decodehelp.js): the refusal stays
+// Help for "Walk one back" (assets/js/ui/decodehelp.js): a refusal stays
 // the engine's, and the page adds one plain advice line for the common
-// paste mistakes and names keyboards and lists in its own words.
+// paste mistakes and names keyboards and lists in its own words; and the
+// decoded text, split for display into what was typed and what the key carried.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { engine, readJson } from "./helpers.js";
-import { plainMessage, pasteAdvice } from "../assets/js/ui/decodehelp.js";
+import { engine, readJson, readJsonl } from "./helpers.js";
+import { plainMessage, pasteAdvice, decodedRuns } from "../assets/js/ui/decodehelp.js";
 import { T } from "../assets/js/ui/text.js";
 
 const hero = readJson("data/hero.json");
-const surfaces = readJson("data/registry.json").siteSurfaces;
+const registry = readJson("data/registry.json");
+const surfaces = registry.siteSurfaces;
 
 test("each common paste mistake is still refused, as before, and gets its advice line", async () => {
   const e = await engine();
@@ -56,4 +58,29 @@ test("internal names in a refusal become the page's names; anything else is kept
     assert.equal(plainMessage(kept, surfaces), kept);
   // every layout a refusal can name has a page name
   for (const s of surfaces) if (s.id === s.layout) assert.doesNotMatch(plainMessage(`the ${s.layout} alphabet`, surfaces), /_/, s.layout);
+});
+
+// The decoded text, split for display into what was typed and what the key
+// carried as plain text: joined, exactly the decoded text, for every walk
+// trace the Python implementation wrote.
+test("the decoded text's runs join to it exactly, and the carried runs are the key's literals", async () => {
+  const cp = s => Array.from(s).length;
+  const traces = readJsonl("tests/fixtures/traces.jsonl.gz");
+  assert.ok(traces.length > 400);
+  let carried = 0;
+  for (const { id, trace } of traces) {
+    const runs = decodedRuns(trace, registry.spacedLanguages);
+    assert.ok(runs, id);
+    assert.equal(runs.map(r => r.text).join(""), trace.text, id);
+    assert.equal(runs.filter(r => r.literal).reduce((n, r) => n + cp(r.text), 0), trace.leak[0], id);
+    if (trace.leak[0]) carried++;
+  }
+  assert.ok(carried > 20, `${carried} traces carry literals`);
+  // a literal holding a bidi override: the runs keep it, exactly (the page shows it as a badge)
+  const e = await engine();
+  const r = await e.encode({ text: "welcome \u202e!!! home", source: "en", surface: "zh_daqian" });
+  assert.deepEqual(decodedRuns(r.trace, registry.spacedLanguages),
+    [{ text: "welcome", literal: false }, { text: " \u202e!!! ", literal: true }, { text: "home", literal: false }]);
+  // a trace whose words don't join to its text is not split at all
+  assert.equal(decodedRuns({ ...r.trace, text: "something else" }, registry.spacedLanguages), null);
 });

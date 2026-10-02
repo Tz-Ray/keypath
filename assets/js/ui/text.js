@@ -131,6 +131,10 @@ export const T = {
   kanaAsTyped: "kana as typed",
   pickedByDigit: selected => `picked by the digit ${selected + 1}`,
   literalCaption: "in the key",
+  // a walked-back message: the runs the key carried as plain text
+  literalRunTitle: "Carried in the key as plain text, not typed",
+  controlBadge: cp => `An invisible control character (${cp}), shown here instead of acting on the text around it`,
+  carried: n => (n === 1 ? "1 character was carried in the key, not typed (underlined)." : `${n} characters were carried in the key, not typed (underlined).`),
   literalTitle: "No route for this text, so the key carries it as plain text.",
   misdirection: (key, symbol) => `On this keyboard "${key}" types ${symbol}.`,
   showAll: n => `Show the whole walk (${n} units)`,

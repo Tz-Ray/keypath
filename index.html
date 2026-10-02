@@ -215,7 +215,8 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
         </div>
         <div id="dec-err" class="refusal" role="alert" hidden></div>
         <div id="dec-out" class="output" hidden>
-          <p id="dec-text" class="plain"></p>
+          <p id="dec-text" class="plain" dir="auto"></p>
+          <p id="dec-lit" class="small muted dec-lit" hidden></p>
           <div id="dec-whatif"></div>
           <div id="dec-walk" class="walk-slot"></div>
         </div>

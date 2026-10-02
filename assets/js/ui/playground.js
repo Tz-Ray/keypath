@@ -1,5 +1,5 @@
 // The playground: "Hide a message" (encode) and "Walk one back" (decode).
-import { $, $$, h, announce, toast, copyText, reducedMotion, cps } from "./dom.js";
+import { $, $$, h, announce, toast, copyText, reducedMotion, cps, withControls } from "./dom.js";
 import { T, LANG_NAMES, LANG_TAGS, DEFAULT_SURFACE } from "./text.js";
 import { LOWERCASE_LANGUAGES } from "../engine/normalize.js";
 import { renderCipher, statsOf, keyspaceFormula } from "./walk.js";
@@ -7,7 +7,7 @@ import { mountFigure } from "./figure.js";
 import { renderKeyText, bindKeyButtons } from "./keypanel.js";
 import { renderKeyboard } from "./keyboard.js";
 import { closePopover } from "./popover.js";
-import { plainMessage, pasteAdvice } from "./decodehelp.js";
+import { plainMessage, pasteAdvice, decodedRuns } from "./decodehelp.js";
 
 const DEBOUNCE = 150;
 
@@ -29,7 +29,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     copyCipher: $("#copy-cipher"),
     decCipher: $("#dec-cipher"), decKey: $("#dec-key"), decFile: $("#dec-file"), decGo: $("#dec-go"),
     decOut: $("#dec-out"), decText: $("#dec-text"), decWalk: $("#dec-walk"), decErr: $("#dec-err"), decWhatIf: $("#dec-whatif"),
-    decNote: $("#dec-note"), copyShortKey: $("#copy-short-key"),
+    decNote: $("#dec-note"), decLit: $("#dec-lit"), copyShortKey: $("#copy-short-key"),
   };
   // listeners told of every new result (or null when there is none)
   const resultListeners = [];
@@ -161,7 +161,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     paintCipher(r);
     const sname = surfaceName(state.surface);
     const [before, after] = T.caption(sname);
-    el.caption.replaceChildren(before, h("bdi", r.text), after);
+    el.caption.replaceChildren(before, h("bdi", withControls(r.text)), after);
     const st = statsOf(r.trace, r.key);
     const [n, m] = st.leak;
     el.stats.textContent = T.statsLine(st.k, st.choices, n ? T.leakSome(n, m) : T.leakNone);
@@ -300,7 +300,7 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     const parts = back.text !== r.text ? T.walkedBackOther
       : back.text === el.msg.value ? T.walkedBack
       : T.walkedBackNorm(LOWERCASE_LANGUAGES.has(r.key.source_language));
-    el.walked.replaceChildren(parts[0], h("bdi", back.text), parts[1]);
+    el.walked.replaceChildren(parts[0], h("bdi", withControls(back.text)), parts[1]);
   });
 
   // replay typing: the cursor steps through the keycaps, the ciphertext fills in
@@ -387,7 +387,14 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
       return decError(msg, advice, r.reason === "loadFailed" ? null : r.message);
     }
     el.decOut.hidden = false;
-    el.decText.textContent = r.text;
+    // display only: bidi controls as badges, and the runs the key carried
+    // (not typed) marked; the decoded text itself is r.text, unchanged
+    const runs = decodedRuns(r.trace, registry.spacedLanguages) || [{ text: r.text, literal: false }];
+    el.decText.replaceChildren(...runs.map(run => (run.literal
+      ? h("span.lit-run", { title: T.literalRunTitle }, withControls(run.text)) : withControls(run.text))));
+    const carried = r.trace.leak[0];
+    el.decLit.hidden = !carried;
+    el.decLit.textContent = carried ? T.carried(carried) : "";
     el.decText.lang = LANG_TAGS[r.key.source_language] || "en";
     if (decFig && decFig.view) decFig.view.destroy();
     const names = r.trace.segments.map(s => surfaces.get(s.surface)).filter(Boolean).map(s => s.longName);

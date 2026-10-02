@@ -1258,6 +1258,25 @@ await attempt("walk links", async () => {
   await b.waitFor("document.documentElement.classList.contains('ready')");
   await b.waitFor(`!${q("#dec-out")}.hidden`);
   check("walk link: no horizontal scroll at 360px on a walk link", await noHScroll(360));
+
+  // a key can carry any text as a literal, bidi overrides included: shown as
+  // badges inside an isolated heading, the carried runs marked, never acting
+  const [bc, bk] = await b.evaluate(`window.__keypath.engine.encode({ text: "welcome \u202e!!! home", source: "en", surface: "zh_daqian" })
+    .then(r => [r.ciphertext, window.__keypath.engine.kp1Pack(r.key).text])`);
+  await b.navigate("about:blank");
+  await b.navigate(`${srv.url}#walk=${b64url({ c: bc, k: bk })}`);
+  await b.waitFor("document.documentElement.classList.contains('ready')");
+  await b.waitFor(`!${q("#dec-out")}.hidden`);
+  const bidi = await b.evaluate(`(() => { const t = ${q("#dec-text")}; const nodes = []; const w = document.createTreeWalker(t, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) nodes.push(w.currentNode.data);
+    return [t.getAttribute("dir"), getComputedStyle(t).unicodeBidi, nodes.some(n => /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(n)),
+      [...t.querySelectorAll(".cp-badge")].map(e => e.textContent), [...t.querySelectorAll(".lit-run")].map(e => e.textContent),
+      ${q("#dec-lit")}.hidden, ${q("#dec-lit")}.textContent, [...document.querySelectorAll("#dec-walk .lit-text .cp-badge")].map(e => e.textContent)]; })()`);
+  check("walk link: a bidi override carried in the key shows as a badge, isolated, never acting",
+    bidi[0] === "auto" && bidi[1] === "isolate" && !bidi[2] && js(bidi[3]) === js(["⟨U+202E⟩"]) && js(bidi[7]) === js(["⟨U+202E⟩"]), js(bidi));
+  check("walk link: the text the key carried is marked, and counted",
+    js(bidi[4]) === js([" ⟨U+202E⟩!!! "]) && !bidi[5] && bidi[6] === "6 characters were carried in the key, not typed (underlined).", js(bidi));
+  check("walk link: no horizontal scroll at 360px with a badge", await noHScroll(360));
 });
 
 await attempt("workbench", async () => {

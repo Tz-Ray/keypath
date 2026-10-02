@@ -4,7 +4,7 @@
 // message (top) down to the keys (bottom).  Layout is pure CSS (band heights
 // are custom properties, edges are inline SVG with percentage coordinates),
 // so the script never measures anything.
-import { h, reducedMotion, cps } from "./dom.js";
+import { h, reducedMotion, cps, withControls } from "./dom.js";
 import { T, LANG_TAGS, SURFACE_BADGE } from "./text.js";
 import { US_SHIFT } from "./keyboard.js";
 
@@ -295,7 +295,7 @@ export function renderWalk(host, trace, ctx) {
       g.classList.add("literal");
       g.setAttribute("aria-label", T.literalLabel(wordNo, w.word.literal));
       g.append(band("msg", 0, h("span.wtile.lit-tile", { title: T.literalTitle },
-        h("bdi.lit-text", { lang: srcTag }, shown), h("span.lit-cap", T.literalCaption))));
+        h("bdi.lit-text", { lang: srcTag }, withControls(shown)), h("span.lit-cap", T.literalCaption))));
       segEl(w.si, w.seg).words.append(g);
       view.wordEls.set(`${w.si}-${w.wi}`, g);
       continue;
@@ -564,7 +564,7 @@ export function renderTable(host, trace, ctx) {
   for (const w of m.words) {
     if (w.literal) {
       n++;
-      tbody.append(h("tr.lit-row", h("td", String(n)), h("td", { colspan: "5" }, T.tableLiteral[0], h("bdi", w.word.literal), T.tableLiteral[1])));
+      tbody.append(h("tr.lit-row", h("td", String(n)), h("td", { colspan: "5" }, T.tableLiteral[0], h("bdi", withControls(w.word.literal)), T.tableLiteral[1])));
       continue;
     }
     w.units.forEach((u, i) => {

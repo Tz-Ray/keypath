@@ -461,6 +461,16 @@ select {
 .file-btn:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
 #dec-out { margin-top: 20px; }
 .plain { font-size: clamp(1.35rem, 4vw, 1.9rem); font-weight: 650; line-height: 1.3; margin-bottom: 12px; overflow-wrap: anywhere; }
+/* a walked-back message: isolated from the page, the key's plain-text runs underlined */
+#dec-text { unicode-bidi: isolate; }
+#dec-text:has(+ .dec-lit:not([hidden])) { margin-bottom: 2px; }
+.dec-lit { margin-bottom: 12px; }
+.lit-run { text-decoration: underline dotted var(--literal) 2px; text-underline-offset: .2em; }
+.cp-badge {
+  display: inline-block; margin: 0 1px; padding: 0 4px; border: 1px solid var(--line); border-radius: 4px;
+  font: 600 max(11px, .5em)/1.5 var(--font-mono); color: var(--ink-2); vertical-align: .15em;
+  unicode-bidi: isolate; white-space: nowrap;
+}
 .caption, .walked { overflow-wrap: anywhere; }
 
 /* ------------------------------------------------------------ the walk */

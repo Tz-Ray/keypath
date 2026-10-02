@@ -1,4 +1,5 @@
 // Tiny DOM helpers.
+import { T } from "./text.js";
 
 /**
  * h("div.card#id", {attrs, on: {click}}, ...children)
@@ -90,6 +91,26 @@ export const storage = {
   get(key) { try { return window.localStorage.getItem(key); } catch { return null; } },
   set(key, value) { try { window.localStorage.setItem(key, value); } catch { /* storage unavailable */ } },
 };
+
+// The invisible bidi controls (ALM, LRM, RLM, the embeddings and overrides
+// U+202A-202E, the isolates U+2066-2069): text from a link or a key shows
+// them as badges, so they never reorder what is around them.
+const BIDI_CONTROLS = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/u;
+
+/** `text` as strings and badges: each bidi control becomes a visible ⟨U+202E⟩ instead of acting. */
+export function withControls(text) {
+  const out = [];
+  let run = "";
+  for (const ch of String(text)) {
+    if (!BIDI_CONTROLS.test(ch)) { run += ch; continue; }
+    if (run) out.push(run);
+    run = "";
+    const cp = `U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, "0")}`;
+    out.push(h("span.cp-badge", { title: T.controlBadge(cp) }, `⟨${cp}⟩`));
+  }
+  if (run) out.push(run);
+  return out;
+}
 
 /** Code-point array. */
 export const cps = s => Array.from(s);
