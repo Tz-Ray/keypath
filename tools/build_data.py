@@ -3,7 +3,7 @@
 
 Everything under data/ and tests/fixtures/ is written by this script and
 never edited by hand.  The oracle is the keypath package installed in the
-site's own venv (from the cipher project at tag v3.0); the cipher project
+site's own venv (from the cipher project at tag v3.0.1); the cipher project
 itself is only read as files (puzzles, golden vectors, test corpora,
 docs/09) and never imported from, executed or written to.  The walks the
 page draws come from keypath.trace (trace/1), mapped to the site's surface
@@ -80,10 +80,10 @@ from keypath.trace import trace as trace1  # noqa: E402
 from keypath.walk import decode, encode  # noqa: E402
 
 SITE = Path(__file__).resolve().parent.parent
-# a checkout of the cipher project at tag v3.0; by default next to this repository
+# a checkout of the cipher project at tag v3.0.1; by default next to this repository
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
-VERSION = "3.0.0"
-TAG = "v3.0"
+VERSION = "3.0.1"
+TAG = "v3.0.1"
 EDITION = "05b2373935c571bb838d6791d13dd567ca3fe2553ea42634daed5afa19379bd2"
 VOCAB_SIZE = 10_000
 SEED = 20260924

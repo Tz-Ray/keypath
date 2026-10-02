@@ -1,5 +1,5 @@
 // The keyboard layouts, ported from KeyPath's reference implementation
-// (3.0.0, unpublished; MIT), both directions, built from
+// (3.0.1, unpublished; MIT), both directions, built from
 // data/layouts.json; the keys -> text readers come from its offline
 // decoder (v2.0).  The Vietnamese
 // layouts (Telex, VNI) are written from KeyPath's specification (docs/10

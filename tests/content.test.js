@@ -197,7 +197,7 @@ test("the private-module check catches the names it is for, and passes the page'
     "cipher-project scripts/build_demo.py", "keypath.registry.split_route", "scripts/analysis.py"])
     assert.match(leak, PRIVATE_NAMES, leak);
   for (const fine of ["e._internal.data", "https://github.com/Tz-Ray/keypath/tree/main/puzzles", "KeyPath's reference implementation",
-    "tools/build_data.py", "keypath 3.0.0"])
+    "tools/build_data.py", "keypath 3.0.1"])
     assert.doesNotMatch(fine, PRIVATE_NAMES, fine);
 });
 
@@ -215,8 +215,8 @@ test("the page's scripts, styles and service worker name no private module", () 
 // strangers; its links lead only to public places (this site and its files).
 test("the copied catalog entry links only to public places", () => {
   const md = readFileSync(join(ROOT, "docs/catalog-entry.md"), "utf8");
-  const tag = readFileSync(join(ROOT, "tools/build_data.py"), "utf8").match(/^TAG = "(v\d+\.\d+)"$/m)[1];
-  assert.match(md, /^# KeyPath cipher — catalog entry\n\n> From KeyPath \d+\.\d+ \(tag `v\d+\.\d+`\)\. /, "title, then the preface");
+  const tag = readFileSync(join(ROOT, "tools/build_data.py"), "utf8").match(/^TAG = "(v\d+\.\d+(?:\.\d+)?)"$/m)[1];
+  assert.match(md, /^# KeyPath cipher — catalog entry\n\n> From KeyPath \d+\.\d+(?:\.\d+)? \(tag `v\d+\.\d+(?:\.\d+)?`\)\. /, "title, then the preface");
   assert.ok(md.includes(`(tag \`${tag}\`)`), `the preface names the tag the data is built from (${tag})`);
   assert.doesNotMatch(md, PRIVATE_REPO);
   // the reference implementation is private, and the entry says so
@@ -269,7 +269,7 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
     const md = readFileSync(join(ROOT, `puzzles/challenge-${pad(c.n)}/solve-path.md`), "utf8");
     assert.match(md, /^# Challenge #\d+[^\n]*\n\n> \*\*Spoilers\.\*\*/, `#${c.n}: title, then the preface`);
     // the release each was set in (1-6 in 2.0, copied from v2.0; 7-12 in 2.6, copied from v3.0)
-    assert.ok(md.includes(c.n <= 6 ? "(from KeyPath 2.0, tag `v2.0`)" : "(from KeyPath 3.0, tag `v3.0`, as set for KeyPath 2.6)"),
+    assert.ok(md.includes(c.n <= 6 ? "(from KeyPath 2.0, tag `v2.0`)" : "(from KeyPath 3.0.1, tag `v3.0.1`, as set for KeyPath 2.6)"),
       `#${c.n}: its release`);
     // the setter's notes cite unpublished documents; #4's once gave away #5
     assert.doesNotMatch(md, /^## (Leakage|How it was minted|Fairness checklist|Playtest)/m, `#${c.n}`);
@@ -281,12 +281,13 @@ test("the copied solve paths keep only the solving steps, and the index gives ev
 // tools/build_data.py pins (TAG, VERSION), everywhere they mention it.
 test("the build notes name the tag and version build_data.py pins", () => {
   const build = readFileSync(join(ROOT, "tools/build_data.py"), "utf8");
-  const tag = build.match(/^TAG = "(v\d+\.\d+)"$/m)[1];
+  const tag = build.match(/^TAG = "(v\d+\.\d+(?:\.\d+)?)"$/m)[1];
   const version = build.match(/^VERSION = "(\d+\.\d+\.\d+)"$/m)[1];
-  assert.ok(version.startsWith(`${tag.slice(1)}.`), `${tag} ${version}`);
+  // vX.Y tags a release X.Y.0; a patch release vX.Y.Z tags X.Y.Z itself
+  assert.ok(version === tag.slice(1) || version === `${tag.slice(1)}.0`, `${tag} ${version}`);
   for (const f of ["tools/requirements.txt", "README.md", "tools/build_data.py"]) {
     const text = readFileSync(join(ROOT, f), "utf8");
-    const tags = [...text.matchAll(/\bat tag (v\d+\.\d+)/g)].map(m => m[1]);
+    const tags = [...text.matchAll(/\bat tag (v\d+\.\d+(?:\.\d+)?)/g)].map(m => m[1]);
     assert.ok(tags.length, `${f} names no tag`);
     assert.deepEqual([...new Set(tags)], [tag], f);
   }

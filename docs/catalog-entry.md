@@ -1,6 +1,6 @@
 # KeyPath cipher — catalog entry
 
-> From KeyPath 3.0 (tag `v3.0`). KeyPath's Python reference implementation
+> From KeyPath 3.0.1 (tag `v3.0.1`). KeyPath's Python reference implementation
 > is not published: the `keypath` commands and output this entry quotes,
 > its offline decoder, and the files it names in that repository (its
 > design documents, such as "docs/10 §3", and its `tables/…` and `*.tsv`
@@ -19,7 +19,8 @@
 - **Era:** modern (2026); computer-assisted encode/decode, hand-solvable
 - **Key type:** per-message JSON route (segment layouts, unit lengths,
   candidate and translation indices), also carried as a one-line `kp1`
-  string; public pinned language tables (Kerckhoffs-style), versioned as
+  string; public pinned language tables (the method, not the tables, is the
+  puzzle's secret), versioned as
   append-only editions
 - **Ciphertext alphabet:** layout-local (see the table below), no
   spaces or delimiters. The union over the fifteen layouts is 62
@@ -186,8 +187,10 @@ keypath type --layout zh_quick 歡迎家
 ## Security
 
 None claimed. This is a puzzle cipher: without the key it reduces to
-book-cipher-class structure (which is why no general solver exists);
-with the key, decoding is deterministic. The intended attack is human:
+book-cipher-class structure whose book (the tables) is public, so once
+the layout is known an ordinary IME-style conversion reads most of a
+native segment; with the key, decoding is deterministic. The project
+ships no solver by design: the hand solve is the product. The intended attack is human:
 recognize the layout(s), invert the keystrokes, resolve candidates by
 linguistic coherence. `docs/09-analysis.md` measures the ambiguity each
 layout adds, the key size in bits, and where the ambiguity lives (in

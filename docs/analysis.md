@@ -1,6 +1,6 @@
 # 09 — Analysis: the ambiguity each layout adds
 
-> From KeyPath 3.0 (tag `v3.0`). The scripts, tests and design documents
+> From KeyPath 3.0.1 (tag `v3.0.1`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -613,12 +613,14 @@ above show what that means in practice.
   lists them, recovers much of a message and fixes the rest from
   context. This is
   how a book cipher falls once the book is known.
-- **Brute force has no foothold.** An automated search must enumerate
-  layouts, unit splits, candidates, routes and hop indices together,
-  with no oracle but "the result reads as language". The table sizes
-  above multiply across every unit of a message. This is the same
-  property that leaves book ciphers without a general solver, and why
-  KeyPath ships no solver (docs/03 §4).
+- **A known layout falls to ordinary conversion.** Once the layout of
+  a native segment is known, the tables are the book, and they are
+  public: an IME-style phrase-frequency pass (the conversion any Zhuyin
+  input method performs) recovers most of a plain sentence without the
+  key. What an automated search lacks is the recognition step: which
+  layouts, where segments start, which routes and hops, with no oracle
+  but "the result reads as language". KeyPath ships no solver by design
+  (docs/03 §4), not because one is infeasible.
 - **Recognition is the real gate.** A bijective layout needs no key
   bits, and a pinyin segment has no hidden boundaries, yet neither is
   readable until the solver sees which keyboard typed it. The puzzle

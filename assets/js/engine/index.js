@@ -1,5 +1,5 @@
 // The in-browser KeyPath engine: encodes the site's live routes exactly like
-// keypath 3.0.0 and decodes keys, returning the Trace the page draws.
+// keypath 3.0.1 and decodes keys, returning the Trace the page draws.
 //
 //   const engine = await createEngine({ fetchText });
 //   await engine.encode({ text, source, surface })

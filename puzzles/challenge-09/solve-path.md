@@ -1,7 +1,7 @@
 # Challenge #9 — intended solve path (SPOILERS)
 
 > **Spoilers.** This is the setter's write-up of how to crack the puzzle
-> (from KeyPath 3.0, tag `v3.0`, as set for KeyPath 2.6); it may also
+> (from KeyPath 3.0.1, tag `v3.0.1`, as set for KeyPath 2.6); it may also
 > give away steps of other puzzles. The public site it names is the
 > [KeyPath page](https://tz-ray.github.io/keypath/): its keyboard pictures, its
 > [workbench](https://tz-ray.github.io/keypath/#workbench) and its playground.

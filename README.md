@@ -6,15 +6,15 @@ on a Chinese, Japanese, Korean, Russian, Vietnamese or Greek keyboard (or in a
 Spanish accent-digit scheme), with a small key that records every choice on the way. The page encodes, decodes and draws the walk
 entirely in the browser: a static site with no server, no build step and no
 third-party requests. Everything it shows as KeyPath output is exactly what
-KeyPath's Python reference implementation (keypath 3.0.0, not published)
+KeyPath's Python reference implementation (keypath 3.0.1, not published)
 produces; the parity tests check this. Its workbench, for solving by hand,
 looks up keys and types text on a keyboard the visitor names, never
 guessing one, and prints exactly what KeyPath's own `lookup` and `type`
 tools print.
 KeyPath is a puzzle, not encryption.
 
-The data under `data/` is derived from the tables of keypath 3.0.0 (its tag
-`v3.0`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
+The data under `data/` is derived from the tables of keypath 3.0.1 (its tag
+`v3.0.1`, tables edition `05b23739…9bd2`); its sources and licenses are listed in
 [DATA-LICENSES.md](DATA-LICENSES.md), with the license texts in
 [`LICENSES/`](LICENSES).
 
@@ -42,13 +42,13 @@ The data under `data/` is derived from the tables of keypath 3.0.0 (its tag
 ## Rebuilding the data
 
 The build reads a checkout of KeyPath's Python implementation at tag
-`v3.0` (its repository is not published), given by `KEYPATH_PROJECT`
+`v3.0.1` (its repository is not published), given by `KEYPATH_PROJECT`
 (default: `../cipher-project`, next to this repository), as files and uses
 its `keypath` package, installed into a local virtual environment:
 
 ```sh
 uv venv --python 3.11 .venv
-uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v3.0
+uv pip install --python .venv/bin/python /path/to/cipher-project   # at tag v3.0.1
 uv pip install --python .venv/bin/python -r tools/requirements.txt
 .venv/bin/python tools/build_data.py            # data/ and tests/fixtures/
 .venv/bin/python tools/copy_docs.py            # puzzles/ and docs/
@@ -58,7 +58,7 @@ uv pip install --python .venv/bin/python -r tools/requirements.txt
 `tools/copy_docs.py` reads git tags of that checkout: puzzles 1 to 6 from
 `v2.0`, where they were set, and puzzles 7 to 12 (set at `v2.6`, and
 checked to be unchanged since), the analysis, the catalog entry and
-`VERSIONS.md` from `v3.0`.
+`VERSIONS.md` from `v3.0.1`.
 The scripts are deterministic; `--check` rebuilds into a temporary
 directory and fails if anything differs from the committed files.
 

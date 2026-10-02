@@ -6,11 +6,11 @@ copies in this repository instead.  Files are read from the project's git
 tags, never its working tree: puzzles 1 to 6 from `v2.0`, where they were
 set (their solve paths describe that release's keyboards), and puzzles 7
 to 12, the analysis, the catalog entry and the table provenance from
-`v3.0`, the release whose tables edition the data under data/ is built
+`v3.0.1`, the release whose tables edition the data under data/ is built
 from.  Puzzles 7 to 12 were set at `v2.6`; the build asserts that their
-files are unchanged since.  Until `v3.0` is made, these are read from the
+files are unchanged since.  Until `v3.0.1` is made, these are read from the
 checkout's committed HEAD, and only if that is the release candidate (its
-package version is 3.0.0).  A solve path keeps its title and its solving
+package version is 3.0.1).  A solve path keeps its title and its solving
 steps (the setter's notes after them, which cite unpublished documents and
 tools, are left out) and gets a short preface; the analysis and the
 catalog entry get a preface too; everything else is copied byte for byte.
@@ -31,8 +31,8 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parent.parent
 PROJECT = Path(os.environ.get("KEYPATH_PROJECT", SITE.parent / "cipher-project"))
 PUZZLES_TAG = "v2.0"
-DOCS_TAG = "v3.0"
-DOCS_VERSION = "3.0.0"   # the package version of that tag (and of its candidate)
+DOCS_TAG = "v3.0.1"
+DOCS_VERSION = "3.0.1"   # the package version of that tag (and of its candidate)
 PACK_II_TAG = "v2.6"     # where puzzles 7 to 12 were set; copied from DOCS_TAG, unchanged since
 PACK_I = range(1, 7)     # set at PUZZLES_TAG
 PACK_II = range(7, 13)   # set at PACK_II_TAG, each with its three hints
@@ -67,7 +67,7 @@ SOLVE_PREFACE = """\
 # puzzles 7-12: every step uses the page's tools, and the command line answers the same
 SOLVE_PREFACE_II = """\
 > **Spoilers.** This is the setter's write-up of how to crack the puzzle
-> (from KeyPath 3.0, tag `v3.0`, as set for KeyPath 2.6); it may also
+> (from KeyPath 3.0.1, tag `v3.0.1`, as set for KeyPath 2.6); it may also
 > give away steps of other puzzles. The public site it names is the
 > [KeyPath page]({page}): its keyboard pictures, its
 > [workbench]({page}#workbench) and its playground.
@@ -80,7 +80,7 @@ SOLVE_PREFACE_II = """\
 """
 
 ANALYSIS_PREFACE = """\
-> From KeyPath 3.0 (tag `v3.0`). The scripts, tests and design documents
+> From KeyPath 3.0.1 (tag `v3.0.1`). The scripts, tests and design documents
 > it cites (`scripts/analysis.py`, `tests/…`, "docs/07 §10", "M12") belong
 > to KeyPath's Python implementation, which is not published; the tables
 > it measures are built from the sources pinned in
@@ -90,7 +90,7 @@ ANALYSIS_PREFACE = """\
 """
 
 CATALOG_PREFACE = """\
-> From KeyPath 3.0 (tag `v3.0`). KeyPath's Python reference implementation
+> From KeyPath 3.0.1 (tag `v3.0.1`). KeyPath's Python reference implementation
 > is not published: the `keypath` commands and output this entry quotes,
 > its offline decoder, and the files it names in that repository (its
 > design documents, such as "docs/10 §3", and its `tables/…` and `*.tsv`
