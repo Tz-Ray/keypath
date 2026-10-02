@@ -365,11 +365,15 @@ select {
 }
 .examples button:hover { border-color: var(--line); }
 
-/* phones: one scrolling strip each for keyboards and examples */
+/* phones: one scrolling strip each for keyboards and examples; with no
+   scrollbar, the strip's edges fade (16px left, 32px right) so a cut-off
+   chip shows there is more, and the end padding clears the fade */
 @media (max-width: 639.98px) {
   .chip-row, .examples {
     flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
-    margin: 0 -16px; padding: 2px 16px 4px; scroll-padding: 0 16px;
+    margin: 0 -16px; padding: 2px 32px 4px 16px; scroll-padding: 0 32px 0 16px;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 32px), transparent);
   }
   .chip-row::-webkit-scrollbar, .examples::-webkit-scrollbar { display: none; }
   .chip, .examples button { flex: none; }

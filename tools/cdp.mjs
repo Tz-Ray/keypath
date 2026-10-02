@@ -1081,6 +1081,13 @@ await attempt("touch targets", async () => {
     .map(e => { const r = e.getBoundingClientRect(); return [e.id || e.textContent.trim().slice(0, 20), Math.round(r.width), Math.round(r.height)]; })
     .filter(([, w, h]) => w < 44 || h < 44)`);
   check("touch targets: every control is at least 44 x 44 px at 360px", small.length === 0, js(small));
+  // the keyboard chips scroll sideways with no scrollbar: the strip's edges fade, and its end clears the fade
+  const strip = await b.evaluate(`(() => { const row = ${q("#kbd .chip-row")}; const st = getComputedStyle(row);
+    const mask = st.maskImage || st.webkitMaskImage || "";
+    row.scrollLeft = row.scrollWidth; const last = [...row.children].pop().getBoundingClientRect(), box = row.getBoundingClientRect();
+    const end = box.right - last.right; row.scrollLeft = 0; return [mask, row.scrollWidth > row.clientWidth, end]; })()`);
+  check("touch targets: the keyboard strip at 360px fades at its edges, and its last chip scrolls clear of the fade",
+    /linear-gradient/.test(strip[0]) && strip[1] && strip[2] >= 31, js(strip));
   // The walk figure's controls may draw smaller (the 18px sense chips) but must
   // take taps across 44 x 44 px: from each one's centre, hit-test pixel by pixel
   // outwards and measure the unbroken span that reaches it, across and down.
