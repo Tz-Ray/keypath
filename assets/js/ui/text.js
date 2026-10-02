@@ -95,6 +95,12 @@ export const T = {
   walkedBackOther: ["Walked back: “", "”."],
   lookingUp: "Looking up…",
   needKey: "Paste the key (and its ciphertext).",
+  // advice under a refused walk, for common paste mistakes (decodehelp.js)
+  adviceQuoted: "The key is wrapped in quotation marks. Paste it without them.",
+  adviceSwapped: "The ciphertext and the key look swapped: the ciphertext goes in the first box, its key (JSON, or one line starting kp1.) in the second.",
+  adviceKp1Spaces: "This short key has spaces or line breaks inside it, perhaps from an email that wrapped it. Join it back into one line and try again.",
+  adviceCipherSpaces: "The ciphertext has spaces or line breaks inside it, and a KeyPath ciphertext has none. Remove them and try again.",
+  rawMessage: "Technical details",
   keyCrashed: "This key can't be read here.",
 
   // detection label

@@ -25,6 +25,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
 <link rel="modulepreload" href="assets/js/ui/challenges.js">
 <link rel="modulepreload" href="assets/js/ui/share.js">
 <link rel="modulepreload" href="assets/js/ui/workbench.js">
+<link rel="modulepreload" href="assets/js/ui/decodehelp.js">
 <link rel="modulepreload" href="assets/js/engine/index.js">
 <link rel="modulepreload" href="assets/js/engine/data.js">
 <link rel="modulepreload" href="assets/js/engine/unicode.js">
@@ -212,7 +213,7 @@ try { var t = localStorage.getItem("kp-theme"); if (t === "light" || t === "dark
           <button type="button" id="dec-go" class="btn primary">Walk it back</button>
           <label class="btn file-btn">Open key.json<input type="file" id="dec-file" accept=".json,application/json" class="vh"></label>
         </div>
-        <p id="dec-err" class="refusal" role="alert" hidden></p>
+        <div id="dec-err" class="refusal" role="alert" hidden></div>
         <div id="dec-out" class="output" hidden>
           <p id="dec-text" class="plain"></p>
           <div id="dec-whatif"></div>

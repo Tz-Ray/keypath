@@ -393,7 +393,7 @@ await attempt("ETen, Jyutping and kana", async () => {
   await b.waitFor(`!${q("#dec-err")}.hidden`);
   const lackMsg = await b.evaluate(`${q("#dec-err")}.textContent`);
   check("kana: a unit whose list the page lacks is refused, not shown as the kana alone",
-    lackMsg.includes("This key needs dictionary data this page doesn't carry (the homophone:ja candidates of ありがと)"), lackMsg);
+    lackMsg.includes("This key needs dictionary data this page doesn't carry (the Japanese reading candidates of ありがと)"), lackMsg);
   await b.evaluate(`${q("#tab-enc")}.click()`);
 
   // a #walk link on a new keyboard (the kana golden, its key as kp1) decodes and animates
@@ -567,14 +567,14 @@ await attempt("greek", async () => {
   await b.evaluate(`${q("#tab-dec")}.click()`);
   await b.evaluate(`(() => { ${q("#dec-err")}.hidden = true; ${q("#dec-cipher")}.value = ${js(outward.ciphertext)}; ${q("#dec-key")}.value = ${js(outward.keyText)}; ${q("#dec-go")}.click(); })()`);
   await b.waitFor(`!${q("#dec-err")}.hidden`);
-  check("el→X: a key out of Greek is refused with the page's reason", await b.evaluate(`${q("#dec-err")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
+  check("el→X: a key out of Greek is refused with the page's reason", await b.evaluate(`${q("#dec-err .err-msg")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
     await b.evaluate(`${q("#dec-err")}.textContent`));
   const outKp1 = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(outward.keyText)})`);
   await b.navigate("about:blank");
   await b.navigate(`${srv.url}#walk=${b64url({ c: outward.ciphertext, k: outKp1.text })}`);
   await b.waitFor("document.documentElement.classList.contains('ready')");
   await b.waitFor(`!${q("#dec-out")}.hidden || !${q("#dec-err")}.hidden`, 20000);
-  check("el→X: as a walk link, refused the same way, with no walk", await b.evaluate(`${q("#dec-err")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
+  check("el→X: as a walk link, refused the same way, with no walk", await b.evaluate(`${q("#dec-err .err-msg")}.textContent === ${js(EL_OUT)} && ${q("#dec-out")}.hidden`),
     await b.evaluate(`${q("#dec-err")}.textContent`));
 
   // a #walk link on the Greek keyboard (native καλημέρα as kp1, English cat as JSON) decodes and animates
@@ -984,6 +984,26 @@ await attempt("tampered keys", async () => {
   await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(hero.ciphertext)}; ${q("#dec-key")}.value = ${js(hero.keyText)}; ${q("#dec-go")}.click(); })()`);
   await b.waitFor(`!${q("#dec-out")}.hidden`);
   check("decode: the hero key walks back", await b.evaluate(`${q("#dec-text")}.textContent === ${js(hero.text)}`));
+  // common paste mistakes: the same refusal, one plain advice line, and the engine's words folded away
+  const short = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(hero.keyText)}).text`);
+  const T = (await import("../assets/js/ui/text.js")).T;
+  for (const [name, cipher, key, advice, msg] of [
+    ["a short key in quotation marks", hero.ciphertext, JSON.stringify(short), T.adviceQuoted, "This key doesn't fit this ciphertext: key is not a JSON object."],
+    ["ciphertext and key swapped", hero.keyText, hero.ciphertext, T.adviceSwapped, "That key isn't valid JSON."],
+    ["a short key wrapped by email", hero.ciphertext, `${short.slice(0, 20)}\n${short.slice(20)}`, T.adviceKp1Spaces, "This short key can't be read: "],
+    ["a space inside the ciphertext", `${hero.ciphertext.slice(0, 3)} ${hero.ciphertext.slice(3)}`, hero.keyText, T.adviceCipherSpaces,
+      "This key doesn't fit this ciphertext: unit "],
+  ]) {
+    await b.evaluate(`(() => { ${q("#dec-err")}.hidden = true; ${q("#dec-cipher")}.value = ${js(cipher)}; ${q("#dec-key")}.value = ${js(key)}; ${q("#dec-go")}.click(); })()`);
+    await b.waitFor(`!${q("#dec-err")}.hidden`);
+    const got = await b.evaluate(`[${q("#dec-err .err-msg")}.textContent, ${q("#dec-err .err-advice")} && ${q("#dec-err .err-advice")}.textContent,
+      ${q("#dec-err .err-raw code")} && ${q("#dec-err .err-raw code")}.textContent, ${q("#dec-out")}.hidden]`);
+    check(`decode advice: ${name}`, got[0].startsWith(msg) && got[1] === advice && got[2] && got[3], js(got));
+  }
+  // internal names become the page's: the keyboard named, its id only in the engine's words
+  const ids = await b.evaluate(`[${q("#dec-err .err-msg")}.textContent, ${q("#dec-err .err-raw code")}.textContent]`);
+  check("decode advice: the keyboard is named as the page names it", ids[0].includes("outside the Bopomofo (Taiwan) keyboard alphabet")
+    && !ids[0].includes("zh_daqian") && ids[1].includes("zh_daqian"), js(ids));
 });
 
 await attempt("edge messages", async () => {
@@ -1002,7 +1022,7 @@ await attempt("edge messages", async () => {
   // a pathologically deep key is refused as bad JSON, with no exception
   await b.evaluate(`(() => { ${q("#dec-cipher")}.value = "cj0u/6ru8"; ${q("#dec-key")}.value = '{"a":'.repeat(3000) + "1" + "}".repeat(3000); ${q("#dec-go")}.click(); })()`);
   await b.waitFor(`!${q("#dec-err")}.hidden`);
-  check("decode: a deeply nested key is bad JSON", await b.evaluate(`${q("#dec-err")}.textContent === "That key isn't valid JSON."`));
+  check("decode: a deeply nested key is bad JSON", await b.evaluate(`${q("#dec-err .err-msg")}.textContent === "That key isn't valid JSON."`));
   await b.evaluate(`${q("#tab-enc")}.click()`);
 
   // the katakana middle dot is punctuation: detected (and chosen) Chinese encodes

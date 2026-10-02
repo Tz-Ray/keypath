@@ -413,7 +413,11 @@ select {
   overflow-wrap: anywhere;
 }
 .refusal > span { min-width: 0; }
-#dec-err { color: var(--literal); background: color-mix(in srgb, var(--literal) 9%, var(--surface)); }
+#dec-err { color: var(--literal); background: color-mix(in srgb, var(--literal) 9%, var(--surface)); flex-direction: column; align-items: stretch; gap: 6px; }
+#dec-err .err-advice { color: var(--ink); }
+#dec-err .err-raw { color: var(--ink-2); font-size: 14px; }
+#dec-err .err-raw > summary { display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
+#dec-err .err-raw code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
 .walked {
   margin-top: 12px; padding: 10px 14px; border-radius: 10px; font-size: 15px;
   background: color-mix(in srgb, var(--keys) 11%, var(--surface)); color: var(--ink);

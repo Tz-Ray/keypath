@@ -7,6 +7,7 @@ import { mountFigure } from "./figure.js";
 import { renderKeyText, bindKeyButtons } from "./keypanel.js";
 import { renderKeyboard } from "./keyboard.js";
 import { closePopover } from "./popover.js";
+import { plainMessage, pasteAdvice } from "./decodehelp.js";
 
 const DEBOUNCE = 150;
 
@@ -376,11 +377,14 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     if (seq !== decSeq) return;
     if (!r.ok) {
       el.decOut.hidden = true;
+      // the engine's refusal, in the page's names for keyboards and lists
+      const plain = r.message ? plainMessage(r.message, engine.surfaces) : "";
       const msg = r.reason === "badJson" ? T.badJson
-        : r.reason === "keyInvalid" ? (r.compact ? T.kp1Invalid(r.message) : T.keyInvalid(r.message))
-        : r.reason === "notCarried" ? (r.hop === "translate:el>en" ? T.elOut : T.notCarried(r.message)) : r.reason === "tier2" ? T.tier2
+        : r.reason === "keyInvalid" ? (r.compact ? T.kp1Invalid(plain) : T.keyInvalid(plain))
+        : r.reason === "notCarried" ? (r.hop === "translate:el>en" ? T.elOut : T.notCarried(plain)) : r.reason === "tier2" ? T.tier2
         : r.reason === "crashed" ? T.keyCrashed : T.loadFailed;
-      return decError(msg);
+      const advice = r.reason === "loadFailed" || r.reason === "crashed" ? null : pasteAdvice(ciphertext, keyText);
+      return decError(msg, advice, r.reason === "loadFailed" ? null : r.message);
     }
     el.decOut.hidden = false;
     el.decText.textContent = r.text;
@@ -393,9 +397,12 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
     });
     if (decFig.view) decFig.view.walkBack();
   }
-  function decError(text) {
+  /** The refusal, an advice line for a common paste mistake, and the engine's own words, folded away. */
+  function decError(text, advice = null, raw = null) {
     el.decErr.hidden = false;
-    el.decErr.textContent = text;
+    el.decErr.replaceChildren(h("p.err-msg", text),
+      advice ? h("p.err-advice", advice) : null,
+      raw ? h("details.err-raw", h("summary", T.rawMessage), h("code", { lang: "en", translate: "no" }, raw)) : null);
   }
 
   // ------------------------------------------------------------ public
