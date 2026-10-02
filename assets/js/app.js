@@ -1,8 +1,9 @@
 // Entry point: wires the page to the engine.  The hero renders from
-// data/hero.json straight away; the engine then re-encodes it when the
-// browser is idle (loading the dictionaries it needs) and must reproduce
-// it.  If the page's own data can't load, a banner says so and offers
-// Retry, and nothing throws unhandled.
+// data/hero.json straight away; once the visitor first reaches for the
+// playground, the engine re-encodes it when the browser is idle (loading
+// the dictionaries it needs) and must reproduce it, so a visit that never
+// does loads no dictionary.  If the page's own data can't load, a banner
+// says so and offers Retry, and nothing throws unhandled.
 import { createEngine, dumpsKeyWithSpans } from "./engine/index.js";
 import { $, h } from "./ui/dom.js";
 import { T } from "./ui/text.js";
@@ -21,6 +22,16 @@ function registerServiceWorker() {
   const local = location.hostname === "localhost" || location.hostname === "127.0.0.1";
   if (location.protocol !== "https:" && !local) return;
   navigator.serviceWorker.register(new URL("../../sw.js", import.meta.url)).catch(() => {});
+}
+
+/** Run `fn` once, on the visitor's first reach into `root` (a press, a key or focus). */
+function onFirstUse(root, fn) {
+  const events = ["pointerdown", "keydown", "focusin"];
+  const go = () => {
+    for (const ev of events) root.removeEventListener(ev, go, true);
+    fn();
+  };
+  for (const ev of events) root.addEventListener(ev, go, true);
 }
 
 /** The banner shown when the page's own data can't load: Retry, or the puzzles on GitHub. */
@@ -64,7 +75,7 @@ async function main() {
     $("#try").scrollIntoView({ block: "start" });
   } else {
     playground.showPrecomputed(hero);
-    idle(() => playground.verifyHero(hero).catch(() => {}));
+    onFirstUse($("#try"), () => idle(() => playground.verifyHero(hero).catch(() => {})));
   }
   playground.initialOpen();
   initShare({ playground, getEngine, engine });

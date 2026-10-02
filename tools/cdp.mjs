@@ -151,13 +151,23 @@ const pictureFits = () => b.evaluate(`(() => { const p = ${q("#kbd-pic .kb-pic")
 
 // ================================================================ checks
 await attempt("hero", async () => {
+  const mark = b.events.length;
   await open(1280, 800);
   check("hero: ciphertext shown", await b.evaluate(cipherIs(hero.ciphertext)));
   check("hero: key panel is the exact key file", await b.evaluate(keyIs(hero.keyText)));
   check("hero: figure drawn", await b.evaluate("document.querySelectorAll('#walk .unit').length === 3"));
-  // the live engine re-encodes the hero once idle; the page must not change
+  // a visit that never reaches for the playground loads no dictionary
   await sleep(2500);
-  check("hero: engine reproduces the precomputed hero", await b.evaluate(cipherIs(hero.ciphertext) + " && " + keyIs(hero.keyText)));
+  const fetched = () => b.events.slice(mark).filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
+  check("hero: a plain visit fetches no dictionary", !fetched().some(u => /\/data\/(zh|en)\//.test(u)), fetched().filter(u => u.includes("/data/")));
+  // the first reach for it re-encodes the hero once idle; the page must not change
+  await b.evaluate(`${q("#msg")}.focus()`);
+  let loaded = false;
+  try { await b.waitFor(`performance.getEntriesByType("resource").some(e => e.name.endsWith("/data/zh/core.json"))`); loaded = true; } catch { loaded = false; }
+  await sleep(1500);
+  check("hero: the first reach for the playground checks it, loading the dictionaries", loaded);
+  check("hero: engine reproduces the precomputed hero", await b.evaluate(cipherIs(hero.ciphertext) + " && " + keyIs(hero.keyText))
+    && await b.evaluate(`window.__keypath.playground.verifyHero(${js(hero)})`));
   const live = await b.evaluate(`window.__keypath.engine.encode({ text: ${js(hero.text)}, source: "en", surface: "zh_daqian" }).then(r => r.keyText)`);
   check("hero: live encode equals hero.json", live === hero.keyText);
   await b.evaluate(`${q("#walk-back")}.click()`);
@@ -1442,7 +1452,7 @@ await attempt("offline", async () => {
   await b.waitFor("navigator.serviceWorker.ready.then(() => true)");
   await b.send("Page.reload", {});
   await b.waitFor("document.readyState === 'complete' && document.documentElement.classList.contains('ready') && !!navigator.serviceWorker.controller");
-  await sleep(2500); // the idle hero check loads the dictionaries through the worker
+  await sleep(2500); // let the worker cache what the page fetched
   await b.send("Network.emulateNetworkConditions", { offline: true, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await b.send("Page.reload", {});
   let ok = false;
