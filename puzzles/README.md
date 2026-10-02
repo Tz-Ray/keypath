@@ -1,7 +1,7 @@
 # The twelve KeyPath puzzles
 
 Play them on the [KeyPath page](https://tz-ray.github.io/keypath/#challenges): each is a ciphertext with no key.
-Work out the keyboard, read the keys, and pick the words that make sense. All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals.
+Work out the keyboard, read the keys, and pick the words that make sense. All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals; Chinese characters may be Traditional or Simplified, and numbers may be written as digits.
 
 | # | level | title | hint | keyboards | files |
 |---|-------|-------|------|-----------|-------|

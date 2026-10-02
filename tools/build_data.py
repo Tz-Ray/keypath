@@ -850,6 +850,20 @@ def challenge_files() -> list[dict[str, Any]]:
     return out
 
 
+def answer_variants() -> dict[int, list[str]]:
+    """Other accepted forms of each challenge's answer (simplified characters,
+    digits for a number word), from the project's puzzles/answer-variants.json
+    ({"variants": {"<n>": [answer, ...]}}); no file, no variants.  Only their
+    hashes reach data/: the file itself is never copied to the site."""
+    path = PROJECT / "puzzles" / "answer-variants.json"
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))["variants"]
+    out = {int(n): list(v) for n, v in raw.items()}
+    assert all(isinstance(v, str) and v for vs in out.values() for v in vs)
+    return out
+
+
 def answer_norm(s: str) -> str:
     s = unicodedata.normalize("NFC", s).lower()
     return "".join(ch for ch in s if unicodedata.category(ch)[0] in "LMN")
@@ -908,6 +922,8 @@ def challenges_data(out: Out) -> list[dict[str, Any]]:
     index = []
     shipped = challenge_files()
     assert [c["n"] for c in shipped] == list(range(1, 13))
+    variants = answer_variants()
+    assert set(variants) <= {c["n"] for c in shipped}, sorted(variants)
     for c in shipped:
         key = json.loads(c["keyText"])
         assert decode(c["ciphertext"], key) == c["plaintext"], c["n"]
@@ -917,6 +933,15 @@ def challenges_data(out: Out) -> list[dict[str, Any]]:
                  "hash": sha(answer_norm(c["plaintext"])), "fold": sha(answer_fold(c["plaintext"]))}
         # pack I (1-6) has no hints; pack II (7-12) has exactly three each,
         # and the card knows only how many there are
+        # accepted alternates: the hashes of each variant's two forms that
+        # the answer's own do not already cover, sorted (never the text)
+        alts = sorted({sha(answer_norm(v)) for v in variants.get(c["n"], [])} - {entry["hash"]})
+        alt_folds = sorted({sha(answer_fold(v)) for v in variants.get(c["n"], [])} - {entry["fold"]})
+        assert len(alts) == len(variants.get(c["n"], [])), f"#{c['n']}: a variant normalizes to the answer or another variant"
+        if alts:
+            entry["alts"] = alts
+        if alt_folds:
+            entry["altFolds"] = alt_folds
         hints = c["hints"]
         assert len(hints) == (HINT_COUNT if c["n"] >= 7 else 0), c["n"]
         assert all(isinstance(h, str) and h.strip() == h and h for h in hints), c["n"]

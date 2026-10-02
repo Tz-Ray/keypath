@@ -3,7 +3,9 @@
 // round-trip property on random text.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { engine, freshEngine, readJson } from "./helpers.js";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { engine, freshEngine, readJson, ROOT } from "./helpers.js";
 import { answerNorm, answerFold, sha256Hex, checkAnswer } from "../assets/js/engine/hash.js";
 import { parseKeyJson, PyFloat } from "../assets/js/engine/keycheck.js";
 
@@ -59,6 +61,43 @@ test("answer hashes reproduce for all twelve challenges", async () => {
   }
   assert.equal(answerNorm("¿Qué  tal, Año?"), "quétalaño");
   assert.equal(answerFold("¿Qué tal, Año?"), "quetalano");
+});
+
+// Accepted alternates (simplified characters, digits for a number word): the
+// card carries only their hashes, sorted, none the answer's own.  The forms
+// themselves are not in this repository; when the project's file of them
+// is beside it (KEYPATH_PROJECT, as tools/build_data.py reads it), each
+// must be accepted, and with its punctuation and capitals changed too.
+test("a challenge's accepted alternates are solved, and only hashes ship", async () => {
+  const hex = /^[0-9a-f]{64}$/;
+  let withAlts = 0;
+  for (const item of index) {
+    for (const [field, own] of [["alts", item.hash], ["altFolds", item.fold]]) {
+      const list = item[field] || [];
+      assert.ok(list.every(h => hex.test(h)) && !list.includes(own), `#${item.n} ${field}`);
+      assert.deepEqual(list, [...new Set(list)].sort(), `#${item.n} ${field} sorted, distinct`);
+    }
+    if (item.alts) withAlts++;
+  }
+  assert.ok(withAlts >= 1, "some challenge accepts an alternate");
+  // the rule, on made-up digests
+  const card = { hash: await sha256Hex("answer"), fold: await sha256Hex("answer"),
+    alts: [await sha256Hex("其他")], altFolds: [await sha256Hex("cafe")] };
+  assert.equal(await checkAnswer("其 他!", card), "solved");
+  assert.equal(await checkAnswer("Café", card), "folded");
+  assert.equal(await checkAnswer("Answer.", card), "solved");
+  assert.equal(await checkAnswer("other", card), "wrong");
+  assert.equal(await checkAnswer("answer", { hash: card.hash, fold: card.fold }), "solved");
+  const file = join(process.env.KEYPATH_PROJECT || join(ROOT, "../cipher-project"), "puzzles/answer-variants.json");
+  if (!existsSync(file)) return;
+  const variants = JSON.parse(readFileSync(file, "utf8")).variants;
+  for (const [n, forms] of Object.entries(variants)) {
+    const item = index.find(c => c.n === Number(n));
+    for (const form of forms) {
+      assert.equal(await checkAnswer(form, item), "solved", `#${n}: an accepted form`);
+      assert.equal(await checkAnswer(` ${form.toUpperCase()}?! `, item), "solved", `#${n}: an accepted form, punctuated`);
+    }
+  }
 });
 
 test("every English row decodes: units give the target, the hop list gives the word", async () => {

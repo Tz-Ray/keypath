@@ -37,7 +37,8 @@ PACK_II_TAG = "v2.6"     # where puzzles 7 to 12 were set; copied from DOCS_TAG,
 PACK_I = range(1, 7)     # set at PUZZLES_TAG
 PACK_II = range(7, 13)   # set at PACK_II_TAG, each with its three hints
 PAGE = "https://tz-ray.github.io/keypath/"
-RULES = "All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals."
+RULES = ("All keyboards are PC layouts. Answers ignore spaces, punctuation and capitals; Chinese characters "
+         "may be Traditional or Simplified, and numbers may be written as digits.")
 
 # The setter's notes that follow the solving steps: they cite unpublished
 # design documents, tools and review history, so the copies end before them.

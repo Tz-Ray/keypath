@@ -207,7 +207,7 @@ test("the card data holds no hint and no answer: hints are fetched one per click
   const raw = readFileSync(join(ROOT, "data/challenges/index.json"), "utf8");
   for (const c of index) {
     assert.deepEqual(Object.keys(c), ["n", "difficulty", "title", "blurb", "keyboards", "ciphertext", "hash", "fold",
-      ...(c.n >= 7 ? ["hints"] : [])], `#${c.n}`);
+      ...(c.alts ? ["alts"] : []), ...(c.altFolds ? ["altFolds"] : []), ...(c.n >= 7 ? ["hints"] : [])], `#${c.n}`);
     assert.equal(c.hints ?? 0, c.n >= 7 ? 3 : 0);
     for (const hint of hintsOf(c)) {
       assert.ok(hint.length > 20 && !raw.includes(hint), `#${c.n}: a hint is in index.json`);

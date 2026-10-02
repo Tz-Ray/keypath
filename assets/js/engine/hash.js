@@ -20,9 +20,15 @@ export async function sha256Hex(text) {
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** "solved" | "folded" | "wrong" for a guess against {hash, fold}. */
-export async function checkAnswer(guess, { hash, fold }) {
-  if (await sha256Hex(answerNorm(guess)) === hash) return "solved";
-  if (await sha256Hex(answerFold(guess)) === fold) return "folded";
+/**
+ * "solved" | "folded" | "wrong" for a guess against {hash, fold} and a
+ * challenge's accepted alternates {alts, altFolds} (other forms of the same
+ * answer: simplified characters, digits for a number word), hashed alike.
+ */
+export async function checkAnswer(guess, { hash, fold, alts = [], altFolds = [] }) {
+  const norm = await sha256Hex(answerNorm(guess));
+  if (norm === hash || alts.includes(norm)) return "solved";
+  const folded = await sha256Hex(answerFold(guess));
+  if (folded === fold || altFolds.includes(folded)) return "folded";
   return "wrong";
 }
