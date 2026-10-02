@@ -161,7 +161,9 @@ await attempt("hero", async () => {
   const fetched = () => b.events.slice(mark).filter(e => e.method === "Network.requestWillBeSent").map(e => e.params.request.url);
   check("hero: a plain visit fetches no dictionary", !fetched().some(u => /\/data\/(zh|en)\//.test(u)), fetched().filter(u => u.includes("/data/")));
   // the first reach for it re-encodes the hero once idle; the page must not change
-  await b.evaluate(`${q("#msg")}.focus()`);
+  // a press, as a visitor's tap is: a headless browser whose window lacks
+  // focus (CI) fires no focusin for a scripted .focus()
+  await b.evaluate(`${q("#msg")}.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })), ${q("#msg")}.focus()`);
   let loaded = false;
   try { await b.waitFor(`performance.getEntriesByType("resource").some(e => e.name.endsWith("/data/zh/core.json"))`); loaded = true; } catch { loaded = false; }
   await sleep(1500);
