@@ -1,0 +1,33 @@
+# The site's tests on every push and pull request: `npm test`, which runs
+# the node suites and the headless-Chrome checks (tests/e2e.test.js runs
+# tools/cdp.mjs). The runner's preinstalled Google Chrome is handed to them
+# through KEYPATH_CHROME (tools/browser.mjs reads it first), and the job
+# fails if it is missing rather than skipping the browser checks.
+# Nothing is built or deployed here; GitHub Pages serves main as it is.
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      KEYPATH_CHROME: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Browser for the end-to-end checks
+        run: |
+          test -x "$KEYPATH_CHROME" || { echo "no Chrome at $KEYPATH_CHROME"; exit 1; }
+          "$KEYPATH_CHROME" --version
+      - run: npm test
