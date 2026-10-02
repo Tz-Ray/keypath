@@ -16,7 +16,7 @@ Work out the keyboard, read the keys, and pick the words that make sense. All ke
 | 9 | Medium | One Handover | The keyboard of #1 has a twin in Taipei. One passed the message to the other, once. The line comes from a hillside town nearby, and each keyboard typed one of its doubled words. The answer uses the standard Traditional forms of its characters, not their variants. | Two keyboards | [`challenge-09/`](challenge-09/) |
 | 10 | Hard | Metal and Orchids | 易經. The second line was typed in a hurry. Two lines, eight characters each. | Two keyboards | [`challenge-10/`](challenge-10/) |
 | 11 | Expert | Digits, Three Ways | Greek first. Then three keyboards on which a digit means three different things. An English message: most of it went through Greek, and each of its last three words through a keyboard of its own. | Four keyboards | [`challenge-11/`](challenge-11/) |
-| 12 | Meta | The Key You Carried | This one came without a key. You have been carrying it: one number from each of #7 to #11, in order. Five characters, two keys each, on a keyboard of #10. | One keyboard | [`challenge-12/`](challenge-12/) |
+| 12 | Meta | The Key You Carried | This one came without a key. You have been carrying it: one number from each of #7 to #11, in order. Five characters, two keys each, on a keyboard of #10. The numbers count from 0, as the workbench numbers its lists. | One keyboard | [`challenge-12/`](challenge-12/) |
 
 Each folder holds the puzzle's `ciphertext.txt` and, as **spoilers**, the author's
 `key.json`, the `plaintext.txt` and `solve-path.md`, the setter's way to crack it.

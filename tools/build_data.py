@@ -245,8 +245,9 @@ CHALLENGE_COPY = {
     6: ("Expert", "Each in Its Own Way", "…несчастлива по-своему.", "Four keyboards"),
     # pack II (KeyPath 2.6): each blurb is the key's hint and the README's
     # framing (9's also its line on the standard Traditional forms, since
-    # two variants type the same keys); the three hints of each come from
-    # its hints.json
+    # two variants type the same keys; 12's also how its numbers count, as
+    # the workbench does, since the walk figure counts from 1); the three
+    # hints of each come from its hints.json
     7: ("Easy", "Every Key a Shape",
         "日月金木水火土. Seven characters; every letter on this keyboard stands for a shape.", "One keyboard"),
     8: ("Medium", "A Question from Hanoi",
@@ -265,7 +266,8 @@ CHALLENGE_COPY = {
          "Four keyboards"),
     12: ("Meta", "The Key You Carried",
          "This one came without a key. You have been carrying it: one number from each of #7 to #11, in order. "
-         "Five characters, two keys each, on a keyboard of #10.", "One keyboard"),
+         "Five characters, two keys each, on a keyboard of #10. The numbers count from 0, as the workbench "
+         "numbers its lists.", "One keyboard"),
 }
 # challenges with hints.json (pack II): its hints, revealed one per click,
 # each in a file of its own so that none is fetched before it is asked for

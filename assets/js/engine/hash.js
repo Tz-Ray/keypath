@@ -1,4 +1,8 @@
-// Answer checking without storing answers: SHA-256 of two normalizations.
+// Answer checking by SHA-256 digests of two normalizations: the checker
+// needs no answer text, so the page never loads an answer to check a guess.
+// The answers are not secret: each challenge's is published as a labelled
+// spoiler (puzzles/challenge-NN/plaintext.txt), and a short answer can be
+// found from its digest by trying guesses.
 //   norm(s) = NFC, lowercase, keep only letters, marks and numbers
 //   fold(s) = norm(s), NFD, drop nonspacing marks, NFC
 // tools/build_data.py computes the same with Python's unicodedata.
