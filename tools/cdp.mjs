@@ -8,7 +8,7 @@
 //
 // Screenshots use the Noto CJK fonts in tools/.cache/ when present (see
 // tools/build_fonts.py), so machines without CJK fonts show real glyphs.
-import { readFileSync, mkdirSync, existsSync, mkdtempSync } from "node:fs";
+import { readFileSync, mkdirSync, existsSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { gunzipSync } from "node:zlib";
@@ -984,6 +984,25 @@ await attempt("tampered keys", async () => {
   await b.evaluate(`(() => { ${q("#dec-cipher")}.value = ${js(hero.ciphertext)}; ${q("#dec-key")}.value = ${js(hero.keyText)}; ${q("#dec-go")}.click(); })()`);
   await b.waitFor(`!${q("#dec-out")}.hidden`);
   check("decode: the hero key walks back", await b.evaluate(`${q("#dec-text")}.textContent === ${js(hero.text)}`));
+  // "Open key.json": a key file fills the key box; a file over 1 MiB is refused unread
+  const files = mkdtempSync(join(tmpdir(), "kp-files-"));
+  writeFileSync(join(files, "key.json"), hero.keyText);
+  writeFileSync(join(files, "big.json"), " ".repeat(1024 * 1024 + 1));
+  const pick = async name => {
+    const { root } = await b.send("DOM.getDocument", { depth: 0 });
+    const { nodeId } = await b.send("DOM.querySelector", { nodeId: root.nodeId, selector: "#dec-file" });
+    await b.send("DOM.setFileInputFiles", { nodeId, files: [join(files, name)] });
+  };
+  await b.evaluate(`${q("#dec-key")}.value = ""`);
+  await pick("key.json");
+  let opened = false;
+  try { await b.waitFor(`${q("#dec-key")}.value === ${js(hero.keyText)}`); opened = true; } catch { opened = false; }
+  check("open key.json: a key file fills the key box", opened);
+  await pick("big.json");
+  await b.waitFor(`!${q("#dec-err")}.hidden`);
+  check("open key.json: a file over 1 MiB is refused unread, with a clear message", await b.evaluate(`${q("#dec-key")}.value === ${js(hero.keyText)}
+    && ${q("#dec-err .err-msg")}.textContent.startsWith("That file is too large to be a key (over 1 MB)")`), await b.evaluate(`${q("#dec-err")}.textContent`));
+  rmSync(files, { recursive: true, force: true });
   // common paste mistakes: the same refusal, one plain advice line, and the engine's words folded away
   const short = await b.evaluate(`window.__keypath.engine.kp1Pack(${js(hero.keyText)}).text`);
   const T = (await import("../assets/js/ui/text.js")).T;

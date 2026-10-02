@@ -10,6 +10,12 @@ import { closePopover } from "./popover.js";
 import { plainMessage, pasteAdvice, decodedRuns } from "./decodehelp.js";
 
 const DEBOUNCE = 150;
+/**
+ * The largest key file "Open key.json" reads: 1 MiB, some 25 times the
+ * largest key the page's own encoder makes (about 42 KB, for 200
+ * characters); a larger file is refused unread.
+ */
+export const KEY_FILE_MAX = 1024 * 1024;
 
 export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }) {
   const registry = engine.registry;
@@ -347,8 +353,14 @@ export function initPlayground({ engine, legends, getEngine, dumpsKeyWithSpans }
   el.decFile.addEventListener("change", async () => {
     const f = el.decFile.files && el.decFile.files[0];
     if (!f) return;
-    el.decKey.value = await f.text();
     el.decFile.value = "";
+    if (f.size > KEY_FILE_MAX) return decError(T.keyFileTooBig);
+    try {
+      el.decKey.value = await f.text();
+      el.decErr.hidden = true;
+    } catch {
+      decError(T.keyFileUnread);
+    }
   });
   let decFig = null;
   let decSeq = 0;

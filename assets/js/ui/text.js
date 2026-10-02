@@ -95,6 +95,8 @@ export const T = {
   walkedBackOther: ["Walked back: “", "”."],
   lookingUp: "Looking up…",
   needKey: "Paste the key (and its ciphertext).",
+  keyFileTooBig: "That file is too large to be a key (over 1 MB); a key file is a few kilobytes. Pick the key file, or paste the key.",
+  keyFileUnread: "That file couldn't be read. Try again, or paste the key.",
   // advice under a refused walk, for common paste mistakes (decodehelp.js)
   adviceQuoted: "The key is wrapped in quotation marks. Paste it without them.",
   adviceSwapped: "The ciphertext and the key look swapped: the ciphertext goes in the first box, its key (JSON, or one line starting kp1.) in the second.",
